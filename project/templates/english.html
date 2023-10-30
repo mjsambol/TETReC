@@ -39,6 +39,9 @@
                 params = window.location.search;
                 if (params != null) {
                     draft_id = params.substring(4);
+                    if (draft_id==null || draft_id=="") {
+                        draft_id = "{{draft_timestamp}}";
+                    }
                     $.ajax({
                         url: "/deleteDraft?dt="+draft_id,
                         type: 'GET',
@@ -60,79 +63,21 @@
                     </textarea>
                 </td>
                 <td width="58%" valign="top" id="translation_panel">
-                    <textarea id="translated_text" rows="50" style="width:100%; font-size:14px;">
+                    <textarea id="translated_text" rows="50" style="width:100%; font-size:14px;" spellcheck="true">
 📻 *Israel News Highlights*
 *{{date_info.part_of_day}} Edition, {{date_info.day_of_week}}, {{date_info.hebrew_dom}} {{date_info.hebrew_month}}, {{date_info.hebrew_year}}, {{date_info.secular_month}} {{date_info.secular_dom}}*
                     
   •   •   •
                     
 &#128204; *Swords of Iron - Day {{date_info.day_of_war}}*                 
-                    
-{% if 'SOUTH' in organized %}
-* *Southern Front:*
-{% for line in organized['SOUTH'] %}
-{{ line }}
+         
+{% for section in sections %}
+{% if section in organized and organized[section] | length > 0 %}
+{% if section in ['SOUTH','NORTH','YandS']%}*{%else%}📌{%endif%} *{{sections[section]}}:*
+{% for line in organized[section] %}
+{{line}}
 {% endfor %}{% endif %}
-{% if 'NORTH' in organized %}
-* *Northern Front:*
-{% for line in organized['NORTH'] %}
-{{ line }}
-{% endfor %}{% endif %}
-{% if 'YandS' in organized %}
-* *Yehuda and Shomron:*
-{% for line in organized['YandS'] %}
-{{ line }}
-{% endfor %}{% endif %}
-{% if 'Civilian' in organized %}
-* *Civilian Front:*
-{% for line in organized['Civilian'] %}
-{{ line }}
-{% endfor %}{% endif %}
-{% if 'PandP' in organized %}
-* *Policy and Politics:*
-{% for line in organized['PandP'] %}
-{{ line }}
-{% endfor %}{% endif %}
-{% if 'WorldEyes' in organized %}
-* *In the Eyes of the World:*
-{% for line in organized['Civilian'] %}
-{{ line }}
-{% endfor %}{% endif %}
-{% if 'InIsrael' in organized %}
-&#128204; *Israel Local News:*
-{% for line in organized['InIsrael'] %}
-{{ line }}
-{% endfor %}{% endif %}
-{% if 'Worldwide' in organized %}
-&#128204; *World News:*
-{% for line in organized['Worldwide'] %}
-{{ line }}
-{% endfor %}{% endif %}
-{% if 'Economy' in organized %}
-&#128204; *Economy:*
-{% for line in organized['Economy'] %}
-{{ line }}
-{% endfor %}{% endif %}
-{% if 'Weather' in organized %}
-&#128204; *Sports:*
-{% for line in organized['Sports'] %}
-{{ line }}
-{% endfor %}{% endif %}
-{% if 'Weather' in organized %}
-&#128204; *Weather:*
-{% for line in organized['Weather'] %}
-{{ line }}
-{% endfor %}{% endif %}
-{% if 'FinishWell' in organized %}
-&#128204; *On a Positive Note:*
-{% for line in organized['FinishWell'] %}
-{{ line }}
-{% endfor %}{% endif %}
-{% if organized['UNKNOWN'] | length > 0 %}
-&#128204; *UNKNOWN:*
-{% for line in organized['UNKNOWN'] %}
-{{ line }}
-{% endfor %}{% endif %}
+{% endfor %}
 
  •   •   •
 

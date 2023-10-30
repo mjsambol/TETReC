@@ -2,6 +2,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from collections import defaultdict
 import re
+import os
 from flask import Blueprint, render_template, request
 #from flask_login import login_required, current_user
 from google.cloud import translate, datastore
@@ -11,6 +12,21 @@ from markupsafe import Markup
 
 PROJECT_ID = "tamtzit-hadashot"
 PARENT = f"projects/{PROJECT_ID}"
+
+sections = {"SOUTH":"Southern Front", 
+            "NORTH":"Northern Front", 
+            "YandS":"Yehuda and Shomron",
+            "Civilian":"Civilian Front", 
+            "PandP":"Policy, Law and Politics",
+            "WorldEyes":"In the Eyes of the World", 
+            "InIsrael":"Israel Local News",
+            "Worldwide":"World News",
+            "Economy":"Economy",
+            "Sports":"Sports",
+            "Weather":"Weather",
+            "FinishWell":"On a Positive Note",
+            "UNKNOWN":"UNKNOWN"
+            }
 
 client = translate.TranslationServiceClient()
 
@@ -31,17 +47,18 @@ client = translate.TranslationServiceClient()
 
 def translate_text(text: str, target_language_code: str, source_language='he') -> translate.Translation:
     client = translate.TranslationServiceClient()
-
     response = client.translate_text(
         parent=PARENT,
         contents=[text],
         source_language_code=source_language,  # optional, can't hurt
         target_language_code=target_language_code,
+        mime_type='text/plain' # HTML is assumed!
     )
-
+    # print(f"DEBUG: translation result has {len(response.translations)} translations")
+    # if len(response.translations) > 1:
+    #     print("DEBUG: the second one is:")
+    #     print(response.translations[1].translated_text)
     return response.translations[0].translated_text
-
-# print_supported_languages('he')
 
 
 datastore_client = datastore.Client()
@@ -49,10 +66,11 @@ datastore_client = datastore.Client()
 def store_draft(heb_text):
     entity = datastore.Entity(key=datastore_client.key("draft"), exclude_from_indexes=["hebrew_text"])
     entity.update({"hebrew_text": heb_text})
-    entity.update({"timestamp": datetime.now(tz=ZoneInfo('Asia/Jerusalem'))})
+    draft_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
+    entity.update({"timestamp": draft_timestamp})
 
     datastore_client.put(entity)
-
+    return draft_timestamp
 
 def fetch_drafts():
     query = datastore_client.query(kind="draft")
@@ -120,38 +138,46 @@ def process():
         return "Input field was missing."
     
     # store the draft in DB so that someone else can continue the translation work
-    store_draft(heb_text)
+    draft_timestamp = store_draft(heb_text)
 
     info = process_translation_request(heb_text)
-    rendered = render_template('english.html', **info)
+    rendered = render_template('english.html', **info, draft_timestamp=draft_timestamp.strftime('%Y%m%d-%H%M%S'))
     return re.sub('\n{3,}', '\n\n', rendered)
 
 
 def process_translation_request(heb_text):
-    heb_lines = heb_text.split("\n")
-    # strip the first few lines if necessary, they're causing some problem...
-    for i in range(5):
-        if "תמצית החדשות" in heb_lines[i]:
-            heb_lines.pop(i)
-            break
-    for i in range(5):
-        if "מהדורת " in heb_lines[i]:
-            heb_lines.pop(i)
-            break
+    # heb_lines = heb_text.split("\n")
 
-    heb_text_marked = "12345: ".join(heb_lines)
-    translated = translate_text(heb_text_marked, 'en')
-    # this is a weird bug...
-    translated = translated.replace("12345 : ", "12345: ")
-    translated_lines = translated.split('12345: ')
-    translated = Markup(translated.replace('12345: ', '\n<br>'))
+    if os.getenv("FLASK_DEBUG") == "1":
+        print(f"DEBUG: RAW HEBREW:--------\n{heb_text}")
+        print(f"DEBUG--------------------------")
+        # print(f"Split hebrew has {len(heb_lines)} lines")
+
+    # strip the first few lines if necessary, they're causing some problem...
+    # for i in range(5):
+    #     if "תמצית החדשות" in heb_lines[i]:
+    #         print("popping a tamtzit" + heb_lines[i])
+    #         heb_lines.pop(i)
+    #         break
+    # for i in range(5):
+    #     if "מהדורת " in heb_lines[i]:
+    #         print("popping a mehadura: " + heb_lines[i])
+    #         heb_lines.pop(i)
+    #         break
+
+    translated = translate_text(heb_text, 'en')
+    if os.getenv("FLASK_DEBUG") == "1":
+        print(f"DEBUG: RAW TRANSLATION:--------\n{translated}")
+        print(f"DEBUG--------------------------")
+
     heb_text = Markup(heb_text) #.replace("\n", "<br>"))
+    translated_lines = translated.split("\n")
 
     section = None
     organized = defaultdict(list)
     for line in translated_lines:
         line = line.strip()
-        line = line.replace("12345: ", '')
+        # print(f"DEBUG {len(line)}: {line}")
         if len(line) == 0:
             continue
         if "📻" in line:
@@ -169,24 +195,24 @@ def process_translation_request(heb_text):
         if line.lower().startswith("📌 war of iron swords"):
             continue
         if line.startswith("• "):
-            if "southern arena" in line.lower() or "arena southern" in line.lower():
+            if "southern " in line.lower():
                 section = organized['SOUTH']
-            elif "northern arena" in line.lower() or "arena northern" in line.lower():
+            elif "northern " in line.lower():
                 section = organized['NORTH']
             elif "judea and samaria" in line.lower():
                 section = organized['YandS']
-            elif "policy and politics" in line.lower():
+            elif "policy" in line.lower() and "politics" in line.lower():
                 section = organized['PandP']
             elif "in the world" in line.lower():
                 section = organized["Worldwide"]
             elif section is not None:
                 section.append(Markup(line.replace("• ", "> ")))
         elif line.startswith("📌"):
-            if line.lower().endswith("happening in israel:"):
+            if "happening in israel" in line.lower():
                 section = organized['InIsrael']
             elif "world" in line.lower():
                 section = organized["Worldwide"]
-            elif "policy and " in line.lower():
+            elif "policy" in line.lower() and "politics" in line.lower():
                 section = organized['PandP']
             elif "weather" in line.lower():
                 section = organized['Weather']
@@ -198,12 +224,15 @@ def process_translation_request(heb_text):
                 section = organized['FinishWell']
             else:
                 section = organized['UNKNOWN']
+                if os.getenv("FLASK_DEBUG") == "1":
+                    print("Adding to unknown: " + line)
                 section.append(Markup(line))    
         else:
             if section is None:
                 section = organized['UNKNOWN']
+                if os.getenv("FLASK_DEBUG") == "1":
+                    print("Adding to unknown (b): " + line)
             section.append(Markup(line))
-#            section.append(Markup("<br><br>"))
    
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
     oct6 = datetime(2023,10,6,tzinfo=ZoneInfo('Asia/Jerusalem'))
@@ -218,7 +247,7 @@ def process_translation_request(heb_text):
                          dt.strftime('%B'), dt.day, (dt - oct6).days)
 
     result = {'heb_text': heb_text, 'translated': translated, 'translated_lines': translated_lines, 
-              'organized': organized, 'date_info': date_info}
+              'organized': organized, 'date_info': date_info, 'sections': sections}
     return result
 
 

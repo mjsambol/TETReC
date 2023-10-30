@@ -1,0 +1,27 @@
+<html>
+    <head>
+        <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
+    </head>    
+    <body>
+        <form method="POST" action="/translate">
+            <table border="0">
+                <tr>
+                    <td>
+                        Enter the original Hebrew post below.<br>
+                        The header and footer are <b>not necessary</b>, they will be ignored and replaced.            
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <textarea name="orig_text" rows="50" cols="80" dir="rtl"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="right">
+                        <input type="submit" style="font-size: 20px; padding:8px 8px">
+                    </td>
+                </tr>
+            </table>
+        </form>        
+    </body>
+</html>

@@ -1,0 +1,158 @@
+<html>
+    <head>
+        <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
+        <script>
+            function makeWhatsappPreview(input) {
+                result = input.replaceAll("\n", "<br>");
+                result = result.replaceAll(/\*(\S.+?)\*/g,"<b>$1</b>");
+                return result;
+            }
+
+            function showPreview() {
+//                document.getElementById("orig_heb_panel").style.width="1%";
+                document.getElementById("orig_heb_panel").style.display="none";
+                document.getElementById("translation_panel").style.width="48%";
+                document.getElementById("preview_panel").style.width="50%";
+                document.getElementById("preview_panel").style.display="initial";
+                document.getElementById("preview_panel").innerHTML=makeWhatsappPreview(document.getElementById("translated_text").value);
+                document.getElementById("preview_button").textContent="Hide Preview";
+                document.getElementById("preview_button").setAttribute("onclick","javascript: hidePreview();");
+            }
+
+            function hidePreview() {
+//                document.getElementById("preview_panel").style.width="1%";
+                document.getElementById("preview_panel").style.display="none";
+                document.getElementById("preview_panel").innerHTML="";
+                document.getElementById("orig_heb_panel").style.width="40%";
+                document.getElementById("orig_heb_panel").style.display="initial";
+                document.getElementById("translation_panel").style.width="58%";
+                document.getElementById("preview_button").textContent="Preview";
+                document.getElementById("preview_button").setAttribute("onclick","javascript: showPreview();");
+            }
+
+        </script>        
+    </head>
+
+    <body>
+        <table width="100%" border="0" cellspacing="10">
+            <tr>
+                <td width="40%" valign="top" id="orig_heb_panel">
+                    <textarea rows="40" style="width:100%; font-size:17px;" dir="rtl">
+                    {{heb_text}}
+                    </textarea>
+                </td>
+                <td width="58%" valign="top" id="translation_panel">
+                    <textarea id="translated_text" rows="50" style="width:100%; font-size:14px;">
+📻 *Israel News Highlights*
+*{{date_info.part_of_day}} Edition, {{date_info.day_of_week}}, {{date_info.hebrew_dom}} {{date_info.hebrew_month}}, {{date_info.hebrew_year}}, {{date_info.secular_month}} {{date_info.secular_dom}}*
+                    
+  •   •   •
+                    
+&#128204; *Swords of Iron - Day {{date_info.day_of_war}}*                 
+                    
+{% if 'SOUTH' in organized %}
+* *Southern Front:*
+{% for line in organized['SOUTH'] %}
+{{ line }}
+{% endfor %}{% endif %}
+{% if 'NORTH' in organized %}
+* *Northern Front:*
+{% for line in organized['NORTH'] %}
+{{ line }}
+{% endfor %}{% endif %}
+{% if 'YandS' in organized %}
+* *Yehuda and Shomron:*
+{% for line in organized['YandS'] %}
+{{ line }}
+{% endfor %}{% endif %}
+{% if 'Civilian' in organized %}
+* *Civilian Front:*
+{% for line in organized['Civilian'] %}
+{{ line }}
+{% endfor %}{% endif %}
+{% if 'PandP' in organized %}
+* *Policy and Politics:*
+{% for line in organized['PandP'] %}
+{{ line }}
+{% endfor %}{% endif %}
+{% if 'WorldEyes' in organized %}
+* *In the Eyes of the World:*
+{% for line in organized['Civilian'] %}
+{{ line }}
+{% endfor %}{% endif %}
+{% if 'InIsrael' in organized %}
+&#128204; *Israel Local News:*
+{% for line in organized['InIsrael'] %}
+{{ line }}
+{% endfor %}{% endif %}
+{% if 'Worldwide' in organized %}
+&#128204; *World News:*
+{% for line in organized['Worldwide'] %}
+{{ line }}
+{% endfor %}{% endif %}
+{% if 'Economy' in organized %}
+&#128204; *Economy:*
+{% for line in organized['Economy'] %}
+{{ line }}
+{% endfor %}{% endif %}
+{% if 'Weather' in organized %}
+&#128204; *Sports:*
+{% for line in organized['Sports'] %}
+{{ line }}
+{% endfor %}{% endif %}
+{% if 'Weather' in organized %}
+&#128204; *Weather:*
+{% for line in organized['Weather'] %}
+{{ line }}
+{% endfor %}{% endif %}
+{% if 'FinishWell' in organized %}
+&#128204; *On a Positive Note:*
+{% for line in organized['FinishWell'] %}
+{{ line }}
+{% endfor %}{% endif %}
+{% if organized['UNKNOWN'] | length > 0 %}
+&#128204; *UNKNOWN:*
+{% for line in organized['UNKNOWN'] %}
+{{ line }}
+{% endfor %}{% endif %}
+
+ •   •   •
+
+To donate and support our News in Brief initiatives:
+https://www.charidy.com/lokchim
+
+ •   •   •
+
+ That’s all for Israel News Highlights this {{date_info.part_of_day}}.
+From Lokhim Ahrayut
+To join the news group: 👇
+https://link.mmb.org.il/INH_NEWS
+
+</textarea>            
+<br><br>
+<table width="100%" border="0">
+    <tr>
+        <td></td>
+        <td align="center"><button id="preview_button" style="font-size: 20px; padding:8px 8px" onclick="showPreview();">Preview</td>
+        <td align="right"><button style="font-size: 20px; padding:8px 8px" onclick="navigator.clipboard.writeText(document.getElementById('translated_text').value);">Copy to Clipboard</button></td>
+
+    </tr>
+</table>
+
+                </td>
+            <td width="1%" valign="top" id="preview_panel">
+
+            </td>
+            </tr>
+    </table>
+
+        <!--
+<br><br><br><br><br><br>
+<br>------RAW GOOGLE TRANSLATION--------------------<br>
+
+{{translated}}
+<br>------------------------------------------------<br>
+{{translated_lines}}
+-->
+    </body>
+</html>

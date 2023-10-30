@@ -10,16 +10,29 @@
                         Enter the original Hebrew post below.<br>
                         The header and footer are <b>not necessary</b>, they will be ignored and replaced.            
                     </td>
+                    <td width="10"></td>
+                    <td>Alternatively, if a draft is available,<br>
+                        You can select it below. </td>
                 </tr>
                 <tr>
                     <td>
                         <textarea name="orig_text" rows="50" cols="80" dir="rtl"></textarea>
+                    </td>
+                    <td width="10"></td>
+                    <td valign="top">
+                        <br>
+                        {% for draft in drafts %}
+                             <a href="/draft?ts={{ draft['timestamp'].strftime('%Y%m%d-%H%M%S') }}">{{ draft['timestamp'].strftime('%Y.%m.%d-%H:%M:%S') }}</a>
+                             <br><br>
+                        {% endfor %}
                     </td>
                 </tr>
                 <tr>
                     <td align="right">
                         <input type="submit" style="font-size: 20px; padding:8px 8px">
                     </td>
+                    <td width="10"></td>
+                    <td> </td>
                 </tr>
             </table>
         </form>        

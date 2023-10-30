@@ -1,6 +1,7 @@
 <html>
     <head>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
         <script>
             function makeWhatsappPreview(input) {
                 result = input.replaceAll("\n", "<br>");
@@ -30,6 +31,23 @@
                 document.getElementById("preview_button").setAttribute("onclick","javascript: showPreview();");
             }
 
+            function copyToClipboard() {
+                navigator.clipboard.writeText(document.getElementById('translated_text').value);
+            }
+
+            function deleteDraft(dt) {
+                params = window.location.search;
+                if (params != null) {
+                    draft_id = params.substring(4);
+                    $.ajax({
+                        url: "/deleteDraft?dt="+draft_id,
+                        type: 'GET',
+                        success: function(res) {
+                            console.log(res);
+                        }
+                    });                                    
+                }
+            }
         </script>        
     </head>
 
@@ -132,9 +150,10 @@ https://link.mmb.org.il/INH_NEWS
 <br><br>
 <table width="100%" border="0">
     <tr>
-        <td></td>
-        <td align="center"><button id="preview_button" style="font-size: 20px; padding:8px 8px" onclick="showPreview();">Preview</td>
-        <td align="right"><button style="font-size: 20px; padding:8px 8px" onclick="navigator.clipboard.writeText(document.getElementById('translated_text').value);">Copy to Clipboard</button></td>
+        <td><button id="restart_button" style="font-size: 20px; padding:8px 8px" onclick="window.location='/'">Start Again</button></td>
+        <td align="center"><button id="preview_button" style="font-size: 20px; padding:8px 8px" onclick="showPreview();">Preview</button></td>
+        <td align="right"><button style="font-size: 20px; padding:8px 8px" onclick="copyToClipboard();deleteDraft();">Copy to Clipboard</button>
+        (<i>and remove draft</i>)</td>
 
     </tr>
 </table>

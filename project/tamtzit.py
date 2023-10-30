@@ -4,7 +4,7 @@ from collections import defaultdict
 import re
 from flask import Blueprint, render_template, request
 #from flask_login import login_required, current_user
-from google.cloud import translate
+from google.cloud import translate, datastore
 from dataclasses import dataclass
 from pyluach import dates
 from markupsafe import Markup
@@ -43,6 +43,26 @@ def translate_text(text: str, target_language_code: str, source_language='he') -
 
 # print_supported_languages('he')
 
+
+datastore_client = datastore.Client()
+
+def store_draft(heb_text):
+    entity = datastore.Entity(key=datastore_client.key("draft"), exclude_from_indexes=["hebrew_text"])
+    entity.update({"hebrew_text": heb_text})
+    entity.update({"timestamp": datetime.now(tz=ZoneInfo('Asia/Jerusalem'))})
+
+    datastore_client.put(entity)
+
+
+def fetch_drafts():
+    query = datastore_client.query(kind="draft")
+    query.order = ["-timestamp"]
+
+    drafts = query.fetch()
+
+    return drafts
+
+
 @dataclass
 class DateInfo():
     part_of_day: str
@@ -58,8 +78,40 @@ tamtzit = Blueprint('tamtzit', __name__)
 
 @tamtzit.route('/')
 def index():
-    return render_template('input.html')
+    drafts = fetch_drafts()
+    # for draft in drafts:
+    #     print(f"draft: {draft}")
+    #     ts = draft['timestamp']
+    #     print(ts.strftime('%m%d%Y-%H%M%S'))        
+    return render_template('input.html', drafts=drafts)
 
+
+@tamtzit.route("/draft", methods=['GET'])
+def continue_draft():
+    draft_timestamp = request.args.get('ts')
+    drafts = fetch_drafts()
+    for draft in drafts:
+        ts = draft['timestamp']
+        if ts.strftime('%Y%m%d-%H%M%S') == draft_timestamp:
+            heb_text = draft['hebrew_text']
+            info = process_translation_request(heb_text)
+            rendered = render_template('english.html', **info)
+            return re.sub('\n{3,}', '\n\n', rendered)
+        
+    return "Draft not found, please start again."
+
+
+@tamtzit.route("/deleteDraft", methods=['GET'])
+def delete_draft():
+    draft_timestamp = request.args.get('dt')
+    drafts = fetch_drafts()
+    for draft in drafts:
+        ts = draft['timestamp']
+        if ts.strftime('%Y%m%d-%H%M%S') == draft_timestamp:
+            datastore_client.delete(draft.key)
+            return "OK"
+    return "Not found"
+            
 
 @tamtzit.route('/translate', methods=['POST'])
 def process():
@@ -67,6 +119,15 @@ def process():
     if not heb_text:
         return "Input field was missing."
     
+    # store the draft in DB so that someone else can continue the translation work
+    store_draft(heb_text)
+
+    info = process_translation_request(heb_text)
+    rendered = render_template('english.html', **info)
+    return re.sub('\n{3,}', '\n\n', rendered)
+
+
+def process_translation_request(heb_text):
     heb_lines = heb_text.split("\n")
     # strip the first few lines if necessary, they're causing some problem...
     for i in range(5):
@@ -155,10 +216,10 @@ def process():
 
     date_info = DateInfo(dt_edition, dt.strftime('%A'), heb_dt.day, heb_dt.month_name(), heb_dt.year, 
                          dt.strftime('%B'), dt.day, (dt - oct6).days)
-    rendered = render_template('english.html', date_info=date_info, 
-                           translated=translated, heb_len = len(heb_lines),
-                           heb_text=heb_text, organized=organized, translated_lines=translated_lines)
-    return re.sub('\n{3,}', '\n\n', rendered)
+
+    result = {'heb_text': heb_text, 'translated': translated, 'translated_lines': translated_lines, 
+              'organized': organized, 'date_info': date_info}
+    return result
 
 
 if __name__ == '__main__':

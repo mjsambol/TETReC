@@ -46,19 +46,30 @@ client = translate.TranslationServiceClient()
 #         print(f"{language_code:10}{display_name}")
 
 def translate_text(text: str, target_language_code: str, source_language='he') -> translate.Translation:
+    # for reasons I don't understand, we regularly lose the last paragraph of text
+    # perhaps it's just too long. Let's try breaking it up.
+
+    break_point = text.index("📌", text.index("📌"))
+    first_section = text[0:break_point]
+    second_section = text[break_point:]
+
     client = translate.TranslationServiceClient()
-    response = client.translate_text(
-        parent=PARENT,
-        contents=[text],
-        source_language_code=source_language,  # optional, can't hurt
-        target_language_code=target_language_code,
-        mime_type='text/plain' # HTML is assumed!
-    )
+
+    result = ""
+    for section in [first_section, second_section]:
+        response = client.translate_text(
+            parent=PARENT,
+            contents=[section],
+            source_language_code=source_language,  # optional, can't hurt
+            target_language_code=target_language_code,
+            mime_type='text/plain' # HTML is assumed!
+        )
+        result += response.translations[0].translated_text
     # print(f"DEBUG: translation result has {len(response.translations)} translations")
     # if len(response.translations) > 1:
     #     print("DEBUG: the second one is:")
     #     print(response.translations[1].translated_text)
-    return response.translations[0].translated_text
+    return result
 
 
 datastore_client = datastore.Client()
@@ -144,13 +155,16 @@ def process():
     rendered = render_template('english.html', **info, draft_timestamp=draft_timestamp.strftime('%Y%m%d-%H%M%S'))
     return re.sub('\n{3,}', '\n\n', rendered)
 
+def debug(stuff):
+    if os.getenv("FLASK_DEBUG") == "1":
+        print("DEBUG: " + stuff)
+
 
 def process_translation_request(heb_text):
     # heb_lines = heb_text.split("\n")
 
-    if os.getenv("FLASK_DEBUG") == "1":
-        print(f"DEBUG: RAW HEBREW:--------\n{heb_text}")
-        print(f"DEBUG--------------------------")
+    debug(f"RAW HEBREW:--------\n{heb_text}")
+    debug(f"--------------------------")
         # print(f"Split hebrew has {len(heb_lines)} lines")
 
     # strip the first few lines if necessary, they're causing some problem...
@@ -166,9 +180,8 @@ def process_translation_request(heb_text):
     #         break
 
     translated = translate_text(heb_text, 'en')
-    if os.getenv("FLASK_DEBUG") == "1":
-        print(f"DEBUG: RAW TRANSLATION:--------\n{translated}")
-        print(f"DEBUG--------------------------")
+    debug(f"RAW TRANSLATION:--------\n{translated}")
+    debug(f"--------------------------")
 
     heb_text = Markup(heb_text) #.replace("\n", "<br>"))
     translated_lines = translated.split("\n")
@@ -177,62 +190,86 @@ def process_translation_request(heb_text):
     organized = defaultdict(list)
     for line in translated_lines:
         line = line.strip()
-        # print(f"DEBUG {len(line)}: {line}")
+        debug(f"{len(line)}: {line}")
         if len(line) == 0:
+            debug("skipping a blank line")
             continue
         if "📻" in line:
+            debug("skipping radio icon line")
             continue
         if "• • •" in line:
+            debug("Found three dot line")
             if "NORTH" in organized or "SOUTH" in organized:
+                debug("post three dots, skipping")
                 # we've processed the main body and moved to a section at the bottom 
                 # which should be ignored
                 break
             else:
+                debug("post three dots, switching to 'unknown'")
                 section = organized['UNKNOWN']
                 continue
         if section is None and "edition" in line.lower() and '202' in line.lower():
+            debug("skipping what looks like the intro edition line")
             continue
         if line.lower().startswith("📌 war of iron swords"):
+            debug("skipping what looks like the intro pin line")
             continue
         if line.startswith("• "):
-            if "southern " in line.lower():
+            debug("bullet line...")
+            if "southern " in line.lower() and 'SOUTH' not in organized:
+                debug("starting south section")
                 section = organized['SOUTH']
-            elif "northern " in line.lower():
+            elif "northern " in line.lower() and 'NORTH' not in organized:
+                debug("starting north section")
                 section = organized['NORTH']
-            elif "judea and samaria" in line.lower():
+            elif "judea and samaria" in line.lower() and 'YandS' not in organized:
+                debug("starting J&S section")
                 section = organized['YandS']
-            elif "policy" in line.lower() and "politics" in line.lower():
+            elif "policy" in line.lower() and "politics" in line.lower() and 'PandP' not in organized:
+                debug("starting policy section")
                 section = organized['PandP']
-            elif "in the world" in line.lower():
+            elif "in the world" in line.lower() and "Worldwide" not in organized:
+                debug("starting world section")
                 section = organized["Worldwide"]
             elif section is not None:
+                debug("inside a section, switching to arrows")
                 section.append(Markup(line.replace("• ", "> ")))
         elif line.startswith("📌"):
-            if "happening in israel" in line.lower():
+            debug("pin line...")
+            if "in israel" in line.lower():
+                debug("starting inIsrael section")
                 section = organized['InIsrael']
             elif "world" in line.lower():
+                debug("staerting world section")
                 section = organized["Worldwide"]
             elif "policy" in line.lower() and "politics" in line.lower():
+                debug("starting policy section")
                 section = organized['PandP']
             elif "weather" in line.lower():
+                debug("Starting weather section")
                 section = organized['Weather']
             elif "economy" in line.lower():
+                debug("Starting economy section")
                 section = organized["Economy"]
             elif "sport" in line.lower():
+                debug("Starting sports section")
                 section = organized["Sports"]
             elif "finish" in line.lower() or "good note" in line.lower() or "end well" in line.lower():
+                debug("Starting good news section")
                 section = organized['FinishWell']
             else:
                 section = organized['UNKNOWN']
-                if os.getenv("FLASK_DEBUG") == "1":
-                    print("Adding to unknown: " + line)
+                debug("Adding to unknown: " + line)
                 section.append(Markup(line))    
         else:
+            debug("regular text line")
             if section is None:
                 section = organized['UNKNOWN']
-                if os.getenv("FLASK_DEBUG") == "1":
-                    print("Adding to unknown (b): " + line)
+                debug("Adding to unknown (b): " + line)
+
             section.append(Markup(line))
+            if section == organized['UNKNOWN']:
+                debug("Adding to unknown (c):" + line)
    
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
     oct6 = datetime(2023,10,6,tzinfo=ZoneInfo('Asia/Jerusalem'))

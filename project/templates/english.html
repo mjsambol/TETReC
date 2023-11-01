@@ -6,6 +6,7 @@
             function makeWhatsappPreview(input) {
                 result = input.replaceAll("\n", "<br>");
                 result = result.replaceAll(/\*(\S.+?)\*/g,"<b>$1</b>");
+                result = result.replaceAll(/(https:\/\/\S+)/g,"<a href=\"$1\">$1</a>");
                 return result;
             }
 
@@ -73,7 +74,7 @@
          
 {% for section in sections %}
 {% if section in organized and organized[section] | length > 0 %}
-{% if section in ['SOUTH','NORTH','YandS']%}*{%else%}📌{%endif%} *{{sections[section]}}:*
+{% if section in ['SOUTH','NORTH','YandS']%}•{%else%}📌{%endif%} *{{sections[section]}}:*
 {% for line in organized[section] %}
 {{line}}
 {% endfor %}{% endif %}
@@ -81,15 +82,19 @@
 
  •   •   •
 
-To donate and support our News in Brief initiatives:
-https://www.charidy.com/lokchim
+ Author:   Translator:  
 
  •   •   •
 
- That’s all for Israel News Highlights this {{date_info.part_of_day}}.
-From Lokhim Ahrayut
+Support the homefront and contribute to help expand the News Highlights initiatives:
+https://www.charidy.com/lokchim 
+
+ •   •   •
+
+That’s all for Israel News Highlights this {{date_info.part_of_day | lower}}.
+From *Lokhim Ahrayut*
 To join the news group: 👇
-https://link.mmb.org.il/INH_NEWS
+https://link.mmb.org.il/INH_NEWS 
 
 </textarea>            
 <br><br>

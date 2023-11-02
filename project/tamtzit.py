@@ -9,7 +9,6 @@ from google.cloud import translate, datastore
 from google.cloud.datastore.key import Key
 from dataclasses import dataclass
 from pyluach import dates
-import pytz
 from markupsafe import Markup
 
 PROJECT_ID = "tamtzit-hadashot"
@@ -124,13 +123,17 @@ def fetch_drafts():
 
     drafts = query.fetch()
 
-    now = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
+    now = datetime.now(tz=ZoneInfo('UTC'))
+    drafts_local_timestamp = {}
+    jlm = ZoneInfo("Asia/Jerusalem")
+
     for draft in drafts:
         ts = draft['timestamp']
+        drafts_local_timestamp[ts] = ts.astimezone(jlm)
         if (now - ts).seconds > DRAFT_TTL:
             datastore_client.delete(draft.key)
-
-    return query.fetch()
+            
+    return query.fetch(), drafts_local_timestamp
 
 def update_draft(draft_key, translated_text):   # can't change the original Hebrew
     draft = datastore_client.get(draft_key)
@@ -153,12 +156,8 @@ tamtzit = Blueprint('tamtzit', __name__)
 
 @tamtzit.route('/')
 def index():
-    drafts = fetch_drafts()
-    # for draft in drafts:
-    #     print(f"draft: {draft}")
-    #     ts = draft['timestamp']
-    #     print(ts.strftime('%m%d%Y-%H%M%S'))        
-    return render_template('input.html', drafts=drafts)  # TODO need the drafts to already be holding a local representation of time
+    drafts, local_tses = fetch_drafts()
+    return render_template('input.html', drafts=drafts, local_timestamps=local_tses)  # TODO need the drafts to already be holding a local representation of time
 
 
 '''
@@ -169,7 +168,7 @@ def index():
 @tamtzit.route("/draft", methods=['GET'])
 def continue_draft():
     draft_timestamp = request.args.get('ts')
-    drafts = fetch_drafts()
+    drafts, _ = fetch_drafts()
     for draft in drafts:
         ts = draft['timestamp']
         if ts.strftime('%Y%m%d-%H%M%S') == draft_timestamp:
@@ -360,9 +359,6 @@ def process_translation_request(heb_text):
     result = {'heb_text': heb_text, 'date_info': date_info, 'organized': organized, 'sections': sections}
     return result
 
-def make_date_info_from_utc(dt):
-    local_representation_of_db_time = pytz.utc.localize(dt).astimezone(pytz.timezone("Asia/Jerusalem"))
-    return make_date_info(local_representation_of_db_time)
 
 def make_date_info(dt):
     oct6 = datetime(2023,10,6,tzinfo=ZoneInfo('Asia/Jerusalem'))

@@ -22,7 +22,7 @@
                     <td valign="top">
                         <br>
                         {% for draft in drafts %}
-                             <a href="/draft?ts={{ draft['timestamp'].strftime('%Y%m%d-%H%M%S') }}">{{ draft['timestamp'].strftime('%Y.%m.%d-%H:%M:%S') }}</a>
+                             <a href="/draft?ts={{ draft['timestamp'].strftime('%Y%m%d-%H%M%S') }}">{{ local_timestamps[draft['timestamp']].strftime('%Y.%m.%d-%H:%M:%S') }}</a>
                              <br><br>
                         {% endfor %}
                     </td>

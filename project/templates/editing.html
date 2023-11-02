@@ -1,0 +1,127 @@
+<html>
+    <head>
+        <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+        <script>
+            function makeWhatsappPreview(input) {
+                result = input.replaceAll("\n", "<br>");
+                result = result.replaceAll(/\*(\S.+?)\*/g,"<b>$1</b>");
+                result = result.replaceAll(/(https:\/\/\S+)/g,"<a href=\"$1\">$1</a>");
+                return result;
+            }
+
+            function showPreview() {
+//                document.getElementById("orig_heb_panel").style.width="1%";
+                document.getElementById("orig_heb_panel").style.display="none";
+                document.getElementById("translation_panel").style.width="48%";
+                document.getElementById("preview_panel").style.width="50%";
+                document.getElementById("preview_panel").style.display="initial";
+                document.getElementById("preview_panel").innerHTML=makeWhatsappPreview(document.getElementById("translated_text").value);
+                document.getElementById("preview_button").textContent="Hide Preview";
+                document.getElementById("preview_button").setAttribute("onclick","javascript: hidePreview();");
+            }
+
+            function hidePreview() {
+//                document.getElementById("preview_panel").style.width="1%";
+                document.getElementById("preview_panel").style.display="none";
+                document.getElementById("preview_panel").innerHTML="";
+                document.getElementById("orig_heb_panel").style.width="40%";
+                document.getElementById("orig_heb_panel").style.display="initial";
+                document.getElementById("translation_panel").style.width="58%";
+                document.getElementById("preview_button").textContent="Preview";
+                document.getElementById("preview_button").setAttribute("onclick","javascript: showPreview();");
+            }
+
+            function copyToClipboard() {
+                navigator.clipboard.writeText(document.getElementById('translated_text').value);
+            }
+
+            // function deleteDraft(dt) {
+            //     params = window.location.search;
+            //     if (params != null) {
+            //         draft_id = params.substring(4);
+            //         if (draft_id==null || draft_id=="") {
+            //             draft_id = "{{draft_timestamp}}";
+            //         }
+            //         $.ajax({
+            //             url: "/deleteDraft?dt="+draft_id,
+            //             type: 'GET',
+            //             success: function(res) {
+            //                 console.log(res);
+            //             }
+            //         });                                    
+            //     }
+            // }
+
+            var last_saved_translation = `{{translated}}`;
+            var is_finished = false;
+
+            function done() {
+                if (! is_finished) {
+                    copyToClipboard();
+                    saveDraft();
+                    document.getElementById("finish_button").innerText = "DONE";
+                    is_finished = true;
+                } else {
+                    window.location='/';
+                }
+            }
+
+            function translation_changed() {
+                if (last_saved_translation.localeCompare(document.getElementById('translated_text').value) != 0) {
+                        document.getElementById("finish_button").innerText = "Copy to Clipboard";
+                        is_finished = false;
+                } 
+            }
+
+            function saveDraft() {
+                if (is_finished) {
+                    return;
+                }
+                curr_translation = document.getElementById('translated_text').value;
+                if (last_saved_translation.localeCompare(curr_translation) === 0) {
+                    return;
+                }
+                
+                $.post("/saveDraft",
+                {
+                    draft_key: "{{draft_key}}",
+                    translation: curr_translation
+                },
+                function(data,status) {
+                    console.log("Draft save status: " + status);
+                    last_saved_translation = curr_translation;
+                });
+            }
+
+            setInterval(function(){saveDraft()}, 10000);  // automatically save a draft every 30 seconds, if the text has changed
+
+        </script>        
+    </head>
+
+    <body>
+        <table width="100%" border="0" cellspacing="10">
+            <tr>
+                <td width="40%" valign="top" id="orig_heb_panel">
+                    <textarea rows="40" style="width:100%; font-size:17px;" dir="rtl">{{heb_text}}</textarea>
+                </td>
+                <td width="58%" valign="top" id="translation_panel">
+                    <textarea id="translated_text" rows="50" style="width:100%; font-size:14px;" spellcheck="true" oninput="translation_changed();">{{translated}}</textarea>            
+<br><br>
+<table width="100%" border="0">
+    <tr>
+        <td><button id="restart_button" style="font-size: 20px; padding:8px 8px" onclick="window.location='/'">Start Again</button></td>
+        <td align="center"><button id="preview_button" style="font-size: 20px; padding:8px 8px" onclick="showPreview();">Preview</button></td>
+        <td align="right"><button id="finish_button" style="font-size: 20px; padding:8px 8px" onclick="done();">Copy to Clipboard</button></td>
+
+    </tr>
+</table>
+
+                </td>
+            <td width="1%" valign="top" id="preview_panel">
+
+            </td>
+            </tr>
+    </table>
+    </body>
+</html>

@@ -6,12 +6,15 @@ import os
 from flask import Blueprint, render_template, request
 #from flask_login import login_required, current_user
 from google.cloud import translate, datastore
+from google.cloud.datastore.key import Key
 from dataclasses import dataclass
 from pyluach import dates
+import pytz
 from markupsafe import Markup
 
 PROJECT_ID = "tamtzit-hadashot"
 PARENT = f"projects/{PROJECT_ID}"
+DRAFT_TTL = 60 * 60 * 24
 
 sections = {"SOUTH":"Southern Front", 
             "NORTH":"Northern Front", 
@@ -74,14 +77,46 @@ def translate_text(text: str, target_language_code: str, source_language='he') -
 
 datastore_client = datastore.Client()
 
-def store_draft(heb_text):
-    entity = datastore.Entity(key=datastore_client.key("draft"), exclude_from_indexes=["hebrew_text"])
-    entity.update({"hebrew_text": heb_text})
-    draft_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
-    entity.update({"timestamp": draft_timestamp})
+############################################
+# Notes on use of GCP DataStore
+#   
+# Documentation is at https://cloud.google.com/datastore/docs/samples/datastore-add-entity
+#
+# We're storing *entities* of *kind* Drafts
+# each entity has *properties*
+# Entity creation returns a key that can later be used to retrieve the entity
+#
+# key = client.key("Drafts", "aDraftID") -- second field is OPTIONAL, if omitted an ID will be generated
+# draft = datastore.Entity(key, other_params_if_needed)
+# draft.update( {dict of fields} )
+#
+# later to fetch the entity:
+# draft = key.get()   or draft = client.get(key)
+#
+# The key has methods:
+#   * get() which returns the full entity data object
+#   * kind() 
+#   * id()
+#   * urlsafe() - encoded unique string that can be used in URLs
+#                 then later: key = Key(urlsafe=url_string); key.get()
+#
+# Any property change requires sending *all* properties to be persisted
+#
+# s = key.get(); s.field=val; s.put();
+#
+# to delete, use the key:
+# key.delete()
 
+def store_draft(heb_text, translation_text='', translation_lang='en'):
+    '''Create a new entry in the Datastore, save the original text and, optionally, the translation, and return the new key and timestamp'''
+
+    key=datastore_client.key("draft")
+    draft_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
+    entity = datastore.Entity(key=key, exclude_from_indexes=["hebrew_text","translation_text"])
+    entity.update({"hebrew_text": heb_text, "timestamp": draft_timestamp, "translation_text": translation_text, "translation_lang": translation_lang}) 
     datastore_client.put(entity)
-    return draft_timestamp
+    entity = datastore_client.get(entity.key)
+    return (entity.key, entity['timestamp'])
 
 def fetch_drafts():
     query = datastore_client.query(kind="draft")
@@ -89,7 +124,18 @@ def fetch_drafts():
 
     drafts = query.fetch()
 
-    return drafts
+    now = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
+    for draft in drafts:
+        ts = draft['timestamp']
+        if (now - ts).seconds > DRAFT_TTL:
+            datastore_client.delete(draft.key)
+
+    return query.fetch()
+
+def update_draft(draft_key, translated_text):   # can't change the original Hebrew
+    draft = datastore_client.get(draft_key)
+    draft.update({"translation_text": translated_text})
+    datastore_client.put(draft)
 
 
 @dataclass
@@ -112,9 +158,14 @@ def index():
     #     print(f"draft: {draft}")
     #     ts = draft['timestamp']
     #     print(ts.strftime('%m%d%Y-%H%M%S'))        
-    return render_template('input.html', drafts=drafts)
+    return render_template('input.html', drafts=drafts)  # TODO need the drafts to already be holding a local representation of time
 
 
+'''
+/translate and /draft are very similar:
+   /translate creates a new entry based on the submission of the form at /  (POST)
+   /draft     edits an existing entry based on a link on the main page      (GET)
+'''
 @tamtzit.route("/draft", methods=['GET'])
 def continue_draft():
     draft_timestamp = request.args.get('ts')
@@ -123,25 +174,35 @@ def continue_draft():
         ts = draft['timestamp']
         if ts.strftime('%Y%m%d-%H%M%S') == draft_timestamp:
             heb_text = draft['hebrew_text']
-            info = process_translation_request(heb_text)
-            rendered = render_template('english.html', **info)
-            return re.sub('\n{3,}', '\n\n', rendered)
-        
+            translated = draft['translation_text']
+            key = draft.key
+
+            return render_template('editing.html', heb_text=heb_text, translated=translated, draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'))
+
     return "Draft not found, please start again."
 
-
-@tamtzit.route("/deleteDraft", methods=['GET'])
-def delete_draft():
-    draft_timestamp = request.args.get('dt')
-    drafts = fetch_drafts()
-    for draft in drafts:
-        ts = draft['timestamp']
-        if ts.strftime('%Y%m%d-%H%M%S') == draft_timestamp:
-            datastore_client.delete(draft.key)
-            return "OK"
-    return "Not found"
+# removing this - since a draft can at any time be edited again, it gets messy... let's just delete them automatically after time
+#
+# @tamtzit.route("/deleteDraft", methods=['GET'])
+# def delete_draft():
+#     draft_timestamp = request.args.get('dt')
+#     drafts = fetch_drafts()
+#     for draft in drafts:
+#         ts = draft['timestamp']
+#         debug(f"deleteDraft asked to delete {draft_timestamp}, is that the same as {ts.strftime('%Y%m%d-%H%M%S')}?")
+#         if ts.strftime('%Y%m%d-%H%M%S') == draft_timestamp:
+#             debug("yes, same, deleting")
+#             datastore_client.delete(draft.key)
+#             return "OK"
+#         else:
+#             debug("Not the same.")
+#     return "Not found"
             
-
+'''
+/translate and /draft are very similar:
+   /translate creates a new entry based on the submission of the form at /  (POST)
+   /draft     edits an existing entry based on a link on the main page      (GET)
+'''
 @tamtzit.route('/translate', methods=['POST'])
 def process():
     heb_text = request.form.get('orig_text')
@@ -149,11 +210,30 @@ def process():
         return "Input field was missing."
     
     # store the draft in DB so that someone else can continue the translation work
-    draft_timestamp = store_draft(heb_text)
+    key, d_timestamp = store_draft(heb_text)
 
     info = process_translation_request(heb_text)
-    rendered = render_template('english.html', **info, draft_timestamp=draft_timestamp.strftime('%Y%m%d-%H%M%S'))
-    return re.sub('\n{3,}', '\n\n', rendered)
+    draft_timestamp=d_timestamp.strftime('%Y%m%d-%H%M%S')
+
+    translated = render_template('english.html', **info, draft_timestamp=draft_timestamp)
+    translated = re.sub('\n{3,}', '\n\n', translated)  # this is necessary because the template can generate large gaps due to unused sections
+
+    # now store the English part as well
+    update_draft(key, translated_text=translated)
+    rendered = render_template('editing.html', heb_text=heb_text, translated=translated, draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'))
+
+    return rendered
+
+
+@tamtzit.route("/saveDraft", methods=['POST'])
+def save_draft():
+    draft_key = Key.from_legacy_urlsafe(request.form.get('draft_key'))
+    if draft_key is None:
+        debug("ERROR: /saveDraft got None draft_key!")
+        return
+    update_draft(draft_key, translated_text=request.form.get('translation'))
+    return "OK"
+
 
 def debug(stuff):
     if os.getenv("FLASK_DEBUG") == "1":
@@ -214,7 +294,7 @@ def process_translation_request(heb_text):
         if line.lower().startswith("📌 war of iron swords"):
             debug("skipping what looks like the intro pin line")
             continue
-        if line.startswith("• "):
+        if line.startswith("> "):
             debug("bullet line...")
             if "southern " in line.lower() and 'SOUTH' not in organized:
                 debug("starting south section")
@@ -232,8 +312,8 @@ def process_translation_request(heb_text):
                 debug("starting world section")
                 section = organized["Worldwide"]
             elif section is not None:
-                debug("inside a section, switching to arrows")
-                section.append(Markup(line.replace("• ", "> ")))
+                debug("inside a section")
+                section.append(Markup(line))
         elif line.startswith("📌"):
             debug("pin line...")
             if "in israel" in line.lower():
@@ -272,6 +352,19 @@ def process_translation_request(heb_text):
                 debug("Adding to unknown (c):" + line)
    
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
+    date_info = make_date_info(dt)
+
+    # for the first pass the translation isn't sent as a block of text but rather 
+    # as small blocks broken down by section. Later after the first human review pass we'll save it
+    # as a contiguous block in the DB and going forward work from that
+    result = {'heb_text': heb_text, 'date_info': date_info, 'organized': organized, 'sections': sections}
+    return result
+
+def make_date_info_from_utc(dt):
+    local_representation_of_db_time = pytz.utc.localize(dt).astimezone(pytz.timezone("Asia/Jerusalem"))
+    return make_date_info(local_representation_of_db_time)
+
+def make_date_info(dt):
     oct6 = datetime(2023,10,6,tzinfo=ZoneInfo('Asia/Jerusalem'))
     heb_dt = dates.HebrewDate.from_pydate(dt)
     dt_edition = "Evening"
@@ -282,10 +375,8 @@ def process_translation_request(heb_text):
 
     date_info = DateInfo(dt_edition, dt.strftime('%A'), heb_dt.day, heb_dt.month_name(), heb_dt.year, 
                          dt.strftime('%B'), dt.day, (dt - oct6).days)
-
-    result = {'heb_text': heb_text, 'translated': translated, 'translated_lines': translated_lines, 
-              'organized': organized, 'date_info': date_info, 'sections': sections}
-    return result
+                         
+    return date_info
 
 
 if __name__ == '__main__':

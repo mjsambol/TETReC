@@ -1,0 +1,150 @@
+<html>
+    <head>
+        <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+        <script>
+            function makeWhatsappPreview(input) {
+                result = input.replaceAll("\n", "<br>");
+                result = result.replaceAll(/\*(\S.+?)\*/g,"<b>$1</b>");
+                result = result.replaceAll(/(https:\/\/\S+)/g,"<a href=\"$1\">$1</a>");
+                return result;
+            }
+
+            // prev_button and next_button; swap_prev and swap_next
+            // 0 = Hebrew, 1 = Translation, 2 = Preview
+            curr_view = 1
+            function swapPrev() {
+                if (curr_view == 0) {
+                    curr_view = 2;
+                    document.getElementById("orig_heb_panel").style.display="none";
+                    document.getElementById("translation_panel").style.display="none";
+                    document.getElementById("preview_panel").style.display="initial";
+                    document.getElementById("preview_text").innerHTML=makeWhatsappPreview(document.getElementById("translated_text").value);
+                    document.getElementById("prev_button").textContent="Translation";
+                    document.getElementById("next_button").textContent="Hebrew";
+                } else if (curr_view == 1) {
+                    curr_view = 0;
+                    document.getElementById("orig_heb_panel").style.display="initial";
+                    document.getElementById("translation_panel").style.display="none";
+                    document.getElementById("preview_panel").style.display="none";
+                    document.getElementById("prev_button").textContent="Preview";
+                    document.getElementById("next_button").textContent="Translation";
+                } else {
+                    curr_view = 1;
+                    document.getElementById("orig_heb_panel").style.display="none";
+                    document.getElementById("translation_panel").style.display="initial";
+                    document.getElementById("preview_panel").style.display="none";
+                    document.getElementById("prev_button").textContent="Hebrew";
+                    document.getElementById("next_button").textContent="Preview";
+
+                }
+            }
+
+            // 0 = Hebrew, 1 = Translation, 2 = Preview
+            function swapNext() {
+                if (curr_view == 1) {
+                    curr_view = 2;
+                    document.getElementById("orig_heb_panel").style.display="none";
+                    document.getElementById("translation_panel").style.display="none";
+                    document.getElementById("preview_panel").style.display="initial";
+                    document.getElementById("preview_text").innerHTML=makeWhatsappPreview(document.getElementById("translated_text").value);
+                    document.getElementById("prev_button").textContent="Translation";
+                    document.getElementById("next_button").textContent="Hebrew";
+                } else if (curr_view == 2) {
+                    curr_view = 0;
+                    document.getElementById("orig_heb_panel").style.display="initial";
+                    document.getElementById("translation_panel").style.display="none";
+                    document.getElementById("preview_panel").style.display="none";
+                    document.getElementById("prev_button").textContent="Preview";
+                    document.getElementById("next_button").textContent="Translation";
+                } else {
+                    curr_view = 1;
+                    document.getElementById("orig_heb_panel").style.display="none";
+                    document.getElementById("translation_panel").style.display="initial";
+                    document.getElementById("preview_panel").style.display="none";
+                    document.getElementById("prev_button").textContent="Hebrew";
+                    document.getElementById("next_button").textContent="Preview";
+
+                }
+            }
+
+            function copyToClipboard() {
+                navigator.clipboard.writeText(document.getElementById('translated_text').value);
+            }
+
+            var last_saved_translation = `{{translated}}`;
+            var is_finished = false;
+
+            function done() {
+                if (! is_finished) {
+                    copyToClipboard();
+                    saveDraft();
+                    document.getElementById("finish_button").innerText = "DONE";
+                    is_finished = true;
+                } else {
+                    window.location='/';
+                }
+            }
+
+            function translation_changed() {
+                if (last_saved_translation.localeCompare(document.getElementById('translated_text').value) != 0) {
+                        document.getElementById("finish_button").innerText = "Copy to Clipboard";
+                        is_finished = false;
+                } 
+            }
+
+            function saveDraft() {
+                if (is_finished) {
+                    return;
+                }
+                curr_translation = document.getElementById('translated_text').value;
+                if (last_saved_translation.localeCompare(curr_translation) === 0) {
+                    return;
+                }
+                
+                $.post("/saveDraft",
+                {
+                    draft_key: "{{draft_key}}",
+                    translation: curr_translation
+                },
+                function(data,status) {
+                    console.log("Draft save status: " + status);
+                    last_saved_translation = curr_translation;
+                });
+            }
+
+            setInterval(function(){saveDraft()}, 10000);  // automatically save a draft every 30 seconds, if the text has changed
+
+        </script>        
+    </head>
+
+    <body>
+                <div id="orig_heb_panel" style="display: none;">
+                    <textarea rows="25" style="width:100%; font-size:17px;" dir="rtl">{{heb_text}}</textarea>
+                </div>
+
+                <div id="translation_panel">
+                    <textarea id="translated_text" rows="30" style="width:100%; font-size:14px;" spellcheck="true" oninput="translation_changed();">{{translated}}</textarea>
+                </div>
+                <div id="preview_panel" style="display: none;">
+                    <table style="display: block; height: 1200px; overflow: auto;">
+                        <tbody>
+                          <tr>
+                            <td id="preview_text">text text</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                </div>
+
+<br><br>
+<table width="100%" border="0">
+    <tr>
+        <td align="center"><button id="prev_button"  style="font-size: 45px; padding:8px 8px" onclick="swapPrev();">Hebrew</button> 
+            <!--<button id="restart_button" style="font-size: 45px; padding:8px 8px" onclick="window.location='/'">Start Again</button>--></td>
+            <td width="10%"> </td>
+        <td align="center"><button id="next_button" style="font-size: 45px; padding:8px 8px" onclick="swapNext();">Preview</button></td>
+    </tr>
+</table>
+
+    </body>
+</html>

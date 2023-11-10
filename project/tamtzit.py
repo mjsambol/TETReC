@@ -218,10 +218,22 @@ class DateInfo():
 
 tamtzit = Blueprint('tamtzit', __name__)
 
+def detect_mobile(request, page_name):
+    ua = request.user_agent
+    ua = str(ua).lower()
+    if "mobile" in ua or "android" in ua or "iphone" in ua:
+        next_pg = page_name + "_mobile.html"
+    else:
+        next_pg = page_name + ".html"
+    debug(ua)  
+    return next_pg
+
+
 @tamtzit.route('/')
 def index():
     drafts, local_tses = fetch_drafts()
-    return render_template('input.html', drafts=drafts, local_timestamps=local_tses, supported_langs=supported_langs_mapping)
+    next_page = detect_mobile(request, "input")
+    return render_template(next_page, drafts=drafts, local_timestamps=local_tses, supported_langs=supported_langs_mapping)
 
 
 '''
@@ -231,6 +243,8 @@ def index():
 '''
 @tamtzit.route("/draft", methods=['GET'])
 def continue_draft():
+    next_page = detect_mobile(request, "editing")
+
     draft_timestamp = request.args.get('ts')
     drafts, _ = fetch_drafts()
     for draft in drafts:
@@ -240,7 +254,7 @@ def continue_draft():
             translated = draft['translation_text']
             key = draft.key
 
-            return render_template('editing.html', heb_text=heb_text, translated=translated, draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'))
+            return render_template(next_page, heb_text=heb_text, translated=translated, draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'))
 
     return "Draft not found, please start again."
 
@@ -274,6 +288,7 @@ def process():
 
     target_language_code = request.form.get('target-lang')
     target_language = supported_langs_mapping[target_language_code]
+    next_page = detect_mobile(request, "editing")
     
     # store the draft in DB so that someone else can continue the translation work
     key, d_timestamp = store_draft(heb_text, translation_lang=target_language_code)
@@ -286,7 +301,7 @@ def process():
 
     # now store the translated part as well
     update_draft(key, translated_text=translated)
-    rendered = render_template('editing.html', heb_text=heb_text, translated=translated, draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'))
+    rendered = render_template(next_page, heb_text=heb_text, translated=translated, draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'))
 
     return rendered
 

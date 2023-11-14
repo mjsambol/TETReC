@@ -11,6 +11,7 @@ from google.cloud.datastore.key import Key
 from dataclasses import dataclass
 from pyluach import dates
 from markupsafe import Markup
+from .translation_utils import *
 
 PROJECT_ID = "tamtzit-hadashot"
 PARENT = f"projects/{PROJECT_ID}"
@@ -111,7 +112,11 @@ def translate_text(text: str, target_language_code: str, source_language='he') -
     # for reasons I don't understand, we regularly lose the last paragraph of text
     # perhaps it's just too long. Let's try breaking it up.
 
-    break_point = text.index("📌", text.index("📌") + 1)
+    text = pre_translation_swaps(text)
+
+    break_point = text.find("📌", text.find("📌") + 1)
+    if break_point == -1:
+        break_point = len(text)
     first_section = text[0:break_point]
     second_section = text[break_point:]
 
@@ -122,6 +127,8 @@ def translate_text(text: str, target_language_code: str, source_language='he') -
 
     result = ""
     for section in [first_section, second_section]:
+        if len(section.strip()) == 0:
+            continue
         response = client.translate_text(
             parent=PARENT,
             contents=[section],
@@ -130,6 +137,8 @@ def translate_text(text: str, target_language_code: str, source_language='he') -
             mime_type='text/plain' # HTML is assumed!
         )
         result += response.translations[0].translated_text
+
+    result = post_translation_swaps(result)
     # print(f"DEBUG: translation result has {len(response.translations)} translations")
     # if len(response.translations) > 1:
     #     print("DEBUG: the second one is:")
@@ -198,10 +207,21 @@ def fetch_drafts():
             
     return query.fetch(), drafts_local_timestamp
 
-def update_draft(draft_key, translated_text):   # can't change the original Hebrew
+def update_draft(draft_key, translated_text, is_finished=False):   # can't change the original Hebrew
     draft = datastore_client.get(draft_key)
     draft.update({"translation_text": translated_text})
+    if is_finished:
+        draft.update({"is_finished": True})
     datastore_client.put(draft)
+
+def get_latest_published(lang_code):
+    drafts = fetch_drafts()[0]
+    debug(f"get_latest_published({lang_code}): ...")
+    for draft in drafts:
+        debug(f"Checking: {draft['translation_lang']}")
+        if draft['translation_lang'] == lang_code and 'is_finished' in draft and draft['is_finished'] == True:
+            return draft
+    return None
 
 
 @dataclass
@@ -229,8 +249,21 @@ def detect_mobile(request, page_name):
     return next_pg
 
 
-@tamtzit.route('/')
+@tamtzit.route('/read')
 def index():
+    return render_template(detect_mobile(request, "index"))
+
+@tamtzit.route('/latest')
+def route_latest_published():
+    lang = request.args.get('lang', default='en')
+    latest = get_latest_published(lang)  # may be None
+    if not latest:
+        latest = {'translation_text': 'None currently available.'}
+    return render_template(detect_mobile(request, "latest"), latest=latest)
+
+
+@tamtzit.route('/')
+def route_create():
     drafts, local_tses = fetch_drafts()
     next_page = detect_mobile(request, "input")
     return render_template(next_page, drafts=drafts, local_timestamps=local_tses, supported_langs=supported_langs_mapping)
@@ -312,7 +345,7 @@ def save_draft():
     if draft_key is None:
         debug("ERROR: /saveDraft got None draft_key!")
         return
-    update_draft(draft_key, translated_text=request.form.get('translation'))
+    update_draft(draft_key, translated_text=request.form.get('translation'), is_finished=request.form.get('is_finished'))
     return "OK"
 
 

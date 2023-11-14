@@ -63,6 +63,8 @@
                     document.getElementById("finish_button").innerText = "DONE";
                     is_finished = true;
                 } else {
+                    copyToClipboard();
+                    saveDraft();
                     window.location='/';
                 }
             }
@@ -75,23 +77,20 @@
             }
 
             function saveDraft() {
-                if (is_finished) {
-                    return;
-                }
                 curr_translation = document.getElementById('translated_text').value;
-                if (last_saved_translation.localeCompare(curr_translation) === 0) {
-                    return;
-                }
+                if (last_saved_translation.localeCompare(curr_translation) != 0) {
                 
-                $.post("/saveDraft",
-                {
-                    draft_key: "{{draft_key}}",
-                    translation: curr_translation
-                },
-                function(data,status) {
-                    console.log("Draft save status: " + status);
-                    last_saved_translation = curr_translation;
-                });
+                    $.post("/saveDraft",
+                    {
+                        draft_key: "{{draft_key}}",
+                        translation: curr_translation,
+                        is_finished: is_finished
+                    },
+                    function(data,status) {
+                        console.log("Draft save status: " + status);
+                        last_saved_translation = curr_translation;
+                    });
+                }
             }
 
             setInterval(function(){saveDraft()}, 10000);  // automatically save a draft every 30 seconds, if the text has changed

@@ -210,8 +210,7 @@ def fetch_drafts():
 def update_draft(draft_key, translated_text, is_finished=False):   # can't change the original Hebrew
     draft = datastore_client.get(draft_key)
     draft.update({"translation_text": translated_text})
-    if is_finished:
-        draft.update({"is_finished": True})
+    draft.update({"is_finished": is_finished})
     datastore_client.put(draft)
 
 def get_latest_published(lang_code):
@@ -219,6 +218,8 @@ def get_latest_published(lang_code):
     debug(f"get_latest_published({lang_code}): ...")
     for draft in drafts:
         debug(f"Checking: {draft['translation_lang']}")
+        if lang_code == 'he' and 'is_finished' in draft and draft['is_finished'] == True:
+            return draft
         if draft['translation_lang'] == lang_code and 'is_finished' in draft and draft['is_finished'] == True:
             return draft
     return None
@@ -258,8 +259,8 @@ def route_latest_published():
     lang = request.args.get('lang', default='en')
     latest = get_latest_published(lang)  # may be None
     if not latest:
-        latest = {'translation_text': 'None currently available.'}
-    return render_template(detect_mobile(request, "latest"), latest=latest)
+        latest = {'translation_text': 'None currently available.', 'hebrew_text': 'לא קיים כרגע'}
+    return render_template(detect_mobile(request, "latest"), latest=latest, lang=lang)
 
 
 @tamtzit.route('/')
@@ -345,7 +346,9 @@ def save_draft():
     if draft_key is None:
         debug("ERROR: /saveDraft got None draft_key!")
         return
-    update_draft(draft_key, translated_text=request.form.get('translation'), is_finished=request.form.get('is_finished'))
+    debug(f"saveDraft: is_finished={request.form.get('is_finished')}")
+    finished = request.form.get('is_finished') and request.form.get('is_finished').lower() == 'true'
+    update_draft(draft_key, translated_text=request.form.get('translation'), is_finished=finished)
     return "OK"
 
 

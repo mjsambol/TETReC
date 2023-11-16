@@ -35,7 +35,8 @@ title_translations = {
     'רנ"ם': 'Sergeant Major',
     'רנ"ג': 'Command Sergeant Major',
 
-    'סמ"ג': 'Second Lieutenant',
+    'סג"מ': 'Second Lieutenant',
+    'סג"ם': 'Second Lieutenant',
     'סגן': 'First Lieutenant',
     'סרן': 'Captain',
 
@@ -47,10 +48,15 @@ title_translations = {
     'סגן אלוף': 'Lieutenant Colonel',
 
     'אלוף משנה': 'Colonel',
+    'אל"מ': 'Colonel',
+    'אל"ם': 'Colonel',
 
     'תת אלוף': 'Brigadier General',
+    'תא"ל': 'Brigadier General',
+
     'אלוף': 'Major General',
     'רב אלוף': 'Lieutenant General',
+    'רא"ל': 'Lieutenant General',
 
     # This section of translations is based on https://www.almaany.com/en/dict/en-he/commander/
     # which is a surprising source but nothing here seems controversial

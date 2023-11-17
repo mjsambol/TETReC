@@ -15,7 +15,7 @@ from .translation_utils import *
 
 PROJECT_ID = "tamtzit-hadashot"
 PARENT = f"projects/{PROJECT_ID}"
-DRAFT_TTL = 60 * 60 * 12
+DRAFT_TTL = 60 * 60 * 24
 supported_langs_mapping = {}
 supported_langs_mapping['English'] = 'en' 
 supported_langs_mapping['en'] = 'English' 
@@ -39,18 +39,18 @@ sections['en'] = {"SOUTH":"Southern Front",
             "FinishWell":"On a Positive Note",
             "UNKNOWN":"UNKNOWN"
             }
-sections['fr'] = {"SOUTH":Markup("L'arène sud"), 
-            "NORTH":Markup("L'arène nord"), 
-            "YandS":"Judée et Samarie",
+sections['fr'] = {"SOUTH":Markup("Au sud"), 
+            "NORTH":Markup("Au nord"), 
+            "YandS":"Yehuda et Shomron",
             "Civilian":"Civilian Front", 
-            "InIsrael":"De ce qui se passe dans le pays",
-            "PandP":"Politique, droit et politique",
-            "WorldEyes":"In the Eyes of the World", 
+            "InIsrael":"Ce qu'il se passe en Israël",
+            "PandP":"Politique",
+            "WorldEyes":"Autour du monde", 
             "Worldwide":"Autour du monde",
             "Economy":"Economie",
             "Sports":"Sport",
             "Weather":"Météo",
-            "FinishWell":"Et bien finir",
+            "FinishWell":"Et on termine sur une bonne note 🎶",
             "UNKNOWN":"UNKNOWN"
             }
 keywords = {}
@@ -71,7 +71,7 @@ keywords['en'] = {
     "finish": "finish"
 }
 keywords['fr'] = {
-    "edition": "Édition",
+    "edition": "édition",
     "intro_pin": "📌 guerre des épées de fer",
     "northern": "nord ",
     "southern": "sud ",

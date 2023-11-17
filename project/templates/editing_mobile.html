@@ -73,39 +73,29 @@
             }
 
             var last_saved_translation = `{{translated}}`;
-            var is_finished = false;
 
             function done() {
-                if (! is_finished) {
-                    copyToClipboard();
-                    saveDraft();
-                    document.getElementById("finish_button").innerText = "DONE";
-                    is_finished = true;
-                } else {
-                    window.location='/';
-                }
+                saveDraft(true);
+                window.location='/';
             }
 
             function translation_changed() {
                 if (last_saved_translation.localeCompare(document.getElementById('translated_text').value) != 0) {
                         document.getElementById("finish_button").innerText = "Copy to Clipboard";
-                        is_finished = false;
                 } 
             }
 
-            function saveDraft() {
-                if (is_finished) {
-                    return;
-                }
+            function saveDraft(finalize=false) {
                 curr_translation = document.getElementById('translated_text').value;
-                if (last_saved_translation.localeCompare(curr_translation) === 0) {
+                if (!finalized && last_saved_translation.localeCompare(curr_translation) === 0) {
                     return;
                 }
                 
                 $.post("/saveDraft",
                 {
                     draft_key: "{{draft_key}}",
-                    translation: curr_translation
+                    translation: curr_translation,
+                    is_finished: finalize
                 },
                 function(data,status) {
                     console.log("Draft save status: " + status);
@@ -144,6 +134,9 @@
             <td width="10%"> </td>
         <td align="center"><button id="next_button" style="font-size: 45px; padding:8px 8px" onclick="swapNext();">Preview</button></td>
     </tr>
+    <tr><td colspan="3" align="center">
+        <button id="done_button" style="font-size: 45px; padding:8px 8px" onclick="done();">DONE</button>
+    </td></tr>
 </table>
 
     </body>

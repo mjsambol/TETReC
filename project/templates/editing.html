@@ -64,7 +64,7 @@
                     is_finished = true;
                 } else {
                     copyToClipboard();
-                    saveDraft();
+                    saveDraft(true);
                     window.location='/';
                 }
             }
@@ -76,9 +76,9 @@
                 } 
             }
 
-            function saveDraft() {
+            function saveDraft(finalize=false) {
                 curr_translation = document.getElementById('translated_text').value;
-                if (last_saved_translation.localeCompare(curr_translation) != 0) {
+                if (finalize || last_saved_translation.localeCompare(curr_translation) != 0) {
                 
                     $.post("/saveDraft",
                     {

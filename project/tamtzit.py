@@ -4,7 +4,7 @@ import locale
 from collections import defaultdict
 import re
 import os
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, request, redirect
 #from flask_login import login_required, current_user
 from google.cloud import translate, datastore
 from google.cloud.datastore.key import Key
@@ -22,8 +22,13 @@ supported_langs_mapping['en'] = 'English'
 supported_langs_mapping['Francais'] = 'fr'
 supported_langs_mapping['fr'] = 'Francais'
 locales = {}
+# Note that at least locally, getting locale support requires some prep-work:
+# sudo apt-get install language-pack-he-base  (or fr instead of he, etc)
+# sudo dpkg-reconfigure locales
+# they seemed to thankfully be supported out of the box in appengine
 locales['en'] = "en_US.UTF-8"
 locales['fr'] = "fr_FR.UTF-8"
+locales['he'] = 'he_IL.UTF-8'
 sections = {}
 sections['en'] = {"SOUTH":"Southern Front", 
             "NORTH":"Northern Front", 
@@ -89,6 +94,7 @@ keywords['fr'] = {
 editions = {}
 editions['en'] = ['Morning', 'Afternoon', 'Evening']
 editions['fr'] = ['Matin', 'après-midi', 'soir']
+editions['he'] = ['בוקר', 'צוהריים', 'ערב']
 
 
 client = translate.TranslationServiceClient()
@@ -184,10 +190,12 @@ def store_draft(heb_text, translation_text='', translation_lang='en'):
     key=datastore_client.key("draft")
     draft_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     entity = datastore.Entity(key=key, exclude_from_indexes=["hebrew_text","translation_text"])
-    entity.update({"hebrew_text": heb_text, "timestamp": draft_timestamp, "translation_text": translation_text, "translation_lang": translation_lang}) 
+    entity.update({"hebrew_text": heb_text, "translation_text": translation_text, "translation_lang": translation_lang, 
+                   "timestamp": draft_timestamp, "last_edit": draft_timestamp, 
+                   "is_finished": False, "ok_to_translate": False}) 
     datastore_client.put(entity)
     entity = datastore_client.get(entity.key)
-    return (entity.key, entity['timestamp'])
+    return entity.key
 
 def fetch_drafts():
     query = datastore_client.query(kind="draft")
@@ -207,10 +215,23 @@ def fetch_drafts():
             
     return query.fetch(), drafts_local_timestamp
 
-def update_draft(draft_key, translated_text, is_finished=False):   # can't change the original Hebrew
+def update_translation_draft(draft_key, translated_text, is_finished=False):   # can't change the original Hebrew
     draft = datastore_client.get(draft_key)
     draft.update({"translation_text": translated_text})
     draft.update({"is_finished": is_finished})
+    edit_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
+    draft.update({"last_edit": edit_timestamp}) 
+    datastore_client.put(draft)
+
+def update_hebrew_draft(draft_key, hebrew_text, is_finished=False, ok_to_translate=False):
+    draft = datastore_client.get(draft_key)
+    draft.update({"hebrew_text": hebrew_text})
+    draft.update({"is_finished": is_finished})
+    if ok_to_translate:  # we don't want to go back once it's set to true
+        draft.update({"ok_to_translate": True})
+    edit_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
+    draft.update({"last_edit": edit_timestamp}) 
+    draft.update({"translation_lang": '--'})
     datastore_client.put(draft)
 
 def get_latest_published(lang_code):
@@ -236,6 +257,9 @@ class DateInfo():
     secular_dom: int
     secular_year: int
     day_of_war: int
+    hebrew_dom_he: str
+    hebrew_month_he: str
+    hebrew_year_he: str
 
 tamtzit = Blueprint('tamtzit', __name__)
 
@@ -250,29 +274,71 @@ def detect_mobile(request, page_name):
     return next_pg
 
 
-@tamtzit.route('/read')
-def index():
-    return render_template(detect_mobile(request, "index"))
-
-@tamtzit.route('/latest')
-def route_latest_published():
-    lang = request.args.get('lang', default='en')
-    latest = get_latest_published(lang)  # may be None
-    if not latest:
-        latest = {'translation_text': 'None currently available.', 'hebrew_text': 'לא קיים כרגע'}
-    return render_template(detect_mobile(request, "latest"), latest=latest, lang=lang)
-
-
 @tamtzit.route('/')
 def route_create():
-    drafts, local_tses = fetch_drafts()
-    next_page = detect_mobile(request, "input")
-    return render_template(next_page, drafts=drafts, local_timestamps=local_tses, supported_langs=supported_langs_mapping)
+    return render_template('index.html')
 
+@tamtzit.route('/heb')
+def route_hebrew_template():
+    # is there a Hebrew draft from the last 3 hours [not a criteria: that's not yet "Done"]
+    drafts, local_tses = fetch_drafts()
+    dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
+    for draft in drafts:
+        debug(f"/heb: should we show draft w/ lang={draft['translation_lang']}, is_finished={'is_finished' in draft and draft['is_finished']}, ok_to_translate={'ok_to_translate' in draft and draft['ok_to_translate']}")
+        draft_last_mod = draft['last_edit']
+        debug(f"/heb: draft's last edit is {draft_last_mod}, it's now {dt}, delta is {dt - draft_last_mod}")
+        if (dt - draft_last_mod).seconds > (60 * 60 * 4):
+            break
+
+        if draft['translation_lang'] == '--': # and draft['is_finished'] == False and 'ok_to_translate' in draft and draft['ok_to_translate'] == True:
+            #return redirect(f'/heb_draft?key={draft.key.to_legacy_urlsafe().decode("utf8")}')
+            return render_template('hebrew.html', heb_text=Markup(draft['hebrew_text']), draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
+                                    ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
+                                    is_finished=('is_finished' in draft and draft['is_finished']))
+            
+    # if no current draf was found, create a new one so that we have a key to work with and save to while editing
+    key = store_draft('')
+    debug(f'Creating a new Hebrew draft with key {key.to_legacy_urlsafe().decode("utf8")}')
+#    return redirect(f'/heb_draft?key={key.to_legacy_urlsafe().decode("utf8")}')
+    date_info = make_date_info(dt, 'he')
+    return render_template('hebrew.html', date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"), ok_to_translate=False, is_finished=False)
+
+# @tamtzit.route('/heb_draft')
+# def route_hebrew_draft(): 
+#     draft_key = Key.from_legacy_urlsafe(request.args.get('key'))
+#     draft = datastore_client.get(draft_key)
+#     heb_text = draft['hebrew_text']
+#     ok_to_translate = "ok_to_translate" in draft and draft["ok_to_translate"]
+#     if len(heb_text) == 0:
+#         dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
+#         date_info = make_date_info(dt, 'he')
+#         return render_template('hebrew.html', date_info=date_info, draft_key=request.args.get('key'), ok_to_translate=ok_to_translate)
+#     else:
+#         return render_template('hebrew.html', heb_text=heb_text, draft_key=request.args.get('key'), ok_to_translate=ok_to_translate)
+
+@tamtzit.route("/start_translation")
+def route_start_translation():
+    drafts, local_tses = fetch_drafts()
+    dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
+    latest_heb = ''
+    for draft in drafts:
+        # if we can't find an ok-to-translate Hebrew draft from the last 4 hours, let the user know it's not ready...
+        draft_last_mod = draft['last_edit']
+        if (dt - draft_last_mod).seconds > (60 * 60 * 4):
+            return render_template("error.html", msg="There is no current edition ready for translation.")
+
+        if draft['translation_lang'] == '--' and 'ok_to_translate' in draft and draft['ok_to_translate'] == True:
+            # this is the most recent Hebrew text
+            latest_heb = draft['hebrew_text']
+            break
+    # we need to restart the iterator
+    drafts, local_tses = fetch_drafts() 
+    next_page = detect_mobile(request, "input")
+    return render_template(next_page, heb_text=latest_heb, drafts=drafts, local_timestamps=local_tses, supported_langs=supported_langs_mapping)
 
 '''
 /translate and /draft are very similar:
-   /translate creates a new entry based on the submission of the form at /  (POST)
+   /translate creates a new entry based on the submission of the form at /start_translate  (POST)
    /draft     edits an existing entry based on a link on the main page      (GET)
 '''
 @tamtzit.route("/draft", methods=['GET'])
@@ -288,26 +354,10 @@ def continue_draft():
             translated = draft['translation_text']
             key = draft.key
 
-            return render_template(next_page, heb_text=heb_text, translated=translated, draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'))
+            return render_template(next_page, heb_text=heb_text, translated=translated, draft_timestamp=draft_timestamp, 
+                                   draft_key=key.to_legacy_urlsafe().decode('utf8'), is_finished=('is_finished' in draft and draft['is_finished']))
 
     return "Draft not found, please start again."
-
-# removing this - since a draft can at any time be edited again, it gets messy... let's just delete them automatically after time
-#
-# @tamtzit.route("/deleteDraft", methods=['GET'])
-# def delete_draft():
-#     draft_timestamp = request.args.get('dt')
-#     drafts = fetch_drafts()
-#     for draft in drafts:
-#         ts = draft['timestamp']
-#         debug(f"deleteDraft asked to delete {draft_timestamp}, is that the same as {ts.strftime('%Y%m%d-%H%M%S')}?")
-#         if ts.strftime('%Y%m%d-%H%M%S') == draft_timestamp:
-#             debug("yes, same, deleting")
-#             datastore_client.delete(draft.key)
-#             return "OK"
-#         else:
-#             debug("Not the same.")
-#     return "Not found"
             
 '''
 /translate and /draft are very similar:
@@ -324,31 +374,33 @@ def process():
     target_language = supported_langs_mapping[target_language_code]
     next_page = detect_mobile(request, "editing")
     
-    # store the draft in DB so that someone else can continue the translation work
-    key, d_timestamp = store_draft(heb_text, translation_lang=target_language_code)
-
     info = process_translation_request(heb_text, target_language_code)
-    draft_timestamp=d_timestamp.strftime('%Y%m%d-%H%M%S')
+    draft_timestamp=datetime.now(tz=ZoneInfo('Asia/Jerusalem')).strftime('%Y%m%d-%H%M%S')
 
     translated = render_template(target_language.lower() + '.html', **info, draft_timestamp=draft_timestamp)
     translated = re.sub('\n{3,}', '\n\n', translated)  # this is necessary because the template can generate large gaps due to unused sections
 
-    # now store the translated part as well
-    update_draft(key, translated_text=translated)
-    rendered = render_template(next_page, heb_text=heb_text, translated=translated, draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'))
-
-    return rendered
+    # store the draft in DB so that someone else can continue the translation work
+    key = store_draft(heb_text, translation_text=translated, translation_lang=target_language_code)
+    return render_template(next_page, heb_text=heb_text, translated=translated, draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'))
 
 
 @tamtzit.route("/saveDraft", methods=['POST'])
 def save_draft():
+    debug(f"saveDraft: draft_key is {request.form.get('draft_key')}")
     draft_key = Key.from_legacy_urlsafe(request.form.get('draft_key'))
     if draft_key is None:
         debug("ERROR: /saveDraft got None draft_key!")
         return
-    debug(f"saveDraft: is_finished={request.form.get('is_finished')}")
     finished = request.form.get('is_finished') and request.form.get('is_finished').lower() == 'true'
-    update_draft(draft_key, translated_text=request.form.get('translation'), is_finished=finished)
+    send_to_translators = request.form.get('to_translators') and request.form.get('to_translators').lower() == 'true'
+    # we're saving _either_ the Hebrew or the translation, not both at once
+    translated_text=request.form.get('translation')
+    source_text = request.form.get('source_text')
+    if translated_text and len(translated_text) > 0:
+        update_translation_draft(draft_key, translated_text, is_finished=finished)
+    else:
+        update_hebrew_draft(draft_key, source_text, is_finished=finished, ok_to_translate=send_to_translators)
     return "OK"
 
 
@@ -483,14 +535,14 @@ def make_date_info(dt, lang):
     oct6 = datetime(2023,10,6,tzinfo=ZoneInfo('Asia/Jerusalem'))
     heb_dt = dates.HebrewDate.from_pydate(dt)
     dt_edition = editions[lang][2]
-    if 4 <= dt.hour <= 12:
+    if 0 <= dt.hour <= 12:
         dt_edition = editions[lang][0]
     elif 12 < dt.hour < 18:
         dt_edition = editions[lang][1]
 
     locale.setlocale(locale.LC_TIME, locales[lang])
     date_info = DateInfo(dt_edition, dt.strftime('%A'), heb_dt.day, heb_dt.month_name(), heb_dt.year, 
-                         dt.strftime('%B'), dt.day, dt.year, (dt - oct6).days)
+                         dt.strftime('%B'), dt.day, dt.year, (dt - oct6).days, heb_dt.hebrew_day(), heb_dt.month_name(True), heb_dt.hebrew_year())
                          
     return date_info
 

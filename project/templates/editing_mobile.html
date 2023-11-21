@@ -87,7 +87,7 @@
 
             function saveDraft(finalize=false) {
                 curr_translation = document.getElementById('translated_text').value;
-                if (!finalized && last_saved_translation.localeCompare(curr_translation) === 0) {
+                if (!finalize && last_saved_translation.localeCompare(curr_translation) === 0) {
                     return;
                 }
                 

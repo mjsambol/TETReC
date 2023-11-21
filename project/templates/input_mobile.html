@@ -11,7 +11,7 @@
     <br><br>
 
     <form method="POST" action="/translate">
-        <textarea name="orig_text" rows="25" cols="45" dir="rtl" style="font-size: 32px;"></textarea>
+        <textarea name="orig_text" rows="25" cols="45" dir="rtl" style="font-size: 32px;">{{heb_text}}</textarea>
 
         <table border="0" width="100%">
             <tr>
@@ -28,10 +28,12 @@
     <div style="font-size: 25px;  font-family: Arial, Helvetica, sans-serif;">
     Alternatively, select a draft:
     <br><br>
-    {% for draft in drafts %}                                
+    {% for draft in drafts %}       
+        {% if draft['translation_lang'] != '--' %}                                
             <a href="/draft?ts={{ draft['timestamp'].strftime('%Y%m%d-%H%M%S') }}">{{ local_timestamps[draft['timestamp']].strftime('%Y.%m.%d-%H:%M:%S') }}</a> 
                 ({{supported_langs[draft['translation_lang']]}})
             <br><br>
+        {% endif %}            
     {% endfor %}
     </div>
     </body>

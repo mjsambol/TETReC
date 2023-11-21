@@ -1,0 +1,194 @@
+<html>
+    <head>
+        <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
+        <script>
+            function makeWhatsappPreview(input) {
+                result = input.replaceAll("\n", "<br>");
+                result = result.replaceAll(/\*(\S.+?)\*/g,"<b>$1</b>");
+                result = result.replaceAll(/_(\S.+?)_/g,"<i>$1</i>");
+                result = result.replaceAll(/(https:\/\/\S+)/g,"<a href=\"$1\">$1</a>");
+                return result;
+            }
+
+            function updatePreview() {
+                document.getElementById("preview_panel").innerHTML=makeWhatsappPreview(document.getElementById("heb_text").value);
+            }
+
+            function copyToClipboard() {
+                navigator.clipboard.writeText(document.getElementById('heb_text').value);
+            }
+
+            var last_saved_text = `{{heb_text}}`;
+            var is_finished = "True" === "{{is_finished}}";
+
+            function done() {
+                disable_done_button();
+                is_finished = true;
+                saveDraft(true);
+            }
+
+            function disable_done_button() {
+                document.getElementById("done_button").style.backgroundColor="#66BB66";
+                document.getElementById("done_button").disabled = true;
+                document.getElementById("heb_text").disabled = true;
+                document.getElementById("back_home").style.visibility = "visible";
+            }
+
+            function disable_send_to_translators() {
+                document.getElementById("to_translation_button").style.backgroundColor="#66BB66";
+                document.getElementById("to_translation_button").disabled = true;
+                document.getElementById("done_button").disabled = false;
+            }
+
+            function to_translators() {
+                disable_send_to_translators();
+                saveDraft(finalize=false, ready_for_translation=true);
+            }
+
+            function translation_changed() {
+                if (last_saved_text.localeCompare(document.getElementById('heb_text').value) != 0) {
+                        document.getElementById("finish_button").innerText = "העתק את כל התוכן";
+                        is_finished = false;
+                } 
+            }
+
+            function saveDraft(finalize=false, ready_for_translation=false) {
+                if (is_finished && !finalize) {
+                    return;
+                }
+                curr_text = document.getElementById('heb_text').value;
+                if (finalize || ready_for_translation || last_saved_text.localeCompare(curr_text) != 0) {
+                    console.log("saving, text was\n\n"+last_saved_text+"\n\ntext is now\n\n" + curr_text);
+                    $.post("/saveDraft",
+                    {
+                        draft_key: "{{draft_key}}",
+                        source_text: curr_text,
+                        is_finished: is_finished,
+                        to_translators: ready_for_translation
+                    },
+                    function(data,status) {
+                        console.log("Draft save status: " + status);
+                        last_saved_text = curr_text;
+                    });
+                }
+            }
+
+            setInterval(function(){saveDraft()}, 10000);  // automatically save a draft every 30 seconds, if the text has changed
+
+
+        </script>
+    </head>
+    <body align="center">
+        
+        <table width="100%" border="0" cellspacing="10">
+            <tr>
+                <td width="40%" valign="top" id="preview_panel" style="font-size:20px;" dir="rtl"> </td>
+                <td width="60%" valign="top" id="orig_heb_panel">
+
+        <textarea id="heb_text" style="font-size:22px;" name="orig_text" rows="30" cols="80" dir="rtl" oninput="updatePreview();translation_changed();">
+{%if heb_text | length > 0 %}{{ heb_text }}{% else %}📻 *תמצית החדשות*
+*מהדורת {{date_info.part_of_day}}, יום {{date_info.day_of_week}}, {{date_info.hebrew_dom_he}} ב{{date_info.hebrew_month_he}} {{date_info.hebrew_year_he}}*, {{date_info.secular_dom}} ב{{date_info.secular_month}} {{date_info.secular_year}}
+                    
+•   •   •
+                    
+📌 *_מלחמת חרבות ברזל:_*
+
+> *הזירה הדרומית:*
+
+• 
+
+• 
+
+> *הזירה הצפונית:*
+
+• 
+
+• 
+
+> *יהודה ושומרון:*
+
+• 
+
+• 
+
+📌 *_מהמתרחש בארץ:_*
+
+• 
+
+• 
+
+📌 *_מדיניות, משפט ופוליטיקה:_*
+
+• 
+
+• 
+
+📌 *_מסביב לעולם:_*
+
+• 
+
+📌 *_כלכלה:_*
+
+• 
+
+📌 *_ספורט:_*
+
+• 
+
+📌 *_מזג האוויר:_*
+
+• 
+
+📌 *_ונסיים בטוב:_*
+
+
+•   •   •
+
+כתיבה: אלעד ינאי. עריכה לשונית: שירה עבאדי.
+
+•   •   •
+
+*שמעתם חדשות טובות?*
+יש לכם *_הערות, בקשות או עדכונים_* עבורנו? 
+*פנו אלינו למוקד הוואטסאפ:* 052-439-3118
+(פניות למנהלי הקהילות לא בהכרח ייענו)
+
+•   •   •
+
+*עזרו* לעוד אלפים להתחבר למיזם *החוסן הלאומי - תמצית החדשות - ושתפו* את הקישור להצטרפות👇
+https://link.mmb.org.il/news {% endif %}</textarea>
+<br><br>
+<table width="100%">
+    <tr>
+        <td width="33%" align="center">
+            <button id="finish_button" style="font-size: 20px; padding:8px 8px" onclick="copyToClipboard();">העתק את כל התוכן</button>
+        </td>
+        <td width="33%" align="center">
+            <button id="done_button" style="font-size: 20px; padding:8px 8px;" disabled="true" onclick="done();">סיים</button>            
+            <br>
+            <a id="back_home" href="/" style="font-size: 20px;visibility: hidden;">חזרה להתחלה</a>
+            </td>
+        <td width="33%" align="center">
+            <button id="to_translation_button" style="font-size: 20px; padding:8px 8px;" onclick="to_translators();">מוכן לתרגום</button>  
+            <br>
+        </td>
+    </tr>
+</table>
+
+    </td></tr></table>
+
+{% if ok_to_translate %}
+    <script>
+        disable_send_to_translators();
+    </script>
+{% endif %}
+{% if is_finished %}
+    <script>
+        disable_done_button();
+    </script>
+{% endif %}
+
+</body>
+</html>

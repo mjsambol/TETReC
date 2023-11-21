@@ -55,7 +55,7 @@
             // }
 
             var last_saved_translation = `{{translated}}`;
-            var is_finished = false;
+            var is_finished = "True" === "{{is_finished}}";
 
             function done() {
                 if (! is_finished) {
@@ -78,6 +78,9 @@
             }
 
             function saveDraft(finalize=false) {
+                if (is_finished && !finalize) {
+                    return;
+                }
                 curr_translation = document.getElementById('translated_text').value;
                 if (finalize || last_saved_translation.localeCompare(curr_translation) != 0) {
                 
@@ -92,6 +95,10 @@
                         last_saved_translation = curr_translation;
                     });
                 }
+            }
+
+            function enable_edit() {
+                document.getElementById("translated_text").disabled = false;
             }
 
             setInterval(function(){saveDraft()}, 10000);  // automatically save a draft every 30 seconds, if the text has changed
@@ -112,7 +119,8 @@
     <tr>
         <td><button id="restart_button" style="font-size: 20px; padding:8px 8px" onclick="window.location='/'">Start Again</button></td>
         <td align="center"><button id="preview_button" style="font-size: 20px; padding:8px 8px" onclick="showPreview();">Preview</button></td>
-        <td align="right"><button id="finish_button" style="font-size: 20px; padding:8px 8px" onclick="done();">Copy to Clipboard</button></td>
+        <td align="right"><button id="edit_anyway_button" style="font-size: 20px; padding:8px 8px;visibility: hidden;" onclick="enable_edit();">Edit Again</button>
+            <button id="finish_button" style="font-size: 20px; padding:8px 8px" onclick="done();">Copy to Clipboard</button></td>
 
     </tr>
 </table>
@@ -123,5 +131,12 @@
             </td>
             </tr>
     </table>
+<script>
+    if (is_finished) {
+        document.getElementById("translated_text").disabled = true;
+        document.getElementById("edit_anyway_button").style.visibility = "visible";
+    }
+</script>
+
     </body>
 </html>

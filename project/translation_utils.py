@@ -69,7 +69,8 @@ title_translations = {
     'מש"ט': 'Flight Commander',
     'מ"מ': 'Platoon Commander',
     'מט"ק': 'Tank Commander',
-    'מש"ק': 'Tank Company Commander',   # not 100% sure about this one...
+    # not 100% sure about this one... it's also an abbreviation for mefaked she'eino katzin
+    # 'מש"ק': 'Tank Company Commander',   
     # end section
 
     # this came up in conversation, seems straightforward though I don't have an official source
@@ -83,8 +84,12 @@ def pre_translation_swaps(text):
     # slightly related given the context in which we are unfortunately using these abbreviations
     text = re.sub(r'\bהי"ד\b',   'HYD', text, re.U)
      
+    text = re.sub(r'\b(ב)צו?הריים\b', lambda m: ("in " if m.group(1).startswith("ב") else '') + 'the afternoon', 
+                  text, re.U)
+    text = re.sub(r'\b(אחר )?ה?צו?הריים\b', 'the afternoon', text, re.U)
     return text
 
 def post_translation_swaps(text):
     text = re.sub('infrastructures', 'infrastructure', text)
+    text = re.sub(r'\b[Aa]larm(s?)\b', lambda m: "siren" + ('s' if m.group(1).startswith("s") else ''), text)
     return text

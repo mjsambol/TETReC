@@ -6,6 +6,7 @@
             function makeWhatsappPreview(input) {
                 result = input.replaceAll("\n", "<br>");
                 result = result.replaceAll(/\*(\S.+?)\*/g,"<b>$1</b>");
+                result = result.replaceAll(/_(\S.+?)_/g,"<i>$1</i>");
                 result = result.replaceAll(/(https:\/\/\S+)/g,"<a href=\"$1\">$1</a>");
                 return result;
             }

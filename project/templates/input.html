@@ -1,6 +1,15 @@
 <html>
     <head>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
+        <!-- Google tag (gtag.js) -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
+        <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-7WJQ95B6KX');
+        </script>        
     </head>    
     <body>
         <form method="POST" action="/translate">

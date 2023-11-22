@@ -1,5 +1,6 @@
 <html>
     <head>
+        <title>Tamtzit - Editing {{lang}}</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
         <!-- Google tag (gtag.js) -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
@@ -46,6 +47,16 @@
                 navigator.clipboard.writeText(document.getElementById('translated_text').value);
             }
 
+            function update_char_count() {
+                entry_len = document.getElementById("translated_text").value.length;
+                document.getElementById("char_count").innerHTML="Length: " + entry_len + " characters";
+                if (entry_len > 4000) {
+                    document.getElementById("char_count").style.color="#FF0000";
+                } else {
+                    document.getElementById("char_count").style.color="#000000";
+                }
+            }
+
             // function deleteDraft(dt) {
             //     params = window.location.search;
             //     if (params != null) {
@@ -80,6 +91,7 @@
             }
 
             function translation_changed() {
+                update_char_count();
                 if (last_saved_translation.localeCompare(document.getElementById('translated_text').value) != 0) {
                         document.getElementById("finish_button").innerText = "Copy to Clipboard";
                         is_finished = false;
@@ -108,6 +120,7 @@
 
             function enable_edit() {
                 document.getElementById("translated_text").disabled = false;
+                document.getElementById("edit_anyway_button").style.visibility = "hidden";
             }
 
             setInterval(function(){saveDraft()}, 10000);  // automatically save a draft every 30 seconds, if the text has changed
@@ -123,7 +136,12 @@
                 </td>
                 <td width="58%" valign="top" id="translation_panel">
                     <textarea id="translated_text" rows="50" style="width:100%; font-size:14px;" spellcheck="true" oninput="translation_changed();">{{translated}}</textarea>            
-<br><br>
+<table width=100%>
+    <tr>
+        <td width="66%" align="right"><span id="char_count" dir="rtl">אורך: X אותיות</span></td>
+        <td width="33%"></td>
+    </tr>
+</table>                    
 <table width="100%" border="0">
     <tr>
         <td><button id="restart_button" style="font-size: 20px; padding:8px 8px" onclick="window.location='/'">Start Again</button></td>
@@ -145,7 +163,7 @@
         document.getElementById("translated_text").disabled = true;
         document.getElementById("edit_anyway_button").style.visibility = "visible";
     }
+    update_char_count();
 </script>
-
     </body>
 </html>

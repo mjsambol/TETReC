@@ -287,7 +287,7 @@ def route_hebrew_template():
         debug(f"/heb: should we show draft w/ lang={draft['translation_lang']}, is_finished={'is_finished' in draft and draft['is_finished']}, ok_to_translate={'ok_to_translate' in draft and draft['ok_to_translate']}")
         draft_last_mod = draft['last_edit']
         debug(f"/heb: draft's last edit is {draft_last_mod}, it's now {dt}, delta is {dt - draft_last_mod}")
-        if (dt - draft_last_mod).seconds > (60 * 60 * 4):
+        if (dt - draft_last_mod).seconds > (60 * 90):  # 1.5 hours per Yair's choice 
             break
 
         if draft['translation_lang'] == '--': # and draft['is_finished'] == False and 'ok_to_translate' in draft and draft['ok_to_translate'] == True:
@@ -355,6 +355,7 @@ def continue_draft():
             key = draft.key
 
             return render_template(next_page, heb_text=heb_text, translated=translated, draft_timestamp=draft_timestamp, 
+                                   lang=draft['translation_lang'],
                                    draft_key=key.to_legacy_urlsafe().decode('utf8'), is_finished=('is_finished' in draft and draft['is_finished']))
 
     return "Draft not found, please start again."
@@ -382,7 +383,8 @@ def process():
 
     # store the draft in DB so that someone else can continue the translation work
     key = store_draft(heb_text, translation_text=translated, translation_lang=target_language_code)
-    return render_template(next_page, heb_text=heb_text, translated=translated, draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'))
+    return render_template(next_page, heb_text=heb_text, translated=translated, lang=target_language_code,
+                           draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'))
 
 
 @tamtzit.route("/saveDraft", methods=['POST'])

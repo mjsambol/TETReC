@@ -1,5 +1,6 @@
 <html>
     <head>
+        <title>Tamtzit - Hebrew Editing</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
         <!-- Google tag (gtag.js) -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
@@ -21,7 +22,18 @@
                 return result;
             }
 
+            function update_char_count() {
+                entry_len = document.getElementById("heb_text").value.length;
+                document.getElementById("char_count").innerHTML="אורך: " + entry_len + " אותיות";
+                if (entry_len > 4000) {
+                    document.getElementById("char_count").style.color="#FF0000";
+                } else {
+                    document.getElementById("char_count").style.color="#000000";
+                }
+            }
+
             function updatePreview() {
+                update_char_count();
                 document.getElementById("preview_panel").innerHTML=makeWhatsappPreview(document.getElementById("heb_text").value);
             }
 
@@ -43,12 +55,22 @@
                 document.getElementById("done_button").disabled = true;
                 document.getElementById("heb_text").disabled = true;
                 document.getElementById("back_home").style.visibility = "visible";
+                document.getElementById("edit_anyway_button").style.visibility = "visible";
             }
 
             function disable_send_to_translators() {
                 document.getElementById("to_translation_button").style.backgroundColor="#66BB66";
                 document.getElementById("to_translation_button").disabled = true;
                 document.getElementById("done_button").disabled = false;
+            }
+
+            function enable_edit() {
+                document.getElementById("heb_text").disabled = false;
+                document.getElementById("edit_anyway_button").style.visibility = "hidden";
+                document.getElementById("done_button").style.backgroundColor="#DDDDDD";
+                document.getElementById("done_button").disabled = false;
+                document.getElementById("back_home").style.visibility = "hidden";
+                document.getElementById("edit_anyway_button").style.visibility = "hidden";
             }
 
             function to_translators() {
@@ -99,9 +121,9 @@
         <textarea id="heb_text" style="font-size:22px;" name="orig_text" rows="30" cols="80" dir="rtl" oninput="updatePreview();translation_changed();">
 {%if heb_text | length > 0 %}{{ heb_text }}{% else %}📻 *תמצית החדשות*
 *מהדורת {{date_info.part_of_day}}, יום {{date_info.day_of_week}}, {{date_info.hebrew_dom_he}} ב{{date_info.hebrew_month_he}} {{date_info.hebrew_year_he}}*, {{date_info.secular_dom}} ב{{date_info.secular_month}} {{date_info.secular_year}}
-                    
+
 •   •   •
-                    
+
 📌 *_מלחמת חרבות ברזל:_*
 
 > *הזירה הדרומית:*
@@ -168,16 +190,22 @@
 
 *עזרו* לעוד אלפים להתחבר למיזם *החוסן הלאומי - תמצית החדשות - ושתפו* את הקישור להצטרפות👇
 https://link.mmb.org.il/news {% endif %}</textarea>
-<br><br>
+
+<table width=100%>
+    <tr>
+        <td width="66%" align="right"><span id="char_count" dir="rtl">אורך: X אותיות</span></td>
+        <td width="33%"></td>
+    </tr>
+</table>
 <table width="100%">
     <tr>
         <td width="33%" align="center">
             <button id="finish_button" style="font-size: 20px; padding:8px 8px" onclick="copyToClipboard();">העתק את כל התוכן</button>
         </td>
         <td width="33%" align="center">
+            <button id="edit_anyway_button" style="font-size: 15px; padding:3px 3px;visibility: hidden;" onclick="enable_edit();">ערוך שוב</button>&nbsp;&nbsp;&nbsp;
+            <button id="back_home" style="font-size: 20px; padding:8px 8px; visibility: hidden;" onclick="window.location='/';">חזרה להתחלה</button>&nbsp;&nbsp;
             <button id="done_button" style="font-size: 20px; padding:8px 8px;" disabled="true" onclick="done();">סיים</button>            
-            <br>
-            <a id="back_home" href="/" style="font-size: 20px;visibility: hidden;">חזרה להתחלה</a>
             </td>
         <td width="33%" align="center">
             <button id="to_translation_button" style="font-size: 20px; padding:8px 8px;" onclick="to_translators();">מוכן לתרגום</button>  
@@ -196,8 +224,11 @@ https://link.mmb.org.il/news {% endif %}</textarea>
 {% if is_finished %}
     <script>
         disable_done_button();
+        document.getElementById("edit_anyway_button").style.visibility = "visible";
     </script>
 {% endif %}
-
+    <script>
+        update_char_count();
+    </script>
 </body>
 </html>

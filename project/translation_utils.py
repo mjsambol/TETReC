@@ -87,6 +87,8 @@ def pre_translation_swaps(text):
     text = re.sub(r'\b(ב)צו?הריים\b', lambda m: ("in " if m.group(1).startswith("ב") else '') + 'the afternoon', 
                   text, re.U)
     text = re.sub(r'\b(אחר )?ה?צו?הריים\b', 'the afternoon', text, re.U)
+
+    text = re.sub(r'\bהלילה\b', 'last night', text, re.U)
     return text
 
 def post_translation_swaps(text):

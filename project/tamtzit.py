@@ -48,7 +48,7 @@ sections['fr'] = {"SOUTH":Markup("Au sud"),
             "NORTH":Markup("Au nord"), 
             "YandS":"Yehuda et Shomron",
             "Civilian":"Civilian Front", 
-            "InIsrael":"Ce qu'il se passe en Israël",
+            "InIsrael":Markup("Ce qu'il se passe en Israël"),
             "PandP":"Politique",
             "WorldEyes":"Autour du monde", 
             "Worldwide":"Autour du monde",
@@ -61,7 +61,7 @@ sections['fr'] = {"SOUTH":Markup("Au sud"),
 keywords = {}
 keywords['en'] = {
     "edition": "edition",
-    "intro_pin": "📌 war of iron swords",
+    "intro_pin": "war of iron swords",
     "northern":"northern ",
     "southern":"southern ",
     "jands":"judea and samaria",
@@ -77,7 +77,7 @@ keywords['en'] = {
 }
 keywords['fr'] = {
     "edition": "édition",
-    "intro_pin": "📌 guerre des épées de fer",
+    "intro_pin": "guerre des épées de fer",
     "northern": "nord ",
     "southern": "sud ",
     "jands": "judée et samarie",
@@ -89,11 +89,11 @@ keywords['fr'] = {
     "weather": "météo",
     "economy": "economie",
     "sport": "sport",
-    "finish": "terminera"
+    "finish": "finir"
 }
 editions = {}
 editions['en'] = ['Morning', 'Afternoon', 'Evening']
-editions['fr'] = ['Matin', 'après-midi', 'soir']
+editions['fr'] = ['Matin', "l'après-midi", 'soir']
 editions['he'] = ['בוקר', 'צוהריים', 'ערב']
 
 
@@ -276,32 +276,39 @@ def detect_mobile(request, page_name):
 
 @tamtzit.route('/')
 def route_create():
-    return render_template('index.html')
+    return render_template(detect_mobile(request, 'index'))
+
+@tamtzit.route('/debug')
+def device_info():
+    return render_template('fonts.html');
 
 @tamtzit.route('/heb')
 def route_hebrew_template():
+    next_page = detect_mobile(request, "hebrew")
+
     # is there a Hebrew draft from the last 3 hours [not a criteria: that's not yet "Done"]
     drafts, local_tses = fetch_drafts()
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
     for draft in drafts:
+        if draft['translation_lang'] != '--': 
+            continue
+
         debug(f"/heb: should we show draft w/ lang={draft['translation_lang']}, is_finished={'is_finished' in draft and draft['is_finished']}, ok_to_translate={'ok_to_translate' in draft and draft['ok_to_translate']}")
         draft_last_mod = draft['last_edit']
         debug(f"/heb: draft's last edit is {draft_last_mod}, it's now {dt}, delta is {dt - draft_last_mod}")
         if (dt - draft_last_mod).seconds > (60 * 90):  # 1.5 hours per Yair's choice 
             break
 
-        if draft['translation_lang'] == '--': # and draft['is_finished'] == False and 'ok_to_translate' in draft and draft['ok_to_translate'] == True:
-            #return redirect(f'/heb_draft?key={draft.key.to_legacy_urlsafe().decode("utf8")}')
-            return render_template('hebrew.html', heb_text=Markup(draft['hebrew_text']), draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
-                                    ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
-                                    is_finished=('is_finished' in draft and draft['is_finished']))
+        return render_template(next_page, heb_text=Markup(draft['hebrew_text']), draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
+                                ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
+                                is_finished=('is_finished' in draft and draft['is_finished']))
             
-    # if no current draf was found, create a new one so that we have a key to work with and save to while editing
+    # if no current draft was found, create a new one so that we have a key to work with and save to while editing
     key = store_draft('')
     debug(f'Creating a new Hebrew draft with key {key.to_legacy_urlsafe().decode("utf8")}')
 #    return redirect(f'/heb_draft?key={key.to_legacy_urlsafe().decode("utf8")}')
     date_info = make_date_info(dt, 'he')
-    return render_template('hebrew.html', date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"), ok_to_translate=False, is_finished=False)
+    return render_template(next_page, date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"), ok_to_translate=False, is_finished=False)
 
 # @tamtzit.route('/heb_draft')
 # def route_hebrew_draft(): 
@@ -463,9 +470,6 @@ def process_translation_request(heb_text, target_language_code):
         if section is None and kw["edition"] in line.lower() and '202' in line.lower():
             debug("skipping what looks like the intro edition line")
             continue
-        if line.lower().startswith(kw['intro_pin']):
-            debug("skipping what looks like the intro pin line")
-            continue
         if line.startswith("> "):
             debug("bullet line...")
             if kw["southern"] in line.lower() and 'SOUTH' not in organized:
@@ -488,6 +492,9 @@ def process_translation_request(heb_text, target_language_code):
                 section.append(Markup(line))
         elif line.startswith("📌"):
             debug("pin line...")
+            if kw['intro_pin'] in line.lower():
+                debug("skipping what looks like the intro pin line")
+                continue            
             if kw["in israel"] in line.lower():
                 debug("starting inIsrael section")
                 section = organized['InIsrael']
@@ -506,7 +513,8 @@ def process_translation_request(heb_text, target_language_code):
             elif kw["sport"] in line.lower():
                 debug("Starting sports section")
                 section = organized["Sports"]
-            elif kw["finish"] in line.lower() or "good note" in line.lower() or "end well" in line.lower():
+            elif (kw["finish"] in line.lower() or "good note" in line.lower() or "end well" in line.lower() 
+                  or "bien finir" in line.lower() or "finit bien" in line.lower()):
                 debug("Starting good news section")
                 section = organized['FinishWell']
             else:

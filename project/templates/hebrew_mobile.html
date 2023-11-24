@@ -1,0 +1,270 @@
+<html>
+    <head>
+        <title>Tamtzit - Hebrew Editing (mobile)</title>
+        <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
+        <!-- Google tag (gtag.js) -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
+        <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-7WJQ95B6KX');
+        </script>        
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
+        <script>
+            function showPrev() {
+                document.getElementById("orig_heb_panel").style.display="none";
+                document.getElementById("preview_panel").style.display="initial";
+                document.getElementById("preview_text").innerHTML=makeWhatsappPreview(document.getElementById("heb_text").value);
+                document.getElementById("prev_button").style.display="none";
+                document.getElementById("edit_button").style.display="initial";
+            }
+
+            function showEdit() {
+                document.getElementById("preview_panel").style.display="none";
+                document.getElementById("orig_heb_panel").style.display="initial";
+                document.getElementById("prev_button").style.display="initial";
+                document.getElementById("edit_button").style.display="none";
+            }
+
+            function makeWhatsappPreview(input) {
+                result = input.replaceAll("\n", "<br>");
+                result = result.replaceAll(/\*(\S.+?)\*/g,"<b>$1</b>");
+                result = result.replaceAll(/_(\S.+?)_/g,"<i>$1</i>");
+                result = result.replaceAll(/(https:\/\/\S+)/g,"<a href=\"$1\">$1</a>");
+                return result;
+            }
+
+            function update_char_count() {
+                entry_len = document.getElementById("heb_text").value.length;
+                document.getElementById("char_count").innerHTML="אורך: " + entry_len + " אותיות";
+                if (entry_len > 4000) {
+                    document.getElementById("char_count").style.color="#FF0000";
+                } else {
+                    document.getElementById("char_count").style.color="#000000";
+                }
+            }
+
+            function copyToClipboard() {
+                navigator.clipboard.writeText(document.getElementById('heb_text').value);
+            }
+
+            var last_saved_text = `{{heb_text}}`;
+            var is_finished = "True" === "{{is_finished}}";
+
+            function done() {
+                disable_done_button();
+                is_finished = true;
+                saveDraft(true);
+            }
+
+            function disable_done_button() {
+                document.getElementById("done_button").style.backgroundColor="#66BB66";
+                document.getElementById("done_button").disabled = true;
+                document.getElementById("heb_text").disabled = true;
+                document.getElementById("back_home").style.display = "initial";
+                document.getElementById("edit_anyway_button").style.visibility = "visible";
+            }
+
+            function disable_send_to_translators() {
+                document.getElementById("to_translation_button").style.backgroundColor="#66BB66";
+                document.getElementById("to_translation_button").disabled = true;
+                document.getElementById("done_button").disabled = false;
+            }
+
+            function enable_edit() {
+                document.getElementById("heb_text").disabled = false;
+                document.getElementById("edit_anyway_button").style.visibility = "hidden";
+                document.getElementById("done_button").style.backgroundColor="#DDDDDD";
+                document.getElementById("done_button").disabled = false;
+                document.getElementById("back_home").style.display = "none";
+                document.getElementById("edit_anyway_button").style.visibility = "hidden";
+            }
+
+            function to_translators() {
+                disable_send_to_translators();
+                saveDraft(finalize=false, ready_for_translation=true);
+            }
+
+            function translation_changed() {
+                if (last_saved_text.localeCompare(document.getElementById('heb_text').value) != 0) {
+                        document.getElementById("finish_button").innerText = "העתק את כל התוכן";
+                        is_finished = false;
+                } 
+            }
+
+            function saveDraft(finalize=false, ready_for_translation=false) {
+                if (is_finished && !finalize) {
+                    return;
+                }
+                curr_text = document.getElementById('heb_text').value;
+                if (finalize || ready_for_translation || last_saved_text.localeCompare(curr_text) != 0) {
+                    console.log("saving, text was\n\n"+last_saved_text+"\n\ntext is now\n\n" + curr_text);
+                    $.post("/saveDraft",
+                    {
+                        draft_key: "{{draft_key}}",
+                        source_text: curr_text,
+                        is_finished: is_finished,
+                        to_translators: ready_for_translation
+                    },
+                    function(data,status) {
+                        console.log("Draft save status: " + status);
+                        last_saved_text = curr_text;
+                    });
+                }
+            }
+
+            setInterval(function(){saveDraft()}, 10000);  // automatically save a draft every 30 seconds, if the text has changed
+
+
+        </script>
+    </head>
+    <body>
+        
+        <div id="preview_panel" style="display: none;  width:98vw;">
+            <table style="width:98vw" border="1">
+                <tbody style="display: block; height: 76vh; overflow-y: scroll">
+                    <tr>
+                        <td id="preview_text" dir="rtl" style="font-size:2vw; "></td>
+                    </tr>
+    
+                </tbody>
+            </table>
+        </div>
+
+
+        <div id="orig_heb_panel" style="font-family: Arial, Helvetica, sans-serif; font-size:calc(.8em + 0.5vmin)">
+     <textarea id="heb_text" style="font-family: inherit; font-size: inherit; width:98vw; height:76vh;" name="orig_text" dir="rtl" 
+     oninput="update_char_count();translation_changed();" >{%if heb_text | length > 0 %}{{ heb_text }}{% else %}📻 *תמצית החדשות*
+*מהדורת {{date_info.part_of_day}}, יום {{date_info.day_of_week}}, {{date_info.hebrew_dom_he}} ב{{date_info.hebrew_month_he}} {{date_info.hebrew_year_he}}*, {{date_info.secular_dom}} ב{{date_info.secular_month}} {{date_info.secular_year}}
+
+•   •   •
+
+📌 *_מלחמת חרבות ברזל:_*
+
+> *הזירה הדרומית:*
+
+• 
+
+• 
+
+> *הזירה הצפונית:*
+
+• 
+
+• 
+
+> *יהודה ושומרון:*
+
+• 
+
+• 
+
+📌 *_מהמתרחש בארץ:_*
+
+• 
+
+• 
+
+📌 *_מדיניות, משפט ופוליטיקה:_*
+
+• 
+
+• 
+
+📌 *_מסביב לעולם:_*
+
+• 
+
+📌 *_כלכלה:_*
+
+• 
+
+📌 *_ספורט:_*
+
+• 
+
+📌 *_מזג האוויר:_*
+
+• 
+
+📌 *_ונסיים בטוב:_*
+
+
+•   •   •
+
+כתיבה: אלעד ינאי. עריכה לשונית: שירה עבאדי.
+
+•   •   •
+
+*שמעתם חדשות טובות?*
+יש לכם *_הערות, בקשות או עדכונים_* עבורנו? 
+*פנו אלינו למוקד הוואטסאפ:* 052-439-3118
+(פניות למנהלי הקהילות לא בהכרח ייענו)
+
+•   •   •
+
+*עזרו* לעוד אלפים להתחבר למיזם *החוסן הלאומי - תמצית החדשות - ושתפו* את הקישור להצטרפות👇
+https://link.mmb.org.il/news {% endif %}</textarea>
+</div>
+
+<br><br>
+<table width=100% border="0">
+    <tr>
+        <td width="66%" align="right"><span id="char_count" style="font-size: 34px; padding:8px 8px" dir="rtl">אורך: X אותיות</span></td>
+        <td width="33%"></td>
+    </tr>
+</table>
+<table width="100%" border="0">
+    <tr>
+        <td align="center">
+            <button id="prev_button" style="font-size: 45px; padding:8px 8px" onclick="showPrev();">תצוגה</button>
+            <button id="edit_button" style="font-size: 45px; padding:8px 8px; display: none;" onclick="showEdit();">עריכה</button>
+        </td>
+    </tr>
+</table>
+<table width="100%" border="0">
+    <tr>
+        <td width="50%" align="left" valign="top">
+            <button id="edit_anyway_button" style="font-size: 35px; padding:3px 3px;visibility: hidden;" onclick="enable_edit();">ערוך שוב</button>&nbsp;&nbsp;&nbsp;
+            <button id="back_home" style="font-size: 45px; padding:8px 8px; display:none;" onclick="window.location='/';">חזרה להתחלה</button>&nbsp;&nbsp;
+            <button id="done_button" style="font-size: 45px; padding:8px 8px;" disabled="true" onclick="done();">סיים</button>            
+            </td>
+        <td width="50%" align="right" valign="top">
+            <button id="to_translation_button" style="font-size: 45px; padding:8px 8px;" onclick="to_translators();">מוכן לתרגום</button>  
+            <br>
+        </td>
+    </tr>
+</table>
+
+
+{% if ok_to_translate %}
+    <script>
+        disable_send_to_translators();
+    </script>
+{% endif %}
+{% if is_finished %}
+    <script>
+        disable_done_button();
+        document.getElementById("edit_anyway_button").style.visibility = "visible";
+    </script>
+{% endif %}
+    <script>
+        update_char_count();
+        if (screen.availWidth > 390) {
+            document.getElementById('orig_heb_panel').style.fontSize = "calc(1em + 2.5vmin)";
+            document.getElementById('preview_text').style.fontSize = "4vw";
+        }
+        // var dpr = window.devicePixelRatio;
+        // var prev_font = 2;
+        // var heb_font = 
+        // while (dpr < 2.8125) {
+        //     prev_font = prev_font + 0.1875;
+        // }
+    </script>
+            <script>
+            </script>
+</body>
+</html>

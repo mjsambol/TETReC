@@ -1,0 +1,34 @@
+<html>
+    <center>
+        <div id="preview_text" style="font-size: 40px;">
+            כאן יש דוגמא של כמה מילים כדי לבדוק גודל הצגתם על המסך שלך
+        </div>
+
+        <div id="orig_heb_panel" style="font-family: Arial, Helvetica, sans-serif; font-size:calc(.8em + 0.5vmin)">
+            <script>
+                document.write("<br><br>");
+                document.write("Screen width is " + screen.availWidth);
+                document.write("<br><br>");
+                document.write("Pixel depth is " + screen.pixelDepth);
+                document.write("<br><br>");
+                document.write("Device Pixel Ratio " + window.devicePixelRatio);
+                document.write("<br><br>");
+                document.write("UserAgent: " + navigator.userAgent);
+                document.write("<br><br>");
+                var ratio = Math.ceil(4000 / Math.min(screen.availWidth, 400) * Math.max(window.devicePixelRatio, 2.7));
+                document.write("Ratio: " + ratio)
+                document.write("<br><br>");
+                document.write("Scaled: " + (30 + (4 * (30-ratio))));
+        </script>
+                </div>
+    </center>
+    <script>
+        var ratio = Math.ceil(4000 / Math.min(screen.availWidth, 400) * Math.max(window.devicePixelRatio, 2.7));
+        var other_ratio = Math.ceil(1920 / Math.min(screen.availWidth, 400) * Math.max(window.devicePixelRatio, 2.7));
+        var delta = (4 * (30-ratio));
+        var scaled = 30 + delta;
+        var other_scaled = delta / 8;
+        document.getElementById('orig_heb_panel').style.fontSize = "calc(" + (0.8 + (delta / 20)) + "em + " + (0.5 + (delta/5)) + "vmin)";
+        document.getElementById('preview_text').style.fontSize = scaled + "px"; //Math.ceil(4000 / (Math.max(screen.availWidth, 400) * Math.min(window.devicePixelRatio, 2.7))) + "vw";
+</script>
+</html>

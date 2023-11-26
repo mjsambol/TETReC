@@ -1,34 +1,62 @@
 <html>
-    <center>
-        <div id="preview_text" style="font-size: 40px;">
-            כאן יש דוגמא של כמה מילים כדי לבדוק גודל הצגתם על המסך שלך
-        </div>
-
-        <div id="orig_heb_panel" style="font-family: Arial, Helvetica, sans-serif; font-size:calc(.8em + 0.5vmin)">
-            <script>
-                document.write("<br><br>");
-                document.write("Screen width is " + screen.availWidth);
-                document.write("<br><br>");
-                document.write("Pixel depth is " + screen.pixelDepth);
-                document.write("<br><br>");
-                document.write("Device Pixel Ratio " + window.devicePixelRatio);
-                document.write("<br><br>");
-                document.write("UserAgent: " + navigator.userAgent);
-                document.write("<br><br>");
-                var ratio = Math.ceil(4000 / Math.min(screen.availWidth, 400) * Math.max(window.devicePixelRatio, 2.7));
-                document.write("Ratio: " + ratio)
-                document.write("<br><br>");
-                document.write("Scaled: " + (30 + (4 * (30-ratio))));
-        </script>
-                </div>
-    </center>
     <script>
         var ratio = Math.ceil(4000 / Math.min(screen.availWidth, 400) * Math.max(window.devicePixelRatio, 2.7));
         var other_ratio = Math.ceil(1920 / Math.min(screen.availWidth, 400) * Math.max(window.devicePixelRatio, 2.7));
         var delta = (4 * (30-ratio));
         var scaled = 30 + delta;
         var other_scaled = delta / 8;
-        document.getElementById('orig_heb_panel').style.fontSize = "calc(" + (0.8 + (delta / 20)) + "em + " + (0.5 + (delta/5)) + "vmin)";
-        document.getElementById('preview_text').style.fontSize = scaled + "px"; //Math.ceil(4000 / (Math.max(screen.availWidth, 400) * Math.min(window.devicePixelRatio, 2.7))) + "vw";
-</script>
+        var ratio = Math.ceil(4000 / Math.min(screen.availWidth, 400) * Math.max(window.devicePixelRatio, 2.7));
+
+        function increase() {
+            scaled = scaled + 1;
+            sp = document.getElementById('sizes_panel');
+            sp.innerHTML = "Ratio: " + ratio + "<br><br>Scaled: " + scaled + "<br><br>Cookie: {{heb_font_size}}";
+            document.getElementById('preview_text').style.fontSize = scaled + "px";
+            document.getElementById('font-size-form-input').value = scaled;
+        }
+        function decrease() {
+            scaled = scaled - 1;
+            sp = document.getElementById('sizes_panel');
+            sp.innerHTML = "Ratio: " + ratio + "<br><br>Scaled: " + scaled + "<br><br>Cookie: {{heb_font_size}}";
+            document.getElementById('preview_text').style.fontSize = scaled + "px";
+            document.getElementById('font-size-form-input').value = scaled;
+        }
+
+    </script>
+    <center>
+        <div id="preview_text" style="font-size: {{heb_font_size}};">
+            כאן יש דוגמא של כמה מילים כדי לבדוק גודל הצגתם על המסך שלך
+        </div>
+
+        <div id="orig_heb_panel" style="font-family: Arial, Helvetica, sans-serif; font-size:calc(.8em + 0.5vmin)">
+        </div>
+        <br><br>
+        <table width="80%">
+            <tr>
+                <td align="center"><img src="https://cdn-icons-png.flaticon.com/512/2/2486.png" width=200px onclick="increase();"></td>
+                <td align="center"><img src="https://cdn-icons-png.flaticon.com/512/61/61932.png" width=200px onclick="decrease();"></td>
+            </tr>
+            <tr>
+                <td colspan="2" align="center"><br><br>
+                    <form action="/setSettings" method="POST">
+                        <input type="hidden" name="font-size" id="font-size-form-input">
+                        <button type="submit" style="font-size: 45px; padding:8px 8px">נראה טוב</button>
+                    </form>
+                </td>
+            </tr>
+        </table>
+        <br>
+        <div id="sizes_panel" style="font-family: Arial, Helvetica, sans-serif; font-size:calc(.8em + 0.5vmin)"></div>
+    </center>
+    <script>
+        hp = document.getElementById('orig_heb_panel');
+        hp.style.fontSize = "calc(" + (0.8 + (delta / 20)) + "em + " + (0.5 + (delta/5)) + "vmin)";
+        // skip this on first render - we're getting user's cookie prefs
+        //document.getElementById('preview_text').style.fontSize = scaled + "px"; //Math.ceil(4000 / (Math.max(screen.availWidth, 400) * Math.min(window.devicePixelRatio, 2.7))) + "vw";
+
+        hp.innerHTML = hp.innerHTML + "<br><br>Screen width is " + screen.availWidth + "<br><br>Pixel depth is " + screen.pixelDepth;
+        hp.innerHTML = hp.innerHTML + "<br><br>Device Pixel Ratio " + window.devicePixelRatio + "<br><br>UserAgent: " + navigator.userAgent;
+        sp = document.getElementById('sizes_panel');
+        sp.innerHTML = "Ratio: " + ratio + "<br><br>Scaled: " + (30 + (4 * (30-ratio))) + "<br><br>Cookie: {{heb_font_size}}";
+    </script>
 </html>

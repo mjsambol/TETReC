@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import locale
 from collections import defaultdict
 import re
 import os
-from flask import Blueprint, render_template, request, redirect
+import json
+from flask import Blueprint, render_template, request, redirect, make_response
 #from flask_login import login_required, current_user
 from google.cloud import translate, datastore
 from google.cloud.datastore.key import Key
@@ -151,8 +152,31 @@ def translate_text(text: str, target_language_code: str, source_language='he') -
     #     print(response.translations[1].translated_text)
     return result
 
+class DatastoreClientProxy:
+    def __init__(self) -> None:
+        self.client = datastore.Client()
+        self.debug_mode = os.getenv("FLASK_DEBUG") == "1"
 
-datastore_client = datastore.Client()
+    def key(self, name):
+        print("DS key returning " + ("debug_" if self.debug_mode else "") + name)
+        return self.client.key(("debug_" if self.debug_mode else "") + name)
+    
+    def put(self, entity):
+        return self.client.put(entity)
+    
+    def get(self, key):
+        return self.client.get(key)
+    
+    def delete(self, key):
+        return self.client.delete(key)
+    
+    def query(self, kind):
+        print("DS query returning " + ("debug_" if self.debug_mode else "") + kind)
+        return self.client.query(kind =("debug_" if self.debug_mode else "") + kind)
+        
+
+datastore_client = DatastoreClientProxy()
+
 
 ############################################
 # Notes on use of GCP DataStore
@@ -184,7 +208,7 @@ datastore_client = datastore.Client()
 # to delete, use the key:
 # key.delete()
 
-def store_draft(heb_text, translation_text='', translation_lang='en'):
+def create_draft(heb_text, translation_text='', translation_lang='en'):
     '''Create a new entry in the Datastore, save the original text and, optionally, the translation, and return the new key and timestamp'''
 
     key=datastore_client.key("draft")
@@ -212,19 +236,46 @@ def fetch_drafts():
         drafts_local_timestamp[ts] = ts.astimezone(jlm)
         if (now - ts).days > 0 or (now - ts).seconds > DRAFT_TTL:
             datastore_client.delete(draft.key)
+            # also delete all the history of edits to that draft
+            query2 = datastore_client.query(kind="draft_backup")
+            query2.add_filter("draft_id", "=", draft.key.id)
+            draft_backups = query2.fetch()
+            for dbkup in draft_backups:
+                print("found a backup, deleting it")
+                datastore_client.delete(dbkup.key)
             
     return query.fetch(), drafts_local_timestamp
 
+def create_draft_history(draft):
+    key = datastore_client.key("draft_backup")
+    entity = datastore.Entity(key=key, exclude_from_indexes=["hebrew_text","translation_text"])
+    entity.update({"draft_id":draft.key.id, "hebrew_text": draft["hebrew_text"], "translation_text": draft["translation_text"], 
+                   "translation_lang": draft["translation_lang"], "draft_timestamp": draft["timestamp"], "last_edit": draft["last_edit"], 
+                   "is_finished": draft["is_finished"], "ok_to_translate": draft["ok_to_translate"], "backup_timestamp": datetime.now(tz=ZoneInfo('Asia/Jerusalem'))})
+    datastore_client.put(entity)
+    entity = datastore_client.get(entity.key)
+    return entity.key
+    
+
 def update_translation_draft(draft_key, translated_text, is_finished=False):   # can't change the original Hebrew
     draft = datastore_client.get(draft_key)
+    prev_last_edit = draft["last_edit"]
     draft.update({"translation_text": translated_text})
     draft.update({"is_finished": is_finished})
     edit_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     draft.update({"last_edit": edit_timestamp}) 
     datastore_client.put(draft)
 
+    # also store history in case of dramatic failure
+    print("checking whether to save a draft backup...")
+    if (edit_timestamp - prev_last_edit).seconds > 120:
+        print("creating a draft backup")
+        create_draft_history(draft)
+
+
 def update_hebrew_draft(draft_key, hebrew_text, is_finished=False, ok_to_translate=False):
     draft = datastore_client.get(draft_key)
+    prev_last_edit = draft["last_edit"]
     draft.update({"hebrew_text": hebrew_text})
     draft.update({"is_finished": is_finished})
     if ok_to_translate:  # we don't want to go back once it's set to true
@@ -233,6 +284,15 @@ def update_hebrew_draft(draft_key, hebrew_text, is_finished=False, ok_to_transla
     draft.update({"last_edit": edit_timestamp}) 
     draft.update({"translation_lang": '--'})
     datastore_client.put(draft)
+
+    # also store history in case of dramatic failure
+    print("checking whether to save a draft backup...")
+    print(edit_timestamp - prev_last_edit)
+    print((edit_timestamp - prev_last_edit).seconds)
+    if (edit_timestamp - prev_last_edit).seconds > 120:
+        print("creating a draft backup")
+        create_draft_history(draft)
+
 
 def get_latest_published(lang_code):
     drafts = fetch_drafts()[0]
@@ -280,16 +340,43 @@ def route_create():
 
 @tamtzit.route('/debug')
 def device_info():
-    return render_template('fonts.html');
+    heb_font_size = "30px";
+    site_prefs = request.cookies.get('tamtzit_prefs')
+    if site_prefs:
+        spd = json.loads(site_prefs)
+        fsz = spd["heb-font-size"]
+        if fsz:
+            heb_font_size = fsz
+            print("/debug: overriding font size from cookie: " + heb_font_size)
+
+    return render_template('fonts.html', heb_font_size=heb_font_size);
+
+@tamtzit.route("/setSettings", methods=['POST'])
+def route_set_settings():
+    font_preference = request.form.get("font-size")
+    debug("Changing settings: font size is now " + font_preference)
+    response = make_response(redirect("/heb"))
+    prefs = {"heb-font-size": font_preference}
+    response.set_cookie('tamtzit_prefs', json.dumps(prefs), expires=datetime.now() + timedelta(days=100))
+    return response
+
+def refresh_cookies(request, response):
+    site_prefs = request.cookies.get('tamtzit_prefs')
+    if site_prefs:
+        response.set_cookie('tamtzit_prefs', site_prefs, expires=datetime.now() + timedelta(days=100))
+
 
 @tamtzit.route('/heb')
 def route_hebrew_template():
     next_page = detect_mobile(request, "hebrew")
-
+    print("next page is " + next_page)
     # is there a Hebrew draft from the last 3 hours [not a criteria: that's not yet "Done"]
     drafts, local_tses = fetch_drafts()
+    print("Drafts is " + ("" if drafts is None else "not ") + "null")
+
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
     for draft in drafts:
+        print("checking a draft...")
         if draft['translation_lang'] != '--': 
             continue
 
@@ -299,12 +386,22 @@ def route_hebrew_template():
         if (dt - draft_last_mod).seconds > (60 * 90):  # 1.5 hours per Yair's choice 
             break
 
-        return render_template(next_page, heb_text=Markup(draft['hebrew_text']), draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
+        heb_font_size = "30px";
+        site_prefs = request.cookies.get('tamtzit_prefs')
+        if site_prefs:
+            spd = json.loads(site_prefs)
+            fsz = spd["heb-font-size"]
+            if fsz:
+                heb_font_size = fsz
+
+        response = make_response(render_template(next_page, heb_text=Markup(draft['hebrew_text']), draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
                                 ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
-                                is_finished=('is_finished' in draft and draft['is_finished']))
+                                is_finished=('is_finished' in draft and draft['is_finished']), heb_font_size=heb_font_size))
+        refresh_cookies(request, response)
+        return response
             
     # if no current draft was found, create a new one so that we have a key to work with and save to while editing
-    key = store_draft('')
+    key = create_draft('')
     debug(f'Creating a new Hebrew draft with key {key.to_legacy_urlsafe().decode("utf8")}')
 #    return redirect(f'/heb_draft?key={key.to_legacy_urlsafe().decode("utf8")}')
     date_info = make_date_info(dt, 'he')
@@ -389,7 +486,7 @@ def process():
     translated = re.sub('\n{3,}', '\n\n', translated)  # this is necessary because the template can generate large gaps due to unused sections
 
     # store the draft in DB so that someone else can continue the translation work
-    key = store_draft(heb_text, translation_text=translated, translation_lang=target_language_code)
+    key = create_draft(heb_text, translation_text=translated, translation_lang=target_language_code)
     return render_template(next_page, heb_text=heb_text, translated=translated, lang=target_language_code,
                            draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'))
 

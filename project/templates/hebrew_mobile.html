@@ -253,10 +253,13 @@ https://link.mmb.org.il/news {% endif %}</textarea>
 {% endif %}
     <script>
         update_char_count();
-        if (screen.availWidth > 390) {
-            document.getElementById('orig_heb_panel').style.fontSize = "calc(1em + 2.5vmin)";
-            document.getElementById('preview_text').style.fontSize = "4vw";
-        }
+        document.getElementById('orig_heb_panel').style.fontSize = "{{heb_font_size}}";
+        document.getElementById('preview_text').style.fontSize = "{{heb_font_size}}";
+
+        // if (screen.availWidth > 390) {
+        //     document.getElementById('orig_heb_panel').style.fontSize = "calc(1em + 2.5vmin)";
+        //     document.getElementById('preview_text').style.fontSize = "4vw";
+        // }
         // var dpr = window.devicePixelRatio;
         // var prev_font = 2;
         // var heb_font = 

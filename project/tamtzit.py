@@ -158,7 +158,6 @@ class DatastoreClientProxy:
         self.debug_mode = os.getenv("FLASK_DEBUG") == "1"
 
     def key(self, name):
-        print("DS key returning " + ("debug_" if self.debug_mode else "") + name)
         return self.client.key(("debug_" if self.debug_mode else "") + name)
     
     def put(self, entity):
@@ -171,7 +170,6 @@ class DatastoreClientProxy:
         return self.client.delete(key)
     
     def query(self, kind):
-        print("DS query returning " + ("debug_" if self.debug_mode else "") + kind)
         return self.client.query(kind =("debug_" if self.debug_mode else "") + kind)
         
 
@@ -241,7 +239,7 @@ def fetch_drafts():
             query2.add_filter("draft_id", "=", draft.key.id)
             draft_backups = query2.fetch()
             for dbkup in draft_backups:
-                print("found a backup, deleting it")
+                debug("found a backup, deleting it")
                 datastore_client.delete(dbkup.key)
             
     return query.fetch(), drafts_local_timestamp
@@ -256,6 +254,29 @@ def create_draft_history(draft):
     entity = datastore_client.get(entity.key)
     return entity.key
     
+def store_draft_backup(draft):
+    debug("checking whether to save a draft backup...")
+    prev_backup_time = 0
+    query2 = datastore_client.query(kind="draft_backup")
+    query2.order = ["-backup_timestamp"]
+    #query2.add_filter("draft_id", "=", draft.key.id)
+    draft_backups = query2.fetch()
+    for dbkup in draft_backups:
+        if dbkup["draft_id"] != draft.key.id:
+            debug("Found a backup but not for this draft")
+            continue
+        else:
+            debug(f"found a relevant backup which was created on {dbkup['backup_timestamp']}")
+            prev_backup_time = dbkup['backup_timestamp']
+            break
+    if prev_backup_time == 0:
+        debug("No prev backup found")
+    else:
+        debug(f'draft last edit is {draft["last_edit"]} so the backup is {draft["last_edit"] - prev_backup_time} which is {(draft["last_edit"] - prev_backup_time).seconds} seconds old')
+    if prev_backup_time == 0 or (draft["last_edit"] - prev_backup_time).seconds > 90:
+        debug("creating a draft backup")
+        create_draft_history(draft)
+
 
 def update_translation_draft(draft_key, translated_text, is_finished=False):   # can't change the original Hebrew
     draft = datastore_client.get(draft_key)
@@ -267,10 +288,7 @@ def update_translation_draft(draft_key, translated_text, is_finished=False):   #
     datastore_client.put(draft)
 
     # also store history in case of dramatic failure
-    print("checking whether to save a draft backup...")
-    if (edit_timestamp - prev_last_edit).seconds > 120:
-        print("creating a draft backup")
-        create_draft_history(draft)
+    store_draft_backup(draft)
 
 
 def update_hebrew_draft(draft_key, hebrew_text, is_finished=False, ok_to_translate=False):
@@ -286,12 +304,7 @@ def update_hebrew_draft(draft_key, hebrew_text, is_finished=False, ok_to_transla
     datastore_client.put(draft)
 
     # also store history in case of dramatic failure
-    print("checking whether to save a draft backup...")
-    print(edit_timestamp - prev_last_edit)
-    print((edit_timestamp - prev_last_edit).seconds)
-    if (edit_timestamp - prev_last_edit).seconds > 120:
-        print("creating a draft backup")
-        create_draft_history(draft)
+    store_draft_backup(draft)
 
 
 def get_latest_published(lang_code):
@@ -435,6 +448,10 @@ def route_start_translation():
             # this is the most recent Hebrew text
             latest_heb = draft['hebrew_text']
             break
+
+    if len(latest_heb) == 0:
+        return render_template("error.html", msg="There is no current edition ready for translation.")
+    
     # we need to restart the iterator
     drafts, local_tses = fetch_drafts() 
     next_page = detect_mobile(request, "input")

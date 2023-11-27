@@ -16,8 +16,12 @@
         <center>
             <BR><BR>
             <h3>{{msg}}</h3>
+            <BR><BR>
+            <h3 dir="rtl">{{heb_msg}}</h3>                
             <br><br>
+            {% if not dont_show_home_link %}
             <a href="/">Back to the start</a>
+            {% endif %}
         </center>
     </body>
 </html>

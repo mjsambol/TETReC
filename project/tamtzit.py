@@ -3,8 +3,9 @@ from zoneinfo import ZoneInfo
 import locale
 from collections import defaultdict
 import re
-import os
 import json
+from uuid import uuid4
+import functools
 from flask import Blueprint, render_template, request, redirect, make_response
 #from flask_login import login_required, current_user
 from google.cloud import translate, datastore
@@ -12,10 +13,15 @@ from google.cloud.datastore.key import Key
 from dataclasses import dataclass
 from pyluach import dates
 from markupsafe import Markup
+import requests
+from requests.auth import HTTPBasicAuth
 from .translation_utils import *
+from .cookies import *
+from .common import debug, DatastoreClientProxy
 
 PROJECT_ID = "tamtzit-hadashot"
 PARENT = f"projects/{PROJECT_ID}"
+mailjet_basic_auth = HTTPBasicAuth('dbe7d877e71f69f13e19d2af6671f6cb', 'a7e171ca7aeb40920bc93f69d79459d6')   
 DRAFT_TTL = 60 * 60 * 24
 supported_langs_mapping = {}
 supported_langs_mapping['English'] = 'en' 
@@ -152,28 +158,8 @@ def translate_text(text: str, target_language_code: str, source_language='he') -
     #     print(response.translations[1].translated_text)
     return result
 
-class DatastoreClientProxy:
-    def __init__(self) -> None:
-        self.client = datastore.Client()
-        self.debug_mode = os.getenv("FLASK_DEBUG") == "1"
 
-    def key(self, name):
-        return self.client.key(("debug_" if self.debug_mode else "") + name)
-    
-    def put(self, entity):
-        return self.client.put(entity)
-    
-    def get(self, key):
-        return self.client.get(key)
-    
-    def delete(self, key):
-        return self.client.delete(key)
-    
-    def query(self, kind):
-        return self.client.query(kind =("debug_" if self.debug_mode else "") + kind)
-        
-
-datastore_client = DatastoreClientProxy()
+datastore_client = DatastoreClientProxy.get_instance()
 
 
 ############################################
@@ -319,6 +305,34 @@ def get_latest_published(lang_code):
     return None
 
 
+def create_invitation(user):
+    key=datastore_client.key("invitation")
+    entity = datastore.Entity(key=key)
+    entity.update({"creation_timestamp": datetime.now(tz=ZoneInfo('Asia/Jerusalem')),
+                   "user_id": user.key.id,
+                   "link_id": str(uuid4())}) 
+    datastore_client.put(entity)
+    entity = datastore_client.get(entity.key)
+    return entity
+
+def consume_invitation(invitation):
+    debug(f"Seeking DB invitation [{invitation}]")
+    query = datastore_client.query(kind="invitation")
+    query.add_filter("link_id", "=", invitation)
+    found_invs = query.fetch()
+    for inv in found_invs:
+        debug(f"found {inv['link_id']}")
+        if inv['link_id'] == invitation:
+            if 'used_at_timestamp' in inv and inv['used_at_timestamp']:
+                debug("It's already been used.")
+                return None
+            inv.update({"used_at_timestamp": datetime.now(tz=ZoneInfo('Asia/Jerusalem'))})
+            datastore_client.put(inv)
+            user_details = get_user(user_id=inv["user_id"])
+            return user_details
+    return None
+
+
 @dataclass
 class DateInfo():
     part_of_day: str
@@ -343,17 +357,137 @@ def detect_mobile(request, page_name):
         next_pg = page_name + "_mobile.html"
     else:
         next_pg = page_name + ".html"
-    debug(ua)  
     return next_pg
+
+def validate_weekly_birthcert(bcert):
+    query = datastore_client.query(kind="crypto_noise")
+    daily_noise_entries = query.fetch()
+    for daily_noise_entry in daily_noise_entries:
+        daily_noise = daily_noise_entry["daily_noise"]
+        if daily_noise in bcert:
+            return True
+    return False
+
+def get_user(email=None, user_id=None):
+    debug("getting users from DB...")
+
+    if email:
+        query = datastore_client.query(kind="user")
+        debug(f"Based on email {email}")
+        query.add_filter("email", "=", email)
+        users = query.fetch()
+        for user in users:
+            return user
+    elif user_id:
+        debug(f"Based on user ID {user_id}")
+        user = datastore_client.get(datastore_client.key("user", int(user_id)))
+        debug(f"Got back {user}")
+        return user
+
+    return None
+
+def send_invitation(user_details, invitation):
+    email_message = (f"To access the Tamtzit HaChadashot Admin Application, click the link below:\n\n "
+                    f"{invitation}")
+
+    data={"Messages":[{"From":{"Email":"moshe.sambol@gmail.com", "Name":"Moshe Sambol"},
+                        "To":[{"Email":user_details["email"], "Name":user_details["name"]}],
+                        "Subject":"Tamtzit HaChadashot Admin App Access",
+                        "TextPart":email_message}]}
+    
+    mailjet_resp = requests.post("https://api.mailjet.com/v3.1/send", auth=mailjet_basic_auth, 
+                                headers={"Content-Type":"application/json"}, data=json.dumps(data))
+
+    debug(f'Sending training launch notification email - status: {mailjet_resp.json()["Messages"][0]["Status"]}')     
+
+
+def require_login(func):
+    @functools.wraps(func)    # this is necessary so that Flask routing will work!!
+    def authentication_check_wrapper(*args, **kwargs):
+        debug("Checking authentication status...")
+        # check if there is a cookie with a valid session cert (session cookie - short expiration, but saves checking the DB frequently)
+        # - that is, today's date + some noise encrypted with our key
+        # if there is, let the method which called us continue. 
+        # if not, redirect to /auth while passing the URL the user was requesting
+        session_cookie = request.cookies.get(Cookies.ONE_DAY_SESSION)
+        if not session_cookie:
+            debug("No session cookie found")
+            return redirect("/auth?requested=" + request.full_path)
+
+        today_noise = get_today_noise()
+        today_session = get_cookie_dict(request, Cookies.ONE_DAY_SESSION)
+        if "birth_cert" in today_session and today_noise in today_session["birth_cert"]:
+            debug("Decrypted cookie is valid!")
+            return func(*args, **kwargs)
+        
+        debug("decryption cookie found but expired / invalid")
+        return redirect("/auth?requested=" + request.full_path)
+
+    return authentication_check_wrapper
+#        response.set_cookie('tamtzit_prefs', site_prefs, expires=datetime.now() + timedelta(days=100))
+
+
+    # at /auth, check if there is a 7-day cookie with a signed user ID. Look up the user ID in our DB, if found,
+    # extend the 7 days, then create and set a daily session cookie, then redirect back to the requested URL. This is a week-long cookie and saves re-auth
+    #
+    # if at /auth no username found, prompt for email address, look it up in DB, create an invitation link for that user
+    # save it in the DB and send the link, then redir to page "check your email" or "email not found". 
+    # Together with the invitation link save the URL user wanted to go to.
+    #
+    # when user clicks invitation link look it up in DB, if found create a 7-day cookie and set it, redirect to requested URL from invitation table 
+    # with invitation link save created and used dates, don't let it be reused
+
+@tamtzit.route("/auth", methods=['GET','POST'])
+def route_authenticate():
+    
+    if request.method == "GET":
+        weekly_cookie = request.cookies.get(Cookies.ONE_WEEK_SESSION)
+        if not weekly_cookie:
+            debug("No weekly cookie found")
+            return render_template("login.html")
+            
+        # how to create and manage the weekly cookie?
+        # one option: just keep a week's worth of entries of the daily noise, check each one of them for inclusion in the weekly cookie
+        # and delete any old ones as they're found
+        # other option is yet another entity, but it doesn't seem any better, still have to keep it updated...
+        weekly_session = get_cookie_dict(request, Cookies.ONE_WEEK_SESSION)
+        bcert = weekly_session["birth_cert"]
+        if validate_weekly_birthcert(bcert):  
+            weekly_session["birth_cert"] = get_today_noise()
+            response = redirect(request.args.get('requested'))
+            response.set_cookie(Cookies.ONE_WEEK_SESSION, make_cookie_from_dict(weekly_session), expires=datetime.now() + timedelta(days=7))
+            return response
+        else:
+            debug("Weekly cookie is not valid")
+            return render_template("login.html")
+    else: 
+        # handle login form submission    
+        email = request.form.get("email")
+        debug("login attempt from user " + email)
+        user_details = get_user(email)
+        if not user_details:
+            return render_template("error.html", dont_show_home_link=True, msg="The email address you provided is unknown. Contact the admin.",
+                                   heb_msg="כתובת מייל זו לא מוכרת. צור קשר עם משה.")
+    
+        debug("Confirmed - it's a known user. Preparing an invitation link...")
+        # create an invitation link and store it in the DB
+        invitation = create_invitation(user_details)
+        debug("new invitation: " + invitation["link_id"])
+        # send the invitation via email to the user
+        send_invitation(user_details, request.url_root + "use_invitation?inv=" + invitation["link_id"])
+
+        return render_template("error.html", dont_show_home_link=True, msg="Check your email for an authentication link.",
+                               heb_msg="לינק לכניסה נשלח למייל שלך")
 
 
 @tamtzit.route('/')
-def route_create():
+@require_login
+def route_create():    
     return render_template(detect_mobile(request, 'index'))
 
 @tamtzit.route('/debug')
 def device_info():
-    heb_font_size = "30px";
+    heb_font_size = "30px"
     site_prefs = request.cookies.get('tamtzit_prefs')
     if site_prefs:
         spd = json.loads(site_prefs)
@@ -362,7 +496,7 @@ def device_info():
             heb_font_size = fsz
             print("/debug: overriding font size from cookie: " + heb_font_size)
 
-    return render_template('fonts.html', heb_font_size=heb_font_size);
+    return render_template('fonts.html', heb_font_size=heb_font_size)
 
 @tamtzit.route("/setSettings", methods=['POST'])
 def route_set_settings():
@@ -379,7 +513,27 @@ def refresh_cookies(request, response):
         response.set_cookie('tamtzit_prefs', site_prefs, expires=datetime.now() + timedelta(days=100))
 
 
+@tamtzit.route("/use_invitation")
+def route_use_invitation_link():
+    invitation = request.args.get("inv")
+    user_details = consume_invitation(invitation)
+    if user_details:
+        response = make_response(redirect("/"))
+        
+        debug(f"/use_invitation: valid invitation for user {user_details['email']}")
+
+        response.set_cookie(Cookies.ONE_DAY_SESSION, make_daily_cookie(user_details), expires=datetime.now() + timedelta(days=1))
+
+        response.set_cookie(Cookies.ONE_WEEK_SESSION, make_weekly_cookie(user_details), expires=datetime.now() + timedelta(days=7))
+
+        return response
+    else:
+        return render_template("error.html", dont_show_home_link=True, msg="Invalid authentication link. Please contact an admin.",
+                               heb_msg="הלינק לא תקין, צור קשר עם משה")
+
+
 @tamtzit.route('/heb')
+@require_login
 def route_hebrew_template():
     next_page = detect_mobile(request, "hebrew")
     print("next page is " + next_page)
@@ -434,14 +588,15 @@ def route_hebrew_template():
 #         return render_template('hebrew.html', heb_text=heb_text, draft_key=request.args.get('key'), ok_to_translate=ok_to_translate)
 
 @tamtzit.route("/start_translation")
+@require_login
 def route_start_translation():
     drafts, local_tses = fetch_drafts()
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
     latest_heb = ''
     for draft in drafts:
-        # if we can't find an ok-to-translate Hebrew draft from the last 4 hours, let the user know it's not ready...
+        # if we can't find an ok-to-translate Hebrew draft from the last 3 hours, let the user know it's not ready...
         draft_last_mod = draft['last_edit']
-        if (dt - draft_last_mod).seconds > (60 * 60 * 4):
+        if (dt - draft_last_mod).seconds > (60 * 60 * 3):
             return render_template("error.html", msg="There is no current edition ready for translation.")
 
         if draft['translation_lang'] == '--' and 'ok_to_translate' in draft and draft['ok_to_translate'] == True:
@@ -463,6 +618,7 @@ def route_start_translation():
    /draft     edits an existing entry based on a link on the main page      (GET)
 '''
 @tamtzit.route("/draft", methods=['GET'])
+@require_login
 def continue_draft():
     next_page = detect_mobile(request, "editing")
 
@@ -487,6 +643,7 @@ def continue_draft():
    /draft     edits an existing entry based on a link on the main page      (GET)
 '''
 @tamtzit.route('/translate', methods=['POST'])
+@require_login
 def process():
     heb_text = request.form.get('orig_text')
     if not heb_text:
@@ -509,6 +666,7 @@ def process():
 
 
 @tamtzit.route("/saveDraft", methods=['POST'])
+@require_login
 def save_draft():
     debug(f"saveDraft: draft_key is {request.form.get('draft_key')}")
     draft_key = Key.from_legacy_urlsafe(request.form.get('draft_key'))
@@ -525,11 +683,6 @@ def save_draft():
     else:
         update_hebrew_draft(draft_key, source_text, is_finished=finished, ok_to_translate=send_to_translators)
     return "OK"
-
-
-def debug(stuff):
-    if os.getenv("FLASK_DEBUG") == "1":
-        print("DEBUG: " + stuff)
 
 
 def process_translation_request(heb_text, target_language_code):

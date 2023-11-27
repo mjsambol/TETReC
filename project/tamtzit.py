@@ -192,15 +192,20 @@ datastore_client = DatastoreClientProxy.get_instance()
 # to delete, use the key:
 # key.delete()
 
-def create_draft(heb_text, translation_text='', translation_lang='en'):
+def create_draft(heb_text, user_info, translation_text='', translation_lang='en', heb_draft_id=None):
     '''Create a new entry in the Datastore, save the original text and, optionally, the translation, and return the new key and timestamp'''
+
+    if len(heb_text) > 0 and heb_draft_id is None:
+        debug("create_draft() ERROR: received heb_text but no heb_draft_id")
+        raise ValueError("No draft ID though text is present")
 
     key=datastore_client.key("draft")
     draft_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     entity = datastore.Entity(key=key, exclude_from_indexes=["hebrew_text","translation_text"])
-    entity.update({"hebrew_text": heb_text, "translation_text": translation_text, "translation_lang": translation_lang, 
+    entity.update({"hebrew_text": heb_text, "heb_draft_id": heb_draft_id, 
+                   "translation_text": translation_text, "translation_lang": translation_lang, 
                    "timestamp": draft_timestamp, "last_edit": draft_timestamp, 
-                   "is_finished": False, "ok_to_translate": False}) 
+                   "is_finished": False, "ok_to_translate": False, "created_by": user_info["user_id"]}) 
     datastore_client.put(entity)
     entity = datastore_client.get(entity.key)
     return entity.key
@@ -235,7 +240,8 @@ def create_draft_history(draft):
     entity = datastore.Entity(key=key, exclude_from_indexes=["hebrew_text","translation_text"])
     entity.update({"draft_id":draft.key.id, "hebrew_text": draft["hebrew_text"], "translation_text": draft["translation_text"], 
                    "translation_lang": draft["translation_lang"], "draft_timestamp": draft["timestamp"], "last_edit": draft["last_edit"], 
-                   "is_finished": draft["is_finished"], "ok_to_translate": draft["ok_to_translate"], "backup_timestamp": datetime.now(tz=ZoneInfo('Asia/Jerusalem'))})
+                   "is_finished": draft["is_finished"], "ok_to_translate": draft["ok_to_translate"], "created_by": draft["created_by"],
+                   "backup_timestamp": datetime.now(tz=ZoneInfo('Asia/Jerusalem'))})
     datastore_client.put(entity)
     entity = datastore_client.get(entity.key)
     return entity.key
@@ -420,7 +426,7 @@ def require_login(func):
             debug("Decrypted cookie is valid!")
             return func(*args, **kwargs)
         
-        debug("decryption cookie found but expired / invalid")
+        debug("daily cookie found but expired / invalid")
         return redirect("/auth?requested=" + request.full_path)
 
     return authentication_check_wrapper
@@ -439,7 +445,8 @@ def require_login(func):
 
 @tamtzit.route("/auth", methods=['GET','POST'])
 def route_authenticate():
-    
+    debug("/auth called with method " + request.method)
+
     if request.method == "GET":
         weekly_cookie = request.cookies.get(Cookies.ONE_WEEK_SESSION)
         if not weekly_cookie:
@@ -450,11 +457,14 @@ def route_authenticate():
         # one option: just keep a week's worth of entries of the daily noise, check each one of them for inclusion in the weekly cookie
         # and delete any old ones as they're found
         # other option is yet another entity, but it doesn't seem any better, still have to keep it updated...
+        debug("checking validity of weekly cookie which is present")
         weekly_session = get_cookie_dict(request, Cookies.ONE_WEEK_SESSION)
         bcert = weekly_session["birth_cert"]
         if validate_weekly_birthcert(bcert):  
+            debug("weekly cookie is valid, refreshing it, setting daily cookie and redirecting to " + request.args.get('requested'))    
             weekly_session["birth_cert"] = get_today_noise()
             response = redirect(request.args.get('requested'))
+            response.set_cookie(Cookies.ONE_DAY_SESSION, make_cookie_from_dict(weekly_session), expires=datetime.now() + timedelta(days=1))
             response.set_cookie(Cookies.ONE_WEEK_SESSION, make_cookie_from_dict(weekly_session), expires=datetime.now() + timedelta(days=7))
             return response
         else:
@@ -536,14 +546,14 @@ def route_use_invitation_link():
 @require_login
 def route_hebrew_template():
     next_page = detect_mobile(request, "hebrew")
-    print("next page is " + next_page)
+    cookie_user_info = user_data_from_req(request)
+
     # is there a Hebrew draft from the last 3 hours [not a criteria: that's not yet "Done"]
     drafts, local_tses = fetch_drafts()
-    print("Drafts is " + ("" if drafts is None else "not ") + "null")
+    debug("Drafts is " + ("" if drafts is None else "not ") + "null")
 
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
     for draft in drafts:
-        print("checking a draft...")
         if draft['translation_lang'] != '--': 
             continue
 
@@ -553,39 +563,37 @@ def route_hebrew_template():
         if (dt - draft_last_mod).seconds > (60 * 90):  # 1.5 hours per Yair's choice 
             break
 
-        heb_font_size = "30px";
-        site_prefs = request.cookies.get('tamtzit_prefs')
-        if site_prefs:
-            spd = json.loads(site_prefs)
-            fsz = spd["heb-font-size"]
-            if fsz:
-                heb_font_size = fsz
+        draft_creator_user_info = get_user(user_id=draft["created_by"])
 
         response = make_response(render_template(next_page, heb_text=Markup(draft['hebrew_text']), draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
                                 ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
-                                is_finished=('is_finished' in draft and draft['is_finished']), heb_font_size=heb_font_size))
+                                is_finished=('is_finished' in draft and draft['is_finished']), 
+                                heb_font_size=get_heb_font_sz_pref(request), user_name=draft_creator_user_info["user_name_heb"]))
         refresh_cookies(request, response)
         return response
             
     # if no current draft was found, create a new one so that we have a key to work with and save to while editing
-    key = create_draft('')
-    debug(f'Creating a new Hebrew draft with key {key.to_legacy_urlsafe().decode("utf8")}')
-#    return redirect(f'/heb_draft?key={key.to_legacy_urlsafe().decode("utf8")}')
-    date_info = make_date_info(dt, 'he')
-    return render_template(next_page, date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"), ok_to_translate=False, is_finished=False)
+    key = create_draft('', cookie_user_info)
+    draft_creator_user_info = get_user(user_id=cookie_user_info[Cookies.USER_ID])
 
-# @tamtzit.route('/heb_draft')
-# def route_hebrew_draft(): 
-#     draft_key = Key.from_legacy_urlsafe(request.args.get('key'))
-#     draft = datastore_client.get(draft_key)
-#     heb_text = draft['hebrew_text']
-#     ok_to_translate = "ok_to_translate" in draft and draft["ok_to_translate"]
-#     if len(heb_text) == 0:
-#         dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
-#         date_info = make_date_info(dt, 'he')
-#         return render_template('hebrew.html', date_info=date_info, draft_key=request.args.get('key'), ok_to_translate=ok_to_translate)
-#     else:
-#         return render_template('hebrew.html', heb_text=heb_text, draft_key=request.args.get('key'), ok_to_translate=ok_to_translate)
+    debug(f'Creating a new Hebrew draft with key {key.to_legacy_urlsafe().decode("utf8")}')
+    date_info = make_date_info(dt, 'he')
+    response = make_response(render_template(next_page, date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"), ok_to_translate=False, is_finished=False,
+                                             heb_font_size=get_heb_font_sz_pref(request), user_name=draft_creator_user_info["name_hebrew"]))
+    refresh_cookies(request, response)
+    return response
+
+
+def get_heb_font_sz_pref(request):
+    heb_font_size = "30px"
+    site_prefs = request.cookies.get('tamtzit_prefs')
+    if site_prefs:
+        spd = json.loads(site_prefs)
+        fsz = spd["heb-font-size"]
+        if fsz:
+            heb_font_size = fsz
+    return heb_font_size
+
 
 @tamtzit.route("/start_translation")
 @require_login
@@ -602,6 +610,8 @@ def route_start_translation():
         if draft['translation_lang'] == '--' and 'ok_to_translate' in draft and draft['ok_to_translate'] == True:
             # this is the most recent Hebrew text
             latest_heb = draft['hebrew_text']
+            latest_creator = draft['created_by']
+            draft_id = draft.key.id
             break
 
     if len(latest_heb) == 0:
@@ -610,7 +620,8 @@ def route_start_translation():
     # we need to restart the iterator
     drafts, local_tses = fetch_drafts() 
     next_page = detect_mobile(request, "input")
-    return render_template(next_page, heb_text=latest_heb, drafts=drafts, local_timestamps=local_tses, supported_langs=supported_langs_mapping)
+    return render_template(next_page, heb_text=latest_heb, creator_id=latest_creator, draft_id=draft_id, 
+                           drafts=drafts, local_timestamps=local_tses, supported_langs=supported_langs_mapping)
 
 '''
 /translate and /draft are very similar:
@@ -621,6 +632,7 @@ def route_start_translation():
 @require_login
 def continue_draft():
     next_page = detect_mobile(request, "editing")
+    user_info = user_data_from_req(request)
 
     draft_timestamp = request.args.get('ts')
     drafts, _ = fetch_drafts()
@@ -632,7 +644,7 @@ def continue_draft():
             key = draft.key
 
             return render_template(next_page, heb_text=heb_text, translated=translated, draft_timestamp=draft_timestamp, 
-                                   lang=draft['translation_lang'],
+                                   lang=draft['translation_lang'], user_name=user_info["user_name"],
                                    draft_key=key.to_legacy_urlsafe().decode('utf8'), is_finished=('is_finished' in draft and draft['is_finished']))
 
     return "Draft not found, please start again."
@@ -652,15 +664,18 @@ def process():
     target_language_code = request.form.get('target-lang')
     target_language = supported_langs_mapping[target_language_code]
     next_page = detect_mobile(request, "editing")
+    cookie_user_info = user_data_from_req(request)
+    draft_creator_user_info = get_user(user_id=request.form.get('heb_author_id'))
     
     info = process_translation_request(heb_text, target_language_code)
     draft_timestamp=datetime.now(tz=ZoneInfo('Asia/Jerusalem')).strftime('%Y%m%d-%H%M%S')
 
-    translated = render_template(target_language.lower() + '.html', **info, draft_timestamp=draft_timestamp)
+    translated = render_template(target_language.lower() + '.html', **info, draft_timestamp=draft_timestamp, 
+                                 translator_user_name=cookie_user_info["user_name"], heb_author_user_name=draft_creator_user_info["name"])
     translated = re.sub('\n{3,}', '\n\n', translated)  # this is necessary because the template can generate large gaps due to unused sections
 
     # store the draft in DB so that someone else can continue the translation work
-    key = create_draft(heb_text, translation_text=translated, translation_lang=target_language_code)
+    key = create_draft(heb_text, cookie_user_info, translation_text=translated, translation_lang=target_language_code, heb_draft_id=request.form.get('heb_draft_id'))
     return render_template(next_page, heb_text=heb_text, translated=translated, lang=target_language_code,
                            draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'))
 

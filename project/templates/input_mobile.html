@@ -21,6 +21,9 @@
     <br><br>
 
     <form method="POST" action="/translate">
+        <input type="hidden" name="heb_draft_id" value="{{draft_id}}">
+        <input type="hidden" name="heb_author_id" value="{{creator_id}}">
+
         <textarea name="orig_text" rows="25" cols="45" dir="rtl" style="font-size: 32px;">{{heb_text}}</textarea>
 
         <table border="0" width="100%">

@@ -1,6 +1,7 @@
 <html>
     <head>
         <title>Tamtzit - Hebrew Editing (mobile)</title>
+        <script src="{{url_for('static', filename='tamtzit-common.js')}}"></script>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
         <!-- Google tag (gtag.js) -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
@@ -29,14 +30,6 @@
                 document.getElementById("edit_button").style.display="none";
             }
 
-            function makeWhatsappPreview(input) {
-                result = input.replaceAll("\n", "<br>");
-                result = result.replaceAll(/\*(\S.+?)\*/g,"<b>$1</b>");
-                result = result.replaceAll(/_(\S.+?)_/g,"<i>$1</i>");
-                result = result.replaceAll(/(https:\/\/\S+)/g,"<a href=\"$1\">$1</a>");
-                return result;
-            }
-
             function update_char_count() {
                 entry_len = document.getElementById("heb_text").value.length;
                 document.getElementById("char_count").innerHTML="אורך: " + entry_len + " אותיות";
@@ -45,10 +38,6 @@
                 } else {
                     document.getElementById("char_count").style.color="#000000";
                 }
-            }
-
-            function copyToClipboard() {
-                navigator.clipboard.writeText(document.getElementById('heb_text').value);
             }
 
             var last_saved_text = `{{heb_text}}`;

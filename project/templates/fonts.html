@@ -1,4 +1,18 @@
 <html>
+    <head>
+        <title>Tamtzit - Preferences</title>
+        <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
+        <!-- Google tag (gtag.js) -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
+        <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-7WJQ95B6KX');
+        </script>        
+    </head>
+  <body>
     <script>
         var ratio = Math.ceil(4000 / Math.min(screen.availWidth, 400) * Math.max(window.devicePixelRatio, 2.7));
         var other_ratio = Math.ceil(1920 / Math.min(screen.availWidth, 400) * Math.max(window.devicePixelRatio, 2.7));
@@ -59,4 +73,5 @@
         sp = document.getElementById('sizes_panel');
         sp.innerHTML = "Ratio: " + ratio + "<br><br>Scaled: " + (30 + (4 * (30-ratio))) + "<br><br>Cookie: {{heb_font_size}}";
     </script>
+  </body>    
 </html>

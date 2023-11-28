@@ -2,6 +2,7 @@
     <head>
         <title>Tamtzit - Editing {{lang}}</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
+        <script src="{{url_for('static', filename='tamtzit-common.js')}}"></script>
         <!-- Google tag (gtag.js) -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
         <script>
@@ -13,14 +14,6 @@
         </script>        
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
         <script>
-            function makeWhatsappPreview(input) {
-                result = input.replaceAll(/\*(\S[^\n]+?)\*/g,"<b>$1</b>");
-                result = result.replaceAll(/_(\S[^\n]+?)_/g,"<i>$1</i>");
-                result = result.replaceAll("\n", "<br>");
-                result = result.replaceAll(/(https:\/\/\S+)/g,"<a href=\"$1\">$1</a>");
-                return result;
-            }
-
             function showPreview() {
 //                document.getElementById("orig_heb_panel").style.width="1%";
                 document.getElementById("orig_heb_panel").style.display="none";
@@ -41,10 +34,6 @@
                 document.getElementById("translation_panel").style.width="58%";
                 document.getElementById("preview_button").textContent="Preview";
                 document.getElementById("preview_button").setAttribute("onclick","javascript: showPreview();");
-            }
-
-            function copyToClipboard() {
-                navigator.clipboard.writeText(document.getElementById('translated_text').value);
             }
 
             function update_char_count() {
@@ -79,12 +68,12 @@
 
             function done() {
                 if (! is_finished) {
-                    copyToClipboard();
+                    copyToClipboard('translated_text');
                     saveDraft();
                     document.getElementById("finish_button").innerText = "DONE";
                     is_finished = true;
                 } else {
-                    copyToClipboard();
+                    copyToClipboard('translated_text');
                     saveDraft(true);
                     window.location='/';
                 }

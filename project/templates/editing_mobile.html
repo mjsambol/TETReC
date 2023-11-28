@@ -2,6 +2,7 @@
     <head>
         <title>Tamtzit - Editing {{lang}} (Mobile)</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
+        <script src="{{url_for('static', filename='tamtzit-common.js')}}"></script>
         <!-- Google tag (gtag.js) -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
         <script>
@@ -13,13 +14,6 @@
         </script>        
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
         <script>
-            function makeWhatsappPreview(input) {
-                result = input.replaceAll("\n", "<br>");
-                result = result.replaceAll(/\*(\S.+?)\*/g,"<b>$1</b>");
-                result = result.replaceAll(/(https:\/\/\S+)/g,"<a href=\"$1\">$1</a>");
-                return result;
-            }
-
             // prev_button and next_button; swap_prev and swap_next
             // 0 = Hebrew, 1 = Translation, 2 = Preview
             curr_view = 1
@@ -76,10 +70,6 @@
                     document.getElementById("next_button").textContent="Preview";
 
                 }
-            }
-
-            function copyToClipboard() {
-                navigator.clipboard.writeText(document.getElementById('translated_text').value);
             }
 
             function update_char_count() {

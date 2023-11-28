@@ -2,6 +2,7 @@
     <head>
         <title>Tamtzit - Hebrew Editing</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
+        <script src="{{url_for('static', filename='tamtzit-common.js')}}"></script>
         <!-- Google tag (gtag.js) -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
         <script>
@@ -14,14 +15,6 @@
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 
         <script>
-            function makeWhatsappPreview(input) {
-                result = input.replaceAll("\n", "<br>");
-                result = result.replaceAll(/\*(\S.+?)\*/g,"<b>$1</b>");
-                result = result.replaceAll(/_(\S.+?)_/g,"<i>$1</i>");
-                result = result.replaceAll(/(https:\/\/\S+)/g,"<a href=\"$1\">$1</a>");
-                return result;
-            }
-
             function update_char_count() {
                 entry_len = document.getElementById("heb_text").value.length;
                 document.getElementById("char_count").innerHTML="אורך: " + entry_len + " אותיות";
@@ -35,10 +28,6 @@
             function updatePreview() {
                 update_char_count();
                 document.getElementById("preview_panel").innerHTML=makeWhatsappPreview(document.getElementById("heb_text").value);
-            }
-
-            function copyToClipboard() {
-                navigator.clipboard.writeText(document.getElementById('heb_text').value);
             }
 
             var last_saved_text = `{{heb_text}}`;
@@ -200,7 +189,7 @@ https://link.mmb.org.il/news {% endif %}</textarea>
 <table width="100%">
     <tr>
         <td width="33%" align="center">
-            <button id="finish_button" style="font-size: 20px; padding:8px 8px" onclick="copyToClipboard();">העתק את כל התוכן</button>
+            <button id="finish_button" style="font-size: 20px; padding:8px 8px" onclick="copyToClipboard('heb_text');">העתק את כל התוכן</button>
         </td>
         <td width="33%" align="center">
             <button id="edit_anyway_button" style="font-size: 15px; padding:3px 3px;visibility: hidden;" onclick="enable_edit();">ערוך שוב</button>&nbsp;&nbsp;&nbsp;

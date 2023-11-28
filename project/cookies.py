@@ -10,8 +10,10 @@ class Cookies:
 
     ONE_DAY_SESSION = 'tamtzit_auth_session'
     ONE_WEEK_SESSION ='tamtzit_auth_weekly'
-    USER_ID = "user_id"
-
+    COOKIE_USER_ID = "user_id"
+    COOKIE_USER_NAME = "user_name"
+    COOKIE_CERT = "birth_cert"
+    
 
 datastore_client = DatastoreClientProxy.get_instance()
 app_crypto_key = None
@@ -86,9 +88,9 @@ def get_today_noise():
 def make_daily_cookie(user_details):
 
     today_noise = get_today_noise()
-    cookie_data = {"birth_cert": today_noise+user_details['name'],
-                Cookies.USER_ID: user_details.key.id,
-                "user_name": user_details['name']}
+    cookie_data = {Cookies.COOKIE_CERT: today_noise+user_details['name'],
+                Cookies.COOKIE_USER_ID: user_details.key.id,
+                Cookies.COOKIE_USER_NAME: user_details['name']}
     return make_cookie_from_dict(cookie_data)
 
 def make_weekly_cookie(user_details):   

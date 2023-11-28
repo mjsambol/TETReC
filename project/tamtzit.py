@@ -422,7 +422,7 @@ def require_login(func):
 
         today_noise = get_today_noise()
         today_session = get_cookie_dict(request, Cookies.ONE_DAY_SESSION)
-        if "birth_cert" in today_session and today_noise in today_session["birth_cert"]:
+        if Cookies.COOKIE_CERT in today_session and today_noise in today_session[Cookies.COOKIE_CERT]:
             debug("Decrypted cookie is valid!")
             return func(*args, **kwargs)
         
@@ -430,6 +430,24 @@ def require_login(func):
         return redirect("/auth?requested=" + request.full_path)
 
     return authentication_check_wrapper
+
+def require_role(role_name):
+    def decorator_require_role(func):
+        @functools.wraps(func)    # this is necessary so that Flask routing will work!!
+        def role_check_wrapper(*args, **kwargs):
+            debug("Checking role requirements...")
+            db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID]) 
+            roles = db_user_info['role']
+            debug(f"user has roles {roles}")
+            if role_name in roles:
+                return func(*args, **kwargs)
+            else:
+                return render_template("error.html", msg="You don't have access to this section.",
+                                    heb_msg="חלק הזה של האתר מיועד למשתמשים אחרים")
+        
+        return role_check_wrapper
+    return decorator_require_role
+
 #        response.set_cookie('tamtzit_prefs', site_prefs, expires=datetime.now() + timedelta(days=100))
 
 
@@ -459,10 +477,10 @@ def route_authenticate():
         # other option is yet another entity, but it doesn't seem any better, still have to keep it updated...
         debug("checking validity of weekly cookie which is present")
         weekly_session = get_cookie_dict(request, Cookies.ONE_WEEK_SESSION)
-        bcert = weekly_session["birth_cert"]
+        bcert = weekly_session[Cookies.COOKIE_CERT]
         if validate_weekly_birthcert(bcert):  
             debug("weekly cookie is valid, refreshing it, setting daily cookie and redirecting to " + request.args.get('requested'))    
-            weekly_session["birth_cert"] = get_today_noise()
+            weekly_session[Cookies.COOKIE_CERT] = get_today_noise()
             response = redirect(request.args.get('requested'))
             response.set_cookie(Cookies.ONE_DAY_SESSION, make_cookie_from_dict(weekly_session), expires=datetime.now() + timedelta(days=1))
             response.set_cookie(Cookies.ONE_WEEK_SESSION, make_cookie_from_dict(weekly_session), expires=datetime.now() + timedelta(days=7))
@@ -544,6 +562,7 @@ def route_use_invitation_link():
 
 @tamtzit.route('/heb')
 @require_login
+@require_role("Hebrew")
 def route_hebrew_template():
     next_page = detect_mobile(request, "hebrew")
     cookie_user_info = user_data_from_req(request)
@@ -568,13 +587,13 @@ def route_hebrew_template():
         response = make_response(render_template(next_page, heb_text=Markup(draft['hebrew_text']), draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
                                 ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
                                 is_finished=('is_finished' in draft and draft['is_finished']), 
-                                heb_font_size=get_heb_font_sz_pref(request), user_name=draft_creator_user_info["user_name_heb"]))
+                                heb_font_size=get_heb_font_sz_pref(request), user_name=draft_creator_user_info["name_hebrew"]))
         refresh_cookies(request, response)
         return response
             
     # if no current draft was found, create a new one so that we have a key to work with and save to while editing
     key = create_draft('', cookie_user_info)
-    draft_creator_user_info = get_user(user_id=cookie_user_info[Cookies.USER_ID])
+    draft_creator_user_info = get_user(user_id=cookie_user_info[Cookies.COOKIE_USER_ID])
 
     debug(f'Creating a new Hebrew draft with key {key.to_legacy_urlsafe().decode("utf8")}')
     date_info = make_date_info(dt, 'he')
@@ -597,6 +616,7 @@ def get_heb_font_sz_pref(request):
 
 @tamtzit.route("/start_translation")
 @require_login
+@require_role("translator")
 def route_start_translation():
     drafts, local_tses = fetch_drafts()
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
@@ -630,6 +650,7 @@ def route_start_translation():
 '''
 @tamtzit.route("/draft", methods=['GET'])
 @require_login
+@require_role("translator")
 def continue_draft():
     next_page = detect_mobile(request, "editing")
     user_info = user_data_from_req(request)
@@ -656,6 +677,7 @@ def continue_draft():
 '''
 @tamtzit.route('/translate', methods=['POST'])
 @require_login
+@require_role("translator")
 def process():
     heb_text = request.form.get('orig_text')
     if not heb_text:

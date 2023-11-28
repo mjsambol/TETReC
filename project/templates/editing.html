@@ -14,9 +14,9 @@
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
         <script>
             function makeWhatsappPreview(input) {
-                result = input.replaceAll("\n", "<br>");
-                result = result.replaceAll(/\*(\S.+?)\*/g,"<b>$1</b>");
-                result = result.replaceAll(/_(\S.+?)_/g,"<i>$1</i>");
+                result = input.replaceAll(/\*(\S[^\n]+?)\*/g,"<b>$1</b>");
+                result = result.replaceAll(/_(\S[^\n]+?)_/g,"<i>$1</i>");
+                result = result.replaceAll("\n", "<br>");
                 result = result.replaceAll(/(https:\/\/\S+)/g,"<a href=\"$1\">$1</a>");
                 return result;
             }
@@ -92,6 +92,10 @@
 
             function translation_changed() {
                 update_char_count();
+                if (document.getElementById("preview_panel").style.display=="initial") {
+                    document.getElementById("preview_panel").innerHTML=makeWhatsappPreview(document.getElementById("translated_text").value);
+                }
+
                 if (last_saved_translation.localeCompare(document.getElementById('translated_text').value) != 0) {
                         document.getElementById("finish_button").innerText = "Copy to Clipboard";
                         is_finished = false;

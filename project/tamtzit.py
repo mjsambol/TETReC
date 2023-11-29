@@ -6,6 +6,7 @@ import re
 import json
 from uuid import uuid4
 import functools
+import cachetools.func
 from flask import Blueprint, render_template, request, redirect, make_response
 #from flask_login import login_required, current_user
 from google.cloud import translate, datastore
@@ -365,6 +366,7 @@ def detect_mobile(request, page_name):
         next_pg = page_name + ".html"
     return next_pg
 
+@cachetools.func.ttl_cache(ttl=600)
 def validate_weekly_birthcert(bcert):
     query = datastore_client.query(kind="crypto_noise")
     daily_noise_entries = query.fetch()
@@ -374,6 +376,7 @@ def validate_weekly_birthcert(bcert):
             return True
     return False
 
+@cachetools.func.ttl_cache(ttl=600)
 def get_user(email=None, user_id=None):
     debug("getting users from DB...")
 

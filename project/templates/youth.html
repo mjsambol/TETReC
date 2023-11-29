@@ -1,0 +1,79 @@
+📻 *תמצית החדשות לנוער*
+*מהדורת {{date_info.part_of_day}}, יום {{date_info.day_of_week}}, {{date_info.hebrew_dom_he}} ב{{date_info.hebrew_month_he}} {{date_info.hebrew_year_he}}*, {{date_info.secular_dom}} ב{{date_info.secular_month}} {{date_info.secular_year}}
+
+•   •   •
+
+*_מלחמת חרבות ברזל:_*
+
+{% if 'SOUTH' in organized and organized['SOUTH'] | length > 0 %}
+⬇️ *הזירה הדרומית:*
+{% for line in organized['SOUTH'] %}
+{{line}}
+{% endfor %}{% endif %}
+
+{% if 'NORTH' in organized and organized['NORTH'] | length > 0 %}
+⬆️ *הזירה הצפונית:*
+{% for line in organized['NORTH'] %}
+{{line}}
+{% endfor %}{% endif %}
+
+{% if 'YandS' in organized and organized['YandS'] | length > 0 %}
+*יהודה ושומרון:*
+{% for line in organized['YandS'] %}
+{{line}}
+{% endfor %}{% endif %}
+
+{% if 'InIsrael' in organized and organized['InIsrael'] | length > 0 %}
+🇮🇱 *_מהמתרחש בארץ:_*
+{% for line in organized['InIsrael'] %}
+{{line}}
+{% endfor %}{% endif %}
+
+{% if 'PandP' in organized and organized['PandP'] | length > 0 %}
+🖋️ *_מדיניות, משפט ופוליטיקה:_*
+{% for line in organized['PandP'] %}
+{{line}}
+{% endfor %}{% endif %}
+
+{% if 'Worldwide' in organized and organized['Worldwide'] | length > 0 %}
+🌍 *_מסביב לעולם:_*
+{% for line in organized['Worldwide'] %}
+{{line}}
+{% endfor %}{% endif %}
+
+{% if 'Economy' in organized and organized['Economy'] | length > 0 %}
+💸 *_כלכלה:_*
+{% for line in organized['Economy'] %}
+{{line}}
+{% endfor %}{% endif %}
+
+{% if 'Sports' in organized and organized['Sports'] | length > 0 %}
+👟 *_ספורט:_*
+{% for line in organized['Sports'] %}
+{{line}}
+{% endfor %}{% endif %}
+
+{% if 'Weather' in organized and organized['Weather'] | length > 0 %}
+⛅ *_מזג האוויר:_*
+{% for line in organized['Weather'] %}
+{{line}}
+{% endfor %}{% endif %}
+
+{% if 'FinishWell' in organized and organized['FinishWell'] | length > 0 %}
+🪬 *_ונסיים בטוב:_*
+{% for line in organized['FinishWell'] %}
+{{line}}
+{% endfor %}{% endif %}
+
+•   •   •
+
+💡 *_הטיפ השבועי:_*
+
+•   •   •
+
+כתיבה: {{heb_author_in_heb}}. עריכת תוכן: {{translator_in_heb}}.
+
+•   •   •
+
+להצטרפות לקבוצות תמצית החדשות לנוער 👇
+https://link.mmb.org.il/newsteen

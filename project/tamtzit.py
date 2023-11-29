@@ -19,91 +19,12 @@ from requests.auth import HTTPBasicAuth
 from .translation_utils import *
 from .cookies import *
 from .common import *
+from .language_mappings import *
 
 PROJECT_ID = "tamtzit-hadashot"
 PARENT = f"projects/{PROJECT_ID}"
 mailjet_basic_auth = HTTPBasicAuth('dbe7d877e71f69f13e19d2af6671f6cb', 'a7e171ca7aeb40920bc93f69d79459d6')   
 DRAFT_TTL = 60 * 60 * 24
-supported_langs_mapping = {}
-supported_langs_mapping['English'] = 'en' 
-supported_langs_mapping['en'] = 'English' 
-supported_langs_mapping['Francais'] = 'fr'
-supported_langs_mapping['fr'] = 'Francais'
-locales = {}
-# Note that at least locally, getting locale support requires some prep-work:
-# sudo apt-get install language-pack-he-base  (or fr instead of he, etc)
-# sudo dpkg-reconfigure locales
-# they seemed to thankfully be supported out of the box in appengine
-locales['en'] = "en_US.UTF-8"
-locales['fr'] = "fr_FR.UTF-8"
-locales['he'] = 'he_IL.UTF-8'
-sections = {}
-sections['en'] = {"SOUTH":"Southern Front", 
-            "NORTH":"Northern Front", 
-            "YandS":"Yehuda and Shomron",
-            "Civilian":"Civilian Front", 
-            "InIsrael":"Israel Local News",
-            "PandP":"Policy, Law and Politics",
-            "WorldEyes":"In the Eyes of the World", 
-            "Worldwide":"World News",
-            "Economy":"Economy",
-            "Sports":"Sports",
-            "Weather":"Weather",
-            "FinishWell":"On a Positive Note",
-            "UNKNOWN":"UNKNOWN"
-            }
-sections['fr'] = {"SOUTH":Markup("Au sud"), 
-            "NORTH":Markup("Au nord"), 
-            "YandS":"Yehuda et Shomron",
-            "Civilian":"Civilian Front", 
-            "InIsrael":Markup("Ce qu'il se passe en Israël"),
-            "PandP":"Politique",
-            "WorldEyes":"Autour du monde", 
-            "Worldwide":"Autour du monde",
-            "Economy":"Economie",
-            "Sports":"Sport",
-            "Weather":"Météo",
-            "FinishWell":"Et on termine sur une bonne note 🎶",
-            "UNKNOWN":"UNKNOWN"
-            }
-keywords = {}
-keywords['en'] = {
-    "edition": "edition",
-    "intro_pin": "war of iron swords",
-    "northern":"northern ",
-    "southern":"southern ",
-    "jands":"judea and samaria",
-    "policy":"policy",
-    "politics":"politics",
-    "in the world": "in the world",
-    "in israel": "in israel",
-    "world": "world",
-    "weather": "weather",
-    "economy": "economy",
-    "sport": "sport",
-    "finish": "finish"
-}
-keywords['fr'] = {
-    "edition": "édition",
-    "intro_pin": "guerre des épées de fer",
-    "northern": "nord ",
-    "southern": "sud ",
-    "jands": "judée et samarie",
-    "policy": "politique",
-    "politics": "politique",
-    "in the world":"UNKNOWN",
-    "in israel": "en israël",
-    "world": "le monde",
-    "weather": "météo",
-    "economy": "economie",
-    "sport": "sport",
-    "finish": "finir"
-}
-editions = {}
-editions['en'] = ['Morning', 'Afternoon', 'Evening']
-editions['fr'] = ['Matin', "l'après-midi", 'soir']
-editions['he'] = ['בוקר', 'צוהריים', 'ערב']
-
 
 client = translate.TranslationServiceClient()
 
@@ -689,7 +610,7 @@ def route_start_translation():
 @require_role("translator")
 def continue_draft():
     next_page = detect_mobile(request, "editing")
-    user_info = user_data_from_req(request)
+    user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
 
     draft_timestamp = request.args.get('ts')
     drafts, _ = fetch_drafts()
@@ -698,10 +619,16 @@ def continue_draft():
         if ts.strftime('%Y%m%d-%H%M%S') == draft_timestamp:
             heb_text = draft['hebrew_text']
             translated = draft['translation_text']
+            names = {
+                "heb_author_in_heb": draft["name_hebrew"],
+                "heb_author_in_en": draft["name"],
+                "translator_in_heb":user_info["name_hebrew"],
+                "translator_in_en": user_info["name"]
+            }
             key = draft.key
 
             return render_template(next_page, heb_text=heb_text, translated=translated, draft_timestamp=draft_timestamp, 
-                                   lang=draft['translation_lang'], user_name=user_info["user_name"],
+                                   lang=draft['translation_lang'], **names,
                                    draft_key=key.to_legacy_urlsafe().decode('utf8'), is_finished=('is_finished' in draft and draft['is_finished']))
 
     return "Draft not found, please start again."
@@ -722,18 +649,24 @@ def process():
     target_language_code = request.form.get('target-lang')
     target_language = supported_langs_mapping[target_language_code]
     next_page = detect_mobile(request, "editing")
-    cookie_user_info = user_data_from_req(request)
+    basic_user_info = user_data_from_req(request)
+    user_info = get_user(user_id=basic_user_info["user_id"])
     draft_creator_user_info = get_user(user_id=request.form.get('heb_author_id'))
+    names = {
+        "heb_author_in_heb": draft_creator_user_info["name_hebrew"],
+        "heb_author_in_en": draft_creator_user_info["name"],
+        "translator_in_heb":user_info["name_hebrew"],
+        "translator_in_en": user_info["name"]
+    }
     
     info = process_translation_request(heb_text, target_language_code)
     draft_timestamp=datetime.now(tz=ZoneInfo('Asia/Jerusalem')).strftime('%Y%m%d-%H%M%S')
 
-    translated = render_template(target_language.lower() + '.html', **info, draft_timestamp=draft_timestamp, 
-                                 translator_user_name=cookie_user_info["user_name"], heb_author_user_name=draft_creator_user_info["name"])
+    translated = render_template(target_language.lower() + '.html', **info, draft_timestamp=draft_timestamp, **names)
     translated = re.sub('\n{3,}', '\n\n', translated)  # this is necessary because the template can generate large gaps due to unused sections
 
     # store the draft in DB so that someone else can continue the translation work
-    key = create_draft(heb_text, cookie_user_info, translation_text=translated, translation_lang=target_language_code, heb_draft_id=request.form.get('heb_draft_id'))
+    key = create_draft(heb_text, basic_user_info, translation_text=translated, translation_lang=target_language_code, heb_draft_id=request.form.get('heb_draft_id'))
     return render_template(next_page, heb_text=heb_text, translated=translated, lang=target_language_code,
                            draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'))
 
@@ -777,7 +710,10 @@ def process_translation_request(heb_text, target_language_code):
     #         heb_lines.pop(i)
     #         break
 
-    translated = translate_text(heb_text, target_language_code)
+    if target_language_code == "YY":
+        translated = heb_text
+    else:
+        translated = translate_text(heb_text, target_language_code)
     debug(f"RAW TRANSLATION:--------\n{translated}")
     debug(f"--------------------------")
 
@@ -796,7 +732,7 @@ def process_translation_request(heb_text, target_language_code):
         if "📻" in line:
             debug("skipping radio icon line")
             continue
-        if "• • •" in line:
+        if "• • •" in line or "•   •   •" in line:
             debug("Found three dot line")
             if "NORTH" in organized or "SOUTH" in organized:
                 debug("post three dots, skipping")

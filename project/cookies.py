@@ -47,6 +47,38 @@ def get_app_key():
     
     return app_crypto_key
 
+def daily_db_cleanup(now):
+    
+    debug("daily_db_cleanup() - removing old crypto_noise entries")
+    valid_day_stamps = []
+    for day_delta in range(7):
+        valid_day = now - timedelta(days=day_delta)
+        valid_day_stamps.append(valid_day.strftime('%Y.%m.%d'))
+    debug(f"daily_db_cleanup(): valid days are {valid_day_stamps}")
+
+    query = datastore_client.query(kind="crypto_noise")
+    daily_noise_entries = query.fetch()
+    for daily_noise_entry in daily_noise_entries:
+        daily_noise = daily_noise_entry["daily_noise"]
+        daily_noise_is_valid = False
+        for option in valid_day_stamps:
+            if option in daily_noise:
+                daily_noise_is_valid = True
+                break
+        if not daily_noise_is_valid:
+            datastore_client.delete(daily_noise_entry.key)
+
+    debug("daily_db_cleanup() - removing old draft_backup entries")
+    query2 = datastore_client.query(kind="draft_backup")
+    draft_backups = query2.fetch()
+    for dbkup in draft_backups:
+        its_from = dbkup['backup_timestamp']
+        debug(f"found a backup from {its_from}")
+        if (now - its_from).days > 0 or (now - its_from).seconds > (60 * 60 * 10):
+            debug("deleting it.")
+            datastore_client.delete(dbkup.key)
+
+
 def get_today_noise():
     global today_crypto_noise
     debug("get_today_noise() starting...")
@@ -62,25 +94,8 @@ def get_today_noise():
     entity.update({"daily_noise":today_crypto_noise})
     datastore_client.put(entity)
 
-    # let's also clean out any old ones that should no longer be valid
-    debug("get_today_noise() - removing old crypto_noise entries")
-    valid_day_stamps = []
-    for day_delta in range(7):
-        valid_day = now - timedelta(days=day_delta)
-        valid_day_stamps.append(valid_day.strftime('%Y.%m.%d'))
-    debug(f"get_today_noise: valid days are {valid_day_stamps}")
-
-    query = datastore_client.query(kind="crypto_noise")
-    daily_noise_entries = query.fetch()
-    for daily_noise_entry in daily_noise_entries:
-        daily_noise = daily_noise_entry["daily_noise"]
-        daily_noise_is_valid = False
-        for option in valid_day_stamps:
-            if option in daily_noise:
-                daily_noise_is_valid = True
-                break
-        if not daily_noise_is_valid:
-            datastore_client.delete(daily_noise_entry.key)
+    # since this process happens once a day, it's a good place to do some DB cleanup
+    daily_db_cleanup(now)
 
     debug("get_today_noise(): returning")
     return today_crypto_noise

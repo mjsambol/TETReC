@@ -327,13 +327,18 @@ def consume_invitation(invitation):
     query = datastore_client.query(kind="invitation")
     query.add_filter("link_id", "=", invitation)
     found_invs = query.fetch()
+    now = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     for inv in found_invs:
         debug(f"found {inv['link_id']}")
         if inv['link_id'] == invitation:
             if 'used_at_timestamp' in inv and inv['used_at_timestamp']:
                 debug("It's already been used.")
                 return None
-            inv.update({"used_at_timestamp": datetime.now(tz=ZoneInfo('Asia/Jerusalem'))})
+            if (now - inv['creation_timestamp']).days > 0 or (now - inv['creation_timestamp']).seconds > (60 * 60):
+                debug("It's expired, deleting it.")
+                datastore_client.delete(inv.key)
+                return None
+            inv.update({"used_at_timestamp": now})
             datastore_client.put(inv)
             user_details = get_user(user_id=inv["user_id"])
             return user_details

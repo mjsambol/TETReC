@@ -619,9 +619,10 @@ def continue_draft():
         if ts.strftime('%Y%m%d-%H%M%S') == draft_timestamp:
             heb_text = draft['hebrew_text']
             translated = draft['translation_text']
+            draft_creator_user_info = get_user(user_id=draft["created_by"])
             names = {
-                "heb_author_in_heb": draft["name_hebrew"],
-                "heb_author_in_en": draft["name"],
+                "heb_author_in_heb": draft_creator_user_info["name_hebrew"],
+                "heb_author_in_en": draft_creator_user_info["name"],
                 "translator_in_heb":user_info["name_hebrew"],
                 "translator_in_en": user_info["name"]
             }

@@ -22,7 +22,7 @@ async function updateStatus() {
                 status = status + "לא בתהליך";
             } else {
                 stuff_happening = true;
-                status = status + obj['by_lang'][lang]['who'] + ' התחיל\\ה ב' + obj['by_lang'][lang]['started'] + " ועבד\\ה עד ל" + obj['by_lang'][lang]['last_edit'];
+                status = status + obj['by_lang'][lang]['who'] + ' התחיל\\ה ' + " ועבד\\ה עד ל" + obj['by_lang'][lang]['last_edit'];
                 if (lang == '--') {
                     if (obj['by_lang'][lang]['ok_to_translate']) {
                         status = status + ' -- <b><font color="#1a9c3b">';

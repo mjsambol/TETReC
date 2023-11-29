@@ -5,6 +5,23 @@ def debug(stuff):
     if os.getenv("FLASK_DEBUG") == "1":
         print("DEBUG: " + stuff)
 
+def expand_lang_code(from_lang, to_lang='H'):
+    if to_lang == 'H':
+        if from_lang == '--':
+            return 'עברית'
+        if from_lang == 'en':
+            return 'אנגלית'
+        if from_lang == 'fr':
+            return 'צרפתית'
+    if to_lang == 'E':
+        if from_lang == '--':
+            return 'Hebrew'
+        if from_lang == 'en':
+            return 'English'
+        if from_lang == 'fr':
+            return 'French'
+    return '??'
+
 class DatastoreClientProxy:
 
     _proxy_instance = None

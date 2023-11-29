@@ -26,6 +26,34 @@
         <td colspan="3" align="center" style="font-size: 45px;  font-family: Arial, Helvetica, sans-serif;"><br><br><br><a href="https://tamtzit-reader.oa.r.appspot.com/">תמצית החדשות במגוון שפות</a></td>
     </tr>
 </table>
+<br><br><br><br><br>
+<table cellpadding="20" border="2">
+    <tr><td id="translation_status" style="font-size: 40px;  font-family: Arial, Helvetica, sans-serif;" dir="rtl">
+
+    </td></tr>
+</table>
+
         </center>
     </body>
+    <script>
+        async function updateStatus() {
+            let obj = await (await fetch("/status")).json();
+            var status = "מצב העבודה נכון ל " + obj['as_of'] + ":";
+            lang_order = ['--', 'en', 'fr']
+            for (lang of lang_order) {
+                if (lang in obj['by_lang']) {
+                    status = status + "<br><br>" + obj['by_lang'][lang]['lang'] + ': ';
+                    if (obj['by_lang'][lang]['elapsed_since_last_edit'] > 600) {
+                        status = status + "לא בתהליך";
+                    } else {
+                        status = status + obj['by_lang'][lang]['who'] + ' התחיל ב' + obj['by_lang'][lang]['started'] + " ועבד עד ל" + obj['by_lang'][lang]['last_edit']
+                    }
+                }
+            }
+            document.getElementById('translation_status').innerHTML= status; 
+        };
+    
+        setInterval(function(){updateStatus()}, 120000);  // automatically update status once every 2 minutes
+        updateStatus();  // so there's data there when the page is first loaded
+    </script>    
 </html>

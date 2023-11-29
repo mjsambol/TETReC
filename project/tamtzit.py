@@ -17,7 +17,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 from .translation_utils import *
 from .cookies import *
-from .common import debug, DatastoreClientProxy
+from .common import *
 
 PROJECT_ID = "tamtzit-hadashot"
 PARENT = f"projects/{PROJECT_ID}"
@@ -539,6 +539,28 @@ def refresh_cookies(request, response):
     site_prefs = request.cookies.get('tamtzit_prefs')
     if site_prefs:
         response.set_cookie('tamtzit_prefs', site_prefs, expires=datetime.now() + timedelta(days=100))
+
+
+@tamtzit.route("/status")
+def route_get_status_json():
+    status_per_lang = {}
+    now = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
+    drafts = fetch_drafts()[0]
+    for draft in drafts:
+        if draft['translation_lang'] in status_per_lang:
+            continue
+        status_per_lang[draft['translation_lang']] = {
+            "lang": expand_lang_code(draft["translation_lang"], to_lang="H"),
+            "who": get_user(user_id=draft["created_by"])['name_hebrew'],
+            "started": draft['timestamp'].strftime('%H:%M'),
+            "last_edit": draft['last_edit'].strftime('%H:%M'),
+            "elapsed_since_last_edit": (now - draft['last_edit']).seconds
+        }
+    response = {
+        'as_of': now.strftime("%H:%M"),
+        'by_lang': status_per_lang
+    }
+    return json.dumps(response)
 
 
 @tamtzit.route("/use_invitation")

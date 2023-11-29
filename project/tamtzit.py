@@ -485,7 +485,10 @@ def route_authenticate():
         # other option is yet another entity, but it doesn't seem any better, still have to keep it updated...
         debug("checking validity of weekly cookie which is present")
         weekly_session = get_cookie_dict(request, Cookies.ONE_WEEK_SESSION)
-        bcert = weekly_session[Cookies.COOKIE_CERT]
+        if Cookies.COOKIE_CERT not in weekly_session:
+            debug("Weekly cookie is not valid")
+            return render_template("login.html")
+        bcert = weekly_session[Cookies.COOKIE_CERT]        
         if validate_weekly_birthcert(bcert):  
             debug("weekly cookie is valid, refreshing it, setting daily cookie and redirecting to " + request.args.get('requested'))    
             weekly_session[Cookies.COOKIE_CERT] = get_today_noise()
@@ -552,7 +555,8 @@ def refresh_cookies(request, response):
 @tamtzit.route("/status")
 def route_get_status_json():
     status_per_lang = {}
-    now = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
+    jlm = ZoneInfo("Asia/Jerusalem")
+    now = datetime.now(tz=jlm)
     drafts = fetch_drafts(query_order="-last_edit")[0]
     for draft in drafts:
         if draft['translation_lang'] in status_per_lang:
@@ -560,8 +564,8 @@ def route_get_status_json():
         status_per_lang[draft['translation_lang']] = {
             "lang": expand_lang_code(draft["translation_lang"], to_lang="H"),
             "who": get_user(user_id=draft["created_by"])['name_hebrew'],
-            "started": draft['timestamp'].strftime('%H:%M'),
-            "last_edit": draft['last_edit'].strftime('%H:%M'),
+            "started": draft['timestamp'].astimezone(jlm).strftime('%H:%M'),
+            "last_edit": draft['last_edit'].astimezone(jlm).strftime('%H:%M'),
             "elapsed_since_last_edit": (now - draft['last_edit']).seconds,
             "ok_to_translate": draft['ok_to_translate'],
             "done": draft['is_finished']
@@ -624,7 +628,7 @@ def route_hebrew_template():
         return response
             
     # if no current draft was found, create a new one so that we have a key to work with and save to while editing
-    key = create_draft('', cookie_user_info)
+    key = create_draft('', cookie_user_info, translation_lang='--')
     draft_creator_user_info = get_user(user_id=cookie_user_info[Cookies.COOKIE_USER_ID])
 
     debug(f'Creating a new Hebrew draft with key {key.to_legacy_urlsafe().decode("utf8")}')

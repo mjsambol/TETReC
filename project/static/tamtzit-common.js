@@ -18,11 +18,11 @@ async function updateStatus() {
     for (lang of lang_order) {
         if (lang in obj['by_lang']) {
             status = status + "<br><br><b>" + obj['by_lang'][lang]['lang'] + ':</b> ';
-            if (obj['by_lang'][lang]['elapsed_since_last_edit'] > 600) {
+            if (obj['by_lang'][lang]['elapsed_since_last_edit'] > 3600) {
                 status = status + "לא בתהליך";
             } else {
                 stuff_happening = true;
-                status = status + obj['by_lang'][lang]['who'] + ' התחיל ב' + obj['by_lang'][lang]['started'] + " ועבד עד ל" + obj['by_lang'][lang]['last_edit'];
+                status = status + obj['by_lang'][lang]['who'] + ' התחיל\\ה ב' + obj['by_lang'][lang]['started'] + " ועבד\\ה עד ל" + obj['by_lang'][lang]['last_edit'];
                 if (lang == '--') {
                     if (obj['by_lang'][lang]['ok_to_translate']) {
                         status = status + ' -- <b><font color="#1a9c3b">';

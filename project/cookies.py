@@ -119,7 +119,12 @@ def get_cookie_dict(request, cookie_name):
     
     # this was very helpful documentation: https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password
     encryption_key = get_app_key()
-    decrypted_cookie = Fernet(encryption_key).decrypt(cookie)  
+    try:
+        decrypted_cookie = Fernet(encryption_key).decrypt(cookie)  
+    except:
+        debug(f"Error decrypting cookie {cookie_name}")
+        return {}
+    
     return json.loads(decrypted_cookie)
 
 def make_cookie_from_dict(session):

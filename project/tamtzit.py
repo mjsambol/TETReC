@@ -210,9 +210,9 @@ def create_draft(heb_text, user_info, translation_text='', translation_lang='en'
     entity = datastore_client.get(entity.key)
     return entity.key
 
-def fetch_drafts():
+def fetch_drafts(query_order="-timestamp"):
     query = datastore_client.query(kind="draft")
-    query.order = ["-timestamp"]
+    query.order = [query_order]
 
     drafts = query.fetch()
 
@@ -545,7 +545,7 @@ def refresh_cookies(request, response):
 def route_get_status_json():
     status_per_lang = {}
     now = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
-    drafts = fetch_drafts()[0]
+    drafts = fetch_drafts(query_order="-last_edit")[0]
     for draft in drafts:
         if draft['translation_lang'] in status_per_lang:
             continue
@@ -554,7 +554,9 @@ def route_get_status_json():
             "who": get_user(user_id=draft["created_by"])['name_hebrew'],
             "started": draft['timestamp'].strftime('%H:%M'),
             "last_edit": draft['last_edit'].strftime('%H:%M'),
-            "elapsed_since_last_edit": (now - draft['last_edit']).seconds
+            "elapsed_since_last_edit": (now - draft['last_edit']).seconds,
+            "ok_to_translate": draft['ok_to_translate'],
+            "done": draft['is_finished']
         }
     response = {
         'as_of': now.strftime("%H:%M"),

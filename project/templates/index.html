@@ -2,6 +2,7 @@
     <head>
         <title>Tamtzit - Admin Portal</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
+        <script src="{{url_for('static', filename='tamtzit-common.js')}}"></script>
         <!-- Google tag (gtag.js) -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
         <script>
@@ -36,24 +37,6 @@
         </center>
     </body>
 <script>
-    async function updateStatus() {
-        let obj = await (await fetch("/status")).json();
-        var status = "מצב העבודה נכון ל " + obj['as_of'] + ":";
-        lang_order = ['--', 'en', 'fr']
-        for (lang of lang_order) {
-            if (lang in obj['by_lang']) {
-                status = status + "<br><br>" + obj['by_lang'][lang]['lang'] + ': ';
-                if (obj['by_lang'][lang]['elapsed_since_last_edit'] > 600) {
-                    status = status + "לא בתהליך";
-                } else {
-                    status = status + obj['by_lang'][lang]['who'] + ' התחיל ב' + obj['by_lang'][lang]['started'] + " ועבד עד ל" + obj['by_lang'][lang]['last_edit']
-                }
-            }
-        }
-        document.getElementById('translation_status').innerHTML= status; 
-    };
-
-    setInterval(function(){updateStatus()}, 120000);  // automatically update status once every 2 minutes
-    updateStatus();  // so there's data there when the page is first loaded
+    updateStatus();  // this will also start a periodic auto-refresh
 </script>
 </html>

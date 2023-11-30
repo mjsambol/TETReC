@@ -540,8 +540,15 @@ def route_hebrew_template():
             break
 
         draft_creator_user_info = get_user(user_id=draft["created_by"])
+        # originally I didn't bother passing date_info based on the assumption that by the time we reach this point we're editing an existing draft,
+        # and the text will already have the date filled in, so there will be no templating left to resolve. But there is an edge case where that 
+        # might not play out: When we create the draft entry in the DB, the text is *blank*. If the user quickly refreshes the page, heb_text here is blank,
+        # so the logic in the hebrew.html page will use the template ... and will need this date info. One approach to fixing it would be to ensure that 
+        # _something_ is always saved to the DB, not blank; it seems not worse to ensure that the call to render_template is kept as close as possible between 
+        # here and the call below.
+        date_info = make_date_info(dt, 'he')
 
-        response = make_response(render_template(next_page, heb_text=Markup(draft['hebrew_text']), draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
+        response = make_response(render_template(next_page, date_info=date_info, heb_text=Markup(draft['hebrew_text']), draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
                                 ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
                                 is_finished=('is_finished' in draft and draft['is_finished']), 
                                 heb_font_size=get_heb_font_sz_pref(request), user_name=draft_creator_user_info["name_hebrew"]))

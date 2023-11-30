@@ -13,6 +13,8 @@ def expand_lang_code(from_lang, to_lang='H'):
             return 'אנגלית'
         if from_lang == 'fr':
             return 'צרפתית'
+        if from_lang == 'YY':
+            return 'נוער'
     if to_lang == 'E':
         if from_lang == '--':
             return 'Hebrew'
@@ -20,6 +22,8 @@ def expand_lang_code(from_lang, to_lang='H'):
             return 'English'
         if from_lang == 'fr':
             return 'French'
+        if from_lang == 'YY':
+            return "Youth"
     return '??'
 
 class DatastoreClientProxy:

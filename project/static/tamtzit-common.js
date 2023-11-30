@@ -13,7 +13,7 @@ function copyToClipboard(from_where) {
 async function updateStatus() {
     let obj = await (await fetch("/status")).json();
     var status = "מצב העבודה נכון ל " + obj['as_of'] + ":";
-    lang_order = ['--', 'en', 'fr']
+    lang_order = ['--', 'en', 'fr', 'YY']
     var stuff_happening = false;
     for (lang of lang_order) {
         if (lang in obj['by_lang']) {

@@ -110,6 +110,6 @@ keywords['YY'] = {
 }
 editions = {}
 editions['en'] = ['Morning', 'Afternoon', 'Evening']
-editions['fr'] = ['Matin', "l'après-midi", 'soir']
+editions['fr'] = ['Matin', Markup("l'après-midi"), 'soir']
 editions['he'] = ['בוקר', 'צוהריים', 'ערב']
 editions['YY'] = ['בוקר', 'צוהריים', 'ערב']

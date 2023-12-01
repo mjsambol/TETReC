@@ -751,7 +751,7 @@ def process_translation_request(heb_text, target_language_code):
                 debug("post three dots, switching to 'unknown'")
                 section = organized['UNKNOWN']
                 continue
-        if section is None and kw["edition"] in line.lower() and '202' in line.lower():
+        if section is None and (kw["edition"] in line.lower() or "edition" in line.lower()) and '202' in line.lower():
             debug("skipping what looks like the intro edition line")
             continue
         if line.startswith("> "):

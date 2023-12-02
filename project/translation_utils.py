@@ -16,6 +16,34 @@ def vav_hey(title):
         return result
     return translate_prefix
 
+
+def tx_heb_prefix(word, lang):
+    if lang == "en":
+        if word.startswith("ב"):
+            return "in "
+        if word.startswith("ו"):
+            return "and "
+        if word.startswith("ל"):
+            return "to "
+        if word.startswith("מ"):
+            return "from "
+        if word.startswith("ה"):
+            return "the "
+        return ""
+    elif lang == "fr":
+        if word.startswith("ב"):
+            return "en "
+        if word.startswith("ו"):
+            return "et "
+        if word.startswith("ל"):
+            return "à "
+        if word.startswith("מ"):
+            return "dès "
+        if word.startswith("ה"):
+            return "la "
+        return ""
+
+
 title_translations = {
     # This section of translations is based on an image shared by Yair, original source unknown
     'רב"ט': 'Corporal',
@@ -77,21 +105,36 @@ title_translations = {
     'סמ"פ': 'Deputy Company Commander',
 }
 
-def pre_translation_swaps(text):
+def pre_translation_swaps(text, target_language_code):
     for title in title_translations:
         text = re.sub(fr'\b(ו?)(ה?){title}\b', vav_hey(title_translations[title]), text, re.U)
 
     # slightly related given the context in which we are unfortunately using these abbreviations
-    text = re.sub(r'\bהי"ד\b',   'HYD', text, re.U)
-     
-    text = re.sub(r'\b(ב)צו?הריים\b', lambda m: ("in " if m.group(1).startswith("ב") else '') + 'the afternoon', 
-                  text, re.U)
-    text = re.sub(r'\b(אחר )?ה?צו?הריים\b', 'the afternoon', text, re.U)
+    if target_language_code == 'en':
+        text = re.sub(r'\bהי"ד\b',   'HYD', text, re.U)
+        
+        text = re.sub(r'\b(ב)צו?הריים\b', lambda m: ("in " if m.group(1).startswith("ב") else '') + 'the afternoon', 
+                    text, re.U)
+        text = re.sub(r'\b(אחר )?ה?צו?הריים\b', 'the afternoon', text, re.U)
 
-    text = re.sub(r'\bהלילה\b', 'last night', text, re.U)
+        text = re.sub(r'\bהלילה\b', 'last night', text, re.U)
+
+        text = re.sub(r'\b([למהבו])?עוטף עזה\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'the Gaza envelope', text, re.U)
+
+    elif target_language_code == 'fr':
+        text = re.sub(r'\bהלילה\b', 'la nuit dernière', text, re.U)
+
+        text = re.sub(r'\b([למהבו])?עוטף עזה\b', lambda m: tx_heb_prefix(m.group(1), "fr") + 'La zone autour de Gaza', text, re.U)
+
     return text
 
-def post_translation_swaps(text):
-    text = re.sub('infrastructures', 'infrastructure', text)
-    text = re.sub(r'\b[Aa]larm(s?)\b', lambda m: "siren" + ('s' if m.group(1).startswith("s") else ''), text)
+
+def post_translation_swaps(text, target_language_code):
+    if target_language_code == 'en':
+        text = re.sub('infrastructures', 'infrastructure', text)
+        text = re.sub(r'\b[Aa]larm(s?)\b', lambda m: "siren" + ('s' if m.group(1).startswith("s") else ''), text)
+        text = re.sub(r'\b([Aa])n siren', "\\1 siren", text)
+    elif target_language_code == 'fr':
+        text = re.sub(r'\b[Aa]larm(s?)\b', lambda m: "alert" + ('s' if m.group(1).startswith("s") else ''), text)
+
     return text

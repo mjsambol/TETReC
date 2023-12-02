@@ -47,7 +47,7 @@ def translate_text(text: str, target_language_code: str, source_language='he') -
     # for reasons I don't understand, we regularly lose the last paragraph of text
     # perhaps it's just too long. Let's try breaking it up.
 
-    text = pre_translation_swaps(text)
+    text = pre_translation_swaps(text, target_language_code)
 
     break_point = text.find("📌", text.find("📌") + 1)
     if break_point == -1:
@@ -73,7 +73,7 @@ def translate_text(text: str, target_language_code: str, source_language='he') -
         )
         result += response.translations[0].translated_text
 
-    result = post_translation_swaps(result)
+    result = post_translation_swaps(result, target_language_code)
     # print(f"DEBUG: translation result has {len(response.translations)} translations")
     # if len(response.translations) > 1:
     #     print("DEBUG: the second one is:")

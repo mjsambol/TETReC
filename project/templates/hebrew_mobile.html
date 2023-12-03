@@ -79,6 +79,8 @@
 
             function translation_changed() {
                 if (last_saved_text.localeCompare(document.getElementById('heb_text').value) != 0) {
+                        document.getElementById("is_saved").innerText = "השינויים עוד לא שמורים!";
+                        document.getElementById("is_saved").style.color = "#FF0000";
                         document.getElementById("finish_button").innerText = "העתק את כל התוכן";
                         is_finished = false;
                 } 
@@ -101,6 +103,10 @@
                     function(data,status) {
                         console.log("Draft save status: " + status);
                         last_saved_text = curr_text;
+                        if (status === "success") {
+                            document.getElementById("is_saved").innerText = "כל השינויים שמורים";
+                            document.getElementById("is_saved").style.color = "#33AA33";
+                        }
                     });
                 }
             }
@@ -202,7 +208,8 @@ https://link.mmb.org.il/news {% endif %}</textarea>
 <br><br>
 <table width=100% border="0">
     <tr>
-        <td width="66%" align="right"><span id="char_count" style="font-size: 34px; padding:8px 8px" dir="rtl">אורך: X אותיות</span></td>
+        <td width="33%" align="right"><span id="is_saved" dir="rtl"></span></td>
+        <td width="33%" align="right"><span id="char_count" style="font-size: 34px; padding:8px 8px" dir="rtl">אורך: X אותיות</span></td>
         <td width="33%"></td>
     </tr>
 </table>

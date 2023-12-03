@@ -95,6 +95,9 @@
                 }
 
                 if (last_saved_translation.localeCompare(document.getElementById('translated_text').value) != 0) {
+                        document.getElementById("is_saved").innerText = "Changes NOT YET Saved!";
+                        document.getElementById("is_saved").style.color = "#FF0000";
+
                         document.getElementById("finish_button").innerText = "Copy to Clipboard";
                         is_finished = false;
                 } 
@@ -116,6 +119,10 @@
                     function(data,status) {
                         console.log("Draft save status: " + status);
                         last_saved_translation = curr_translation;
+                        if (status === "success") {
+                            document.getElementById("is_saved").innerText = "All Changes Saved";
+                            document.getElementById("is_saved").style.color = "#33AA33";
+                        }
                     });
                 }
             }
@@ -144,7 +151,8 @@
                     oninput="translation_changed();">{{translated}}</textarea>            
 <table width=100%>
     <tr>
-        <td width="66%" align="right"><span id="char_count" dir="rtl">אורך: X אותיות</span></td>
+        <td width="33%" align="right"><span id="is_saved"></span></td>
+        <td width="33%" align="right"><span id="char_count">Length: X chars</span></td>
         <td width="33%"></td>
     </tr>
 </table>                    

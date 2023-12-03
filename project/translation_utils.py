@@ -18,6 +18,9 @@ def vav_hey(title):
 
 
 def tx_heb_prefix(word, lang):
+    if not word or not lang or word == "" or lang == "":
+        debug(f"tx_heb_prefix: uhoh got {word} - {lang}")
+        return ""
     if lang == "en":
         if word.startswith("ב"):
             return "in "
@@ -120,11 +123,13 @@ def pre_translation_swaps(text, target_language_code):
         text = re.sub(r'\bהלילה\b', 'last night', text, re.U)
 
         text = re.sub(r'\b([למהבו])?עוטף עזה\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'the Gaza envelope', text, re.U)
+        text = re.sub(r'\b([למהבו])?עוטף\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'the Gaza envelope [?]', text, re.U)
 
     elif target_language_code == 'fr':
         text = re.sub(r'\bהלילה\b', 'la nuit dernière', text, re.U)
 
         text = re.sub(r'\b([למהבו])?עוטף עזה\b', lambda m: tx_heb_prefix(m.group(1), "fr") + 'La zone autour de Gaza', text, re.U)
+        text = re.sub(r'\b([למהבו])?עוטף\b', lambda m: tx_heb_prefix(m.group(1), "fr") + 'La zone autour de Gaza [?]', text, re.U)
 
     return text
 

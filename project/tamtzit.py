@@ -424,7 +424,7 @@ def route_authenticate():
         # handle login form submission    
         email = request.form.get("email")
         debug("login attempt from user " + email)
-        user_details = get_user(email)
+        user_details = get_user(email.lower())
         if not user_details:
             return render_template("error.html", dont_show_home_link=True, msg="The email address you provided is unknown. Contact the admin.",
                                    heb_msg="כתובת מייל זו לא מוכרת. צור קשר עם משה.")

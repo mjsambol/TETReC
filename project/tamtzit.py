@@ -21,65 +21,10 @@ from .cookies import *
 from .common import *
 from .language_mappings import *
 
-PROJECT_ID = "tamtzit-hadashot"
-PARENT = f"projects/{PROJECT_ID}"
 mailjet_basic_auth = HTTPBasicAuth('dbe7d877e71f69f13e19d2af6671f6cb', 'a7e171ca7aeb40920bc93f69d79459d6')   
 DRAFT_TTL = 60 * 60 * 24
 
 client = translate.TranslationServiceClient()
-
-# def print_supported_languages(display_language_code: str):
-#     client = translate.TranslationServiceClient()
-
-#     response = client.get_supported_languages(
-#         parent=PARENT,
-#         display_language_code=display_language_code,
-#     )
-
-#     languages = response.languages
-#     print(f" Languages: {len(languages)} ".center(60, "-"))
-#     for language in languages:
-#         language_code = language.language_code
-#         display_name = language.display_name
-#         print(f"{language_code:10}{display_name}")
-
-def translate_text(text: str, target_language_code: str, source_language='he') -> translate.Translation:
-    # for reasons I don't understand, we regularly lose the last paragraph of text
-    # perhaps it's just too long. Let's try breaking it up.
-
-    text = pre_translation_swaps(text, target_language_code)
-
-    break_point = text.find("📌", text.find("📌") + 1)
-    if break_point == -1:
-        break_point = len(text)
-    first_section = text[0:break_point]
-    second_section = text[break_point:]
-
-    debug(f"translate_text(): Hebrew is -----\n{text}\n-----")
-    debug(f"first section length: {len(first_section)}")
-    debug(f"second section length: {len(second_section)}")
-    client = translate.TranslationServiceClient()
-
-    result = ""
-    for section in [first_section, second_section]:
-        if len(section.strip()) == 0:
-            continue
-        response = client.translate_text(
-            parent=PARENT,
-            contents=[section],
-            source_language_code=source_language,  # optional, can't hurt
-            target_language_code=target_language_code,
-            mime_type='text/plain' # HTML is assumed!
-        )
-        result += response.translations[0].translated_text
-
-    result = post_translation_swaps(result, target_language_code)
-    # print(f"DEBUG: translation result has {len(response.translations)} translations")
-    # if len(response.translations) > 1:
-    #     print("DEBUG: the second one is:")
-    #     print(response.translations[1].translated_text)
-    return result
-
 
 datastore_client = DatastoreClientProxy.get_instance()
 

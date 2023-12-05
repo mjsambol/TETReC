@@ -1,7 +1,9 @@
 import re
+from google.cloud import translate
+from .common import debug
 
-def debug(stuff):
-    print(stuff)
+PROJECT_ID = "tamtzit-hadashot"
+PARENT = f"projects/{PROJECT_ID}"
 
 def vav_hey(title):
     # this lambda works but is a bit hard to read
@@ -143,3 +145,39 @@ def post_translation_swaps(text, target_language_code):
         text = re.sub(r'\b[Aa]larm(s?)\b', lambda m: "alert" + ('s' if m.group(1).startswith("s") else ''), text)
 
     return text
+
+
+def translate_text(text: str, target_language_code: str, source_language='he') -> translate.Translation:
+
+    text = pre_translation_swaps(text, target_language_code)
+
+    break_point = text.find("📌", text.find("📌") + 1)
+    if break_point == -1:
+        break_point = len(text)
+    first_section = text[0:break_point]
+    second_section = text[break_point:]
+
+    debug(f"translate_text(): Hebrew is -----\n{text}\n-----")
+    debug(f"first section length: {len(first_section)}")
+    debug(f"second section length: {len(second_section)}")
+    client = translate.TranslationServiceClient()
+
+    result = ""
+    for section in [first_section, second_section]:
+        if len(section.strip()) == 0:
+            continue
+        response = client.translate_text(
+            parent=PARENT,
+            contents=[section],
+            source_language_code=source_language,  # optional, can't hurt
+            target_language_code=target_language_code,
+            mime_type='text/plain' # HTML is assumed!
+        )
+        result += response.translations[0].translated_text
+
+    result = post_translation_swaps(result, target_language_code)
+    # print(f"DEBUG: translation result has {len(response.translations)} translations")
+    # if len(response.translations) > 1:
+    #     print("DEBUG: the second one is:")
+    #     print(response.translations[1].translated_text)
+    return result

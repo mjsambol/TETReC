@@ -1,0 +1,131 @@
+from difflib import SequenceMatcher
+import re
+import sys
+from collections import defaultdict
+from common import *
+from translation_utils import translate_text
+from language_mappings import sections
+
+def parse_for_comparison(text):
+    result = defaultdict(list)
+    section = None
+    current_entry = None
+    for line in text:
+        line = line.strip()
+        if len(line.replace("•","").strip()) == 0:
+#            print(f"skipping a blank line: {line}")
+            current_entry = None
+            continue
+        # two consecutive lines not separated by a blank line will be considered the same entry
+        if not re.match("^[•📌>]", line):  # it doesn't start with any prefix
+            if current_entry:
+                result[section][-1] = result[section][-1] + "\n" + line
+ #               print("Appending this line to the previous one")
+ #           else:
+ #               print(f"skipping a no-prefix non-blank line: {line}")
+        elif not line.startswith("•"):
+            section = line  ## this should always get replaced, but just in case...
+            for heb_section in sections['keys_from_Hebrew']:
+                if heb_section in line:
+                    section = heb_section
+                    break
+        else:
+            current_entry = line
+            result[section].append(current_entry)
+    return result
+
+
+def get_substantial_additions(parsed_heb_draft, parsed_backup):
+    additions = defaultdict(list)
+
+    for section in parsed_heb_draft:
+        if not section in parsed_backup:
+            print(f"The section {section} is entirely missing from the backup")
+            additions[section] = parsed_heb_draft[section]
+            continue
+        backup_section = parsed_backup[section]
+        for bullet in parsed_heb_draft[section]:
+            if len(bullet) < 5:
+                continue
+            best_fit = max([SequenceMatcher(None, backup_bullet, bullet).ratio() for backup_bullet in backup_section])
+            if best_fit < 0.5:
+#                print(f"More than half ({best_fit}) has been changed, let's consider it added to section {section}:")
+#                print(bullet)
+                additions[section].append(bullet)
+    return additions
+
+
+def get_pre_translation_backup(draft, num_to_skip=0):
+    backup_query = datastore_client.query(kind="draft_backup")
+    backup_query.order = ["-backup_timestamp"]
+    backups = backup_query.fetch()
+    candidate = None
+    skipped = 0
+    for backup in backups:
+        if backup["draft_id"] != draft.key.id:
+            continue
+        if backup['ok_to_translate']:
+            continue
+        if skipped == num_to_skip:
+            return backup
+        candidate = backup
+        skipped += 1
+    print(f"There are insufficient backups to go back {num_to_skip} versions, restoring one that's from -{skipped}")
+    return candidate
+
+
+def get_translated_additions_since_ok_to_translate(draft, num_backups_to_skip, target_lang="en"):
+
+    pre_translation_backup = get_pre_translation_backup(draft, num_backups_to_skip)
+
+    parsed_heb_draft = parse_for_comparison(draft['hebrew_text'].split('\n'))
+
+    #        print(f"-----------------------------\n{latest_heb}\n\n-------------------------------\n\n{pre_share_heb}\n-----------------------\n")
+    parsed_backup = parse_for_comparison(pre_translation_backup['hebrew_text'].split('\n'))
+
+    additions_by_section = get_substantial_additions(parsed_heb_draft, parsed_backup)
+    translated_additions_by_section = defaultdict(list)
+
+    for section_with_addition in additions_by_section:
+        #print(f"Additions to section {section_with_addition}:\n{additions_by_section[section_with_addition]}")
+        translated_section_name = sections[target_lang][sections['keys_from_Hebrew'][section_with_addition]]
+
+        for addition in additions_by_section[section_with_addition]:
+            translated = translate_text(addition, target_language_code=target_lang)
+            translated_additions_by_section[translated_section_name].append(translated)
+
+    return (additions_by_section, translated_additions_by_section)
+
+
+if __name__ == "__main__":
+
+    datastore_client = DatastoreClientProxy.get_instance()
+
+    draft_query = datastore_client.query(kind="draft")
+    draft_query.order = ["-timestamp"]
+    # need to add indexes...
+    # draft_query.add_filter("ok_to_translate", "=", True)
+
+    num_backups_to_skip = 8
+    if len(sys.argv) > 1:
+        num_backups_to_skip = int(sys.argv[1])
+
+    drafts = draft_query.fetch()
+    for draft in drafts:
+        debug(f"Checking: {draft['translation_lang']}")
+        if draft['translation_lang'] == '--' and draft['ok_to_translate']:
+            break
+
+    print(f"Processing a Hebrew draft with ID {draft.key.id} from {draft['timestamp']}")
+    heb_additions_by_section, translated_additions_by_section = get_translated_additions_since_ok_to_translate(draft, num_backups_to_skip, "en")
+    print("Here are all the added bullets:")
+    for section in heb_additions_by_section:
+        print(section + ":")
+        for addition in heb_additions_by_section[section]:
+            print(addition)
+        print()
+        translated_section_name = sections["en"][sections['keys_from_Hebrew'][section]]
+        print(translated_section_name + ":")
+        for addition in translated_additions_by_section[translated_section_name]:
+            print(addition)
+        print("\n")

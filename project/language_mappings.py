@@ -17,13 +17,26 @@ locales['fr'] = "fr_FR.UTF-8"
 locales['he'] = 'he_IL.UTF-8'
 locales['YY'] = 'he_IL.UTF-8'
 sections = {}
+sections['keys_from_Hebrew'] = {
+    "הזירה הדרומית": "SOUTH",
+    "הזירה הצפונית": "NORTH",
+    "יהודה ושומרון": "YandS",
+    "מהמתרחש בארץ": "InIsrael",
+    "מדיניות, ממשל ופוליטיקה": "PandP",
+    "מסביב לעולם": "Worldwide",
+    "כלכלה": "Economy",
+    "ספורט":"Sports",
+    "מזג האוויר":"Weather",
+    "ונסיים בטוב":"FinishWell"
+}
+
 sections['en'] = {"SOUTH":"Southern Front", 
             "NORTH":"Northern Front", 
             "YandS":"Yehuda and Shomron",
-            "Civilian":"Civilian Front", 
+#            "Civilian":"Civilian Front", 
             "InIsrael":"Israel Local News",
             "PandP":"Policy, Law and Politics",
-            "WorldEyes":"In the Eyes of the World", 
+#            "WorldEyes":"In the Eyes of the World", 
             "Worldwide":"World News",
             "Economy":"Economy",
             "Sports":"Sports",
@@ -34,10 +47,10 @@ sections['en'] = {"SOUTH":"Southern Front",
 sections['fr'] = {"SOUTH":Markup("Au sud"), 
             "NORTH":Markup("Au nord"), 
             "YandS":"Yehuda et Shomron",
-            "Civilian":"Civilian Front", 
+#            "Civilian":"Civilian Front", 
             "InIsrael":Markup("Ce qu'il se passe en Israël"),
             "PandP":"Politique",
-            "WorldEyes":"Autour du monde", 
+#            "WorldEyes":"Autour du monde", 
             "Worldwide":"Autour du monde",
             "Economy":"Economie",
             "Sports":"Sport",

@@ -114,7 +114,10 @@ def pre_translation_swaps(text, target_language_code):
     for title in title_translations:
         text = re.sub(fr'\b(ו?)(ה?){title}\b', vav_hey(title_translations[title]), text, re.U)
 
-    # slightly related given the context in which we are unfortunately using these abbreviations
+    # our Motzei Shabbat header is confused for regular content, this is an easy way to get rid of it
+    text = re.sub(r'\*עדכון מוצאי שבת\*', '', text, re.U)
+    text = re.sub(r'קוראים יקרים, זהו עדכון מקוצר. מהדורה רגילה תישלח אחרי 21:00.', '', text, re.U)
+
     if target_language_code == 'en':
         text = re.sub(r'\bהי"ד\b',   'HYD', text, re.U)
         

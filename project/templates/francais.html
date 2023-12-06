@@ -1,9 +1,16 @@
-📻 *L'essentiel de l'actualité*
+{% if date_info.motzei_shabbat_early %}*Mise à jour résumée du samedi soir.*
+
+Chers lecteurs, 
+Ceci est une mise à jour résumée de l'actualité. L'édition régulière sera publiée après 21h30.
+
+•   •   •
+{% else %}📻 *L'essentiel de l'actualité*
 *Édition de {{date_info.part_of_day}}: {{date_info.day_of_week}} {{date_info.hebrew_dom}} {{date_info.hebrew_month}} {{date_info.hebrew_year}}* / {{date_info.secular_dom}} {{date_info.secular_month}} {{date_info.secular_year}}
 
   •   •   •
 
 📌 *Guerre des Épées de Fer*
+{%endif%}
 {% for section in sections %}
 {% if section in organized and organized[section] | length > 0 %}
 {% if section in ['SOUTH','NORTH','YandS']%}>{%else%}📌{%endif%} *{{sections[section]}}:*

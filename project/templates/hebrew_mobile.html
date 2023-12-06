@@ -132,13 +132,19 @@
 
         <div id="orig_heb_panel" style="font-family: Arial, Helvetica, sans-serif; font-size:calc(.8em + 0.5vmin)">
      <textarea id="heb_text" style="font-family: inherit; font-size: inherit; width:98vw; height:76vh;" name="orig_text" dir="rtl" 
-     oninput="update_char_count();translation_changed();" >{%if heb_text | length > 0 %}{{ heb_text }}{% else %}📻 *תמצית החדשות*
+     oninput="update_char_count();translation_changed();" >{%if heb_text | length > 0 %}{{ heb_text }}{% else %}{% 
+        if date_info.motzei_shabbat_early %}*עדכון מוצאי שבת*
+    
+קוראים יקרים, זהו עדכון מקוצר. מהדורה רגילה תישלח אחרי 21:00.
+
+•   •   •
+{% else %}📻 *תמצית החדשות*
 *מהדורת {{date_info.part_of_day}}, יום {{date_info.day_of_week}}, {{date_info.hebrew_dom_he}} ב{{date_info.hebrew_month_he}} {{date_info.hebrew_year_he}}*, {{date_info.secular_dom}} ב{{date_info.secular_month}} {{date_info.secular_year}}
 
 •   •   •
 
 📌 *_מלחמת חרבות ברזל:_*
-
+{%endif%}
 > *הזירה הדרומית:*
 
 • 

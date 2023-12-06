@@ -228,6 +228,7 @@ class DateInfo():
     hebrew_dom_he: str
     hebrew_month_he: str
     hebrew_year_he: str
+    motzei_shabbat_early: bool
 
 tamtzit = Blueprint('tamtzit', __name__)
 
@@ -808,7 +809,8 @@ def make_date_info(dt, lang):
 
     locale.setlocale(locale.LC_TIME, locales[lang])
     date_info = DateInfo(dt_edition, dt.strftime('%A'), heb_dt.day, heb_dt.month_name(), heb_dt.year, 
-                         dt.strftime('%B'), dt.day, dt.year, (dt - oct6).days, heb_dt.hebrew_day(), heb_dt.month_name(True), heb_dt.hebrew_year())
+                         dt.strftime('%B'), dt.day, dt.year, (dt - oct6).days, heb_dt.hebrew_day(), heb_dt.month_name(True), heb_dt.hebrew_year(),
+                         (dt.isoweekday() == 6 and dt.hour < 20))
                          
     return date_info
 

@@ -2,7 +2,7 @@
     <head>
         <title>Tamtzit - Admin Portal</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
-        <script src="{{url_for('static', filename='tamtzit-common.js', version='20231130')}}"></script>
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20231206')}}"></script>
         <!-- Google tag (gtag.js) -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
         <script>
@@ -38,5 +38,9 @@
     </body>
 <script>
     updateStatus();  // this will also start a periodic auto-refresh
+    window.onfocus = function() {
+        focused = true;
+        updateStatus();
+    };
 </script>
 </html>

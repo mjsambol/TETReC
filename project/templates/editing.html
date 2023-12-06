@@ -2,7 +2,7 @@
     <head>
         <title>Tamtzit - Editing {{lang}}</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
-        <script src="{{url_for('static', filename='tamtzit-common.js', version='20231129')}}"></script>
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20231206b')}}"></script>
         <!-- Google tag (gtag.js) -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
         <script>
@@ -54,23 +54,6 @@
                     document.getElementById("char_count").style.color="#000000";
                 }
             }
-
-            // function deleteDraft(dt) {
-            //     params = window.location.search;
-            //     if (params != null) {
-            //         draft_id = params.substring(4);
-            //         if (draft_id==null || draft_id=="") {
-            //             draft_id = "{{draft_timestamp}}";
-            //         }
-            //         $.ajax({
-            //             url: "/deleteDraft?dt="+draft_id,
-            //             type: 'GET',
-            //             success: function(res) {
-            //                 console.log(res);
-            //             }
-            //         });                                    
-            //     }
-            // }
 
             var last_saved_translation = `{{translated}}`;
             var is_finished = "True" === "{{is_finished}}";
@@ -132,6 +115,101 @@
                 document.getElementById("edit_anyway_button").style.visibility = "hidden";
             }
 
+            function search(string, regexp, from = 0) {
+                const index = string.slice(from).search(regexp);
+                return index === -1 ? -1 : index + from;
+            }
+
+            async function pullAdditions() {
+                alert("*IF* there have been additions to the Hebrew text " +
+                "since this translation was started, they will be added to the Hebrew and Translation here.\n\n" +
+                "Only *newly added entries* will be copied, no other changes. They will be marked in the Hebrew with +-+-+-+-.\n\n");
+                alert("Please wait, this update takes about 10 seconds. It can only be requested once per minute.");
+                document.getElementById("pull_additions_button").disabled = true;
+                document.getElementById("heb_text_area").disabled = true;
+                document.getElementById("translated_text").disabled = true;
+
+                // do the update...
+                var server_says = await (await fetch("/getUntranslatedAdditions?heb_draft_id={{heb_draft_id}}&lang={{lang}}")).json();
+                if ('additions' in server_says) {
+                    var num_section_additions = 0;
+                    var num_additions = 0;
+                    hta = document.getElementById('heb_text_area');
+                    // this pattern is unexpected, had to be refined because:
+                    // 1. the text is one long block, we're not actually looking for these things at the "start of the line" as there are no lines
+                    // 2. the emphasis marks may or may not be there in the Hebrew, depending on where it came from, it may have been pasted without those
+                    var section_start_pat = "\\n\\n.[📌>] \\*?_?";
+
+                    for (key in server_says['additions']) {
+                        ht = hta.value;
+                        // console.log("processing key " + key);
+                        var pat = section_start_pat + key + ":";
+                        var re = new RegExp(pat, "g");
+                        var section_start_pos = ht.search(re);
+                        // console.log("Found that section starting at index " + section_start_pos + " which looks like this:");
+                        // console.log(ht.substring(section_start_pos, section_start_pos + 50));
+                        var next_section_start_pos = search(ht, section_start_pat, section_start_pos + 10);
+                        // console.log("The next section starts at index " + next_section_start_pos + " which looks like this:");
+                        // console.log(ht.substring(next_section_start_pos, next_section_start_pos + 50));
+                        num_section_additions += 1;
+                        added_bullets = server_says['additions'][key];
+                        // console.log("There are " + added_bullets.length + " new entries to add there");
+                        
+                        // add them
+                        head = ht.substring(0, next_section_start_pos);
+                        tail = ht.substring(next_section_start_pos);
+                        updated_content = head + "\n\n++++++++++++++++++++++++++\n";
+                        for (b=0; b<added_bullets.length; b++) {
+                            updated_content = updated_content + added_bullets[b] + "\n\n";
+                            num_additions += 1;
+                        }
+                        updated_content = updated_content + "++++++++++++++++++++++++++";
+                        hta.value = updated_content + tail;
+                    }
+
+                    eta = document.getElementById('translated_text');
+
+                    var section_start_pat = "\\n\\n.[📌>] \\*";
+
+                    for (key in server_says['translated_additions']) {
+                        et = eta.value;
+                        // console.log("processing key " + key);
+                        var pat = section_start_pat + key + ":";
+                        var re = new RegExp(pat, "g");
+                        var section_start_pos = et.search(re);
+                        // console.log("Found that section starting at index " + section_start_pos + " which looks like this:");
+                        // console.log(et.substring(section_start_pos, section_start_pos + 50));
+                        var next_section_start_pos = search(et, section_start_pat, section_start_pos + 10);
+                        // console.log("The next section starts at index " + next_section_start_pos + " which looks like this:");
+                        // console.log(et.substring(next_section_start_pos, next_section_start_pos + 50));
+                        added_bullets = server_says['translated_additions'][key];
+                        // console.log("There are " + added_bullets.length + " new entries to add there");
+                        
+                        // add them
+                        head = et.substring(0, next_section_start_pos);
+                        tail = et.substring(next_section_start_pos);
+                        updated_content = head + "\n\n++++++++++++++++++++++++++\n";
+                        for (b=0; b<added_bullets.length; b++) {
+                            updated_content = updated_content + added_bullets[b] + "\n\n";
+                            num_additions += 1;
+                        }
+                        updated_content = updated_content + "++++++++++++++++++++++++++";
+                        eta.value = updated_content + tail;
+                    }
+
+                    alert("Update is done, there were " + num_additions + " additions across " + num_section_additions + " sections.");
+                } else {
+                    alert("Got no changes. You can resume working.");
+                }
+
+                document.getElementById("heb_text_area").disabled = false;
+                document.getElementById("translated_text").disabled = false;
+
+                setTimeout(function() {
+                    document.getElementById("pull_additions_button").disabled = false;
+                }, 60000);
+            }
+
             setInterval(function(){saveDraft()}, 10000);  // automatically save a draft every 30 seconds, if the text has changed
 
         </script>        
@@ -141,7 +219,13 @@
         <table width="100%" border="0" cellspacing="10">
             <tr>
                 <td width="40%" valign="top" id="orig_heb_panel">
-                    <textarea rows="40" style="width:100%; font-size:17px;" dir="rtl">{{heb_text}}</textarea>
+                    <textarea id="heb_text_area" rows="40" style="width:100%; font-size:17px;" dir="rtl">{{heb_text}}</textarea>
+                    <table width="100%">
+                        <tr><br><br>
+                            <!-- button to pull latest changes, active only once per minute, not nec b/c there are changes to pull -->
+                            <td align="center"><button id="pull_additions_button" style="font-size: 16px; padding:6px 6px" onclick="pullAdditions();">Get Additions</button></td>
+                        </tr>
+                    </table>
                 </td>
                 <td width="58%" valign="top" id="translation_panel">
                     <textarea id="translated_text" rows="50" style="width:100%; font-size:14px;" spellcheck="true"

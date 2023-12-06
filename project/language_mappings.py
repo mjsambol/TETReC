@@ -22,7 +22,8 @@ sections['keys_from_Hebrew'] = {
     "הזירה הצפונית": "NORTH",
     "יהודה ושומרון": "YandS",
     "מהמתרחש בארץ": "InIsrael",
-    "מדיניות, ממשל ופוליטיקה": "PandP",
+    "מדיניות, ממשל ופוליטיקה": "PandP",  # an old version still sometimes in use
+    "מדיניות, משפט ופוליטיקה": "PandP",  
     "מסביב לעולם": "Worldwide",
     "כלכלה": "Economy",
     "ספורט":"Sports",

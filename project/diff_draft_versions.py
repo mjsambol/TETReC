@@ -2,9 +2,9 @@ from difflib import SequenceMatcher
 import re
 import sys
 from collections import defaultdict
-from common import *
-from translation_utils import translate_text
-from language_mappings import sections
+from .common import *
+from .translation_utils import translate_text
+from .language_mappings import sections
 
 def parse_for_comparison(text):
     result = defaultdict(list)
@@ -40,7 +40,7 @@ def get_substantial_additions(parsed_heb_draft, parsed_backup):
 
     for section in parsed_heb_draft:
         if not section in parsed_backup:
-            print(f"The section {section} is entirely missing from the backup")
+            debug(f"The section {section} is entirely missing from the backup")
             additions[section] = parsed_heb_draft[section]
             continue
         backup_section = parsed_backup[section]
@@ -55,45 +55,53 @@ def get_substantial_additions(parsed_heb_draft, parsed_backup):
     return additions
 
 
-def get_pre_translation_backup(draft, num_to_skip=0):
+def get_pre_translation_backup(draft):
+    # the FIRST (oldest) backup in the DB which is marked as "ok to translate"
+    # represents the text when the author hit "ok to translate" - there is an auto backup at that point
+    # and therefore it's the earliest text the translator could have worked from
+    # we want to build a list of additions made since that point
+    datastore_client = DatastoreClientProxy.get_instance()
+    debug(f"get_pre_translation_backup: draft id is {draft.key.id}")
     backup_query = datastore_client.query(kind="draft_backup")
     backup_query.order = ["-backup_timestamp"]
     backups = backup_query.fetch()
     candidate = None
-    skipped = 0
     for backup in backups:
         if backup["draft_id"] != draft.key.id:
             continue
-        if backup['ok_to_translate']:
-            continue
-        if skipped == num_to_skip:
-            return backup
+        if not backup['ok_to_translate']:
+            # we've gone too far - want the backup that's 1 younger than this
+            return candidate
         candidate = backup
-        skipped += 1
-    print(f"There are insufficient backups to go back {num_to_skip} versions, restoring one that's from -{skipped}")
     return candidate
 
 
-def get_translated_additions_since_ok_to_translate(draft, num_backups_to_skip, target_lang="en"):
+def get_translated_additions_since_ok_to_translate(draft, target_lang="en"):
 
-    pre_translation_backup = get_pre_translation_backup(draft, num_backups_to_skip)
+    pre_translation_backup = get_pre_translation_backup(draft)
+
+    # print(f"-----------------------------\n{pre_translation_backup['hebrew_text']}\n\n-------------------------------\n\n{draft['hebrew_text']}\n-----------------------\n")
 
     parsed_heb_draft = parse_for_comparison(draft['hebrew_text'].split('\n'))
 
-    #        print(f"-----------------------------\n{latest_heb}\n\n-------------------------------\n\n{pre_share_heb}\n-----------------------\n")
     parsed_backup = parse_for_comparison(pre_translation_backup['hebrew_text'].split('\n'))
 
     additions_by_section = get_substantial_additions(parsed_heb_draft, parsed_backup)
+    debug(f"there were {len(additions_by_section)} sections with additions")
     translated_additions_by_section = defaultdict(list)
 
     for section_with_addition in additions_by_section:
         #print(f"Additions to section {section_with_addition}:\n{additions_by_section[section_with_addition]}")
-        translated_section_name = sections[target_lang][sections['keys_from_Hebrew'][section_with_addition]]
+        try:
+            translated_section_name = sections[target_lang][sections['keys_from_Hebrew'][section_with_addition]]
 
-        for addition in additions_by_section[section_with_addition]:
-            translated = translate_text(addition, target_language_code=target_lang)
-            translated_additions_by_section[translated_section_name].append(translated)
+            for addition in additions_by_section[section_with_addition]:
+                translated = translate_text(addition, target_language_code=target_lang)
+                translated_additions_by_section[translated_section_name].append(translated)
+        except KeyError as ke:
+            debug("ERROR from get_translated_additions_since_ok_to_translate(): KeyError: {ke}")
 
+    debug(f"there are now {len(translated_additions_by_section)} translations of those")
     return (additions_by_section, translated_additions_by_section)
 
 
@@ -106,26 +114,21 @@ if __name__ == "__main__":
     # need to add indexes...
     # draft_query.add_filter("ok_to_translate", "=", True)
 
-    num_backups_to_skip = 8
-    if len(sys.argv) > 1:
-        num_backups_to_skip = int(sys.argv[1])
-
     drafts = draft_query.fetch()
     for draft in drafts:
         debug(f"Checking: {draft['translation_lang']}")
         if draft['translation_lang'] == '--' and draft['ok_to_translate']:
             break
 
-    print(f"Processing a Hebrew draft with ID {draft.key.id} from {draft['timestamp']}")
-    heb_additions_by_section, translated_additions_by_section = get_translated_additions_since_ok_to_translate(draft, num_backups_to_skip, "en")
-    print("Here are all the added bullets:")
+    debug(f"Processing a Hebrew draft with ID {draft.key.id} from {draft['timestamp']}")
+    heb_additions_by_section, translated_additions_by_section = get_translated_additions_since_ok_to_translate(draft, "en")
+    debug("Here are all the added bullets:")
     for section in heb_additions_by_section:
-        print(section + ":")
+        debug(section + ":")
         for addition in heb_additions_by_section[section]:
-            print(addition)
-        print()
+            debug(addition)
         translated_section_name = sections["en"][sections['keys_from_Hebrew'][section]]
-        print(translated_section_name + ":")
+        debug(translated_section_name + ":")
         for addition in translated_additions_by_section[translated_section_name]:
-            print(addition)
-        print("\n")
+            debug(addition)
+        debug("\n")

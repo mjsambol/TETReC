@@ -20,6 +20,7 @@ from .translation_utils import *
 from .cookies import *
 from .common import *
 from .language_mappings import *
+from .diff_draft_versions import get_translated_additions_since_ok_to_translate
 
 mailjet_basic_auth = HTTPBasicAuth('dbe7d877e71f69f13e19d2af6671f6cb', 'a7e171ca7aeb40920bc93f69d79459d6')   
 DRAFT_TTL = 60 * 60 * 24
@@ -113,7 +114,7 @@ def create_draft_history(draft):
     entity = datastore_client.get(entity.key)
     return entity.key
     
-def store_draft_backup(draft):
+def store_draft_backup(draft, force_backup=False):
     debug("checking whether to save a draft backup...")
     prev_backup_time = 0
     query2 = datastore_client.query(kind="draft_backup")
@@ -132,7 +133,7 @@ def store_draft_backup(draft):
         debug("No prev backup found")
     else:
         debug(f'draft last edit is {draft["last_edit"]} so the backup is {draft["last_edit"] - prev_backup_time} which is {(draft["last_edit"] - prev_backup_time).seconds} seconds old')
-    if prev_backup_time == 0 or (draft["last_edit"] - prev_backup_time).seconds > 90:
+    if force_backup or prev_backup_time == 0 or (draft["last_edit"] - prev_backup_time).seconds > 90:
         debug("creating a draft backup")
         create_draft_history(draft)
 
@@ -155,7 +156,8 @@ def update_hebrew_draft(draft_key, hebrew_text, is_finished=False, ok_to_transla
     prev_last_edit = draft["last_edit"]
     draft.update({"hebrew_text": hebrew_text})
     draft.update({"is_finished": is_finished})
-    if ok_to_translate:  # we don't want to go back once it's set to true
+    if ok_to_translate:  
+        # we don't want to ever change it back (on this draft) once it's set to true
         draft.update({"ok_to_translate": True})
     edit_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     draft.update({"last_edit": edit_timestamp}) 
@@ -163,7 +165,8 @@ def update_hebrew_draft(draft_key, hebrew_text, is_finished=False, ok_to_transla
     datastore_client.put(draft)
 
     # also store history in case of dramatic failure
-    store_draft_backup(draft)
+    # and for reasons related to applying deltas in translation, we need to force save this as a backup
+    store_draft_backup(draft, force_backup=ok_to_translate)
 
 
 def get_latest_published(lang_code):
@@ -399,7 +402,7 @@ def device_info():
         fsz = spd["heb-font-size"]
         if fsz:
             heb_font_size = fsz
-            print("/debug: overriding font size from cookie: " + heb_font_size)
+            debug("/debug: overriding font size from cookie: " + heb_font_size)
 
     return render_template('fonts.html', heb_font_size=heb_font_size)
 
@@ -582,7 +585,8 @@ def continue_draft():
 
             return render_template(next_page, heb_text=heb_text, translated=translated, draft_timestamp=draft_timestamp, 
                                    lang=draft['translation_lang'], **names,
-                                   draft_key=key.to_legacy_urlsafe().decode('utf8'), is_finished=('is_finished' in draft and draft['is_finished']))
+                                   draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=draft['heb_draft_id'],
+                                   is_finished=('is_finished' in draft and draft['is_finished']))
 
     return "Draft not found, please start again."
             
@@ -621,7 +625,7 @@ def process():
     # store the draft in DB so that someone else can continue the translation work
     key = create_draft(heb_text, basic_user_info, translation_text=translated, translation_lang=target_language_code, heb_draft_id=request.form.get('heb_draft_id'))
     return render_template(next_page, heb_text=heb_text, translated=translated, lang=target_language_code,
-                           draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'))
+                           draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=request.form.get('heb_draft_id'))
 
 
 @tamtzit.route("/saveDraft", methods=['POST'])
@@ -643,6 +647,29 @@ def save_draft():
         update_hebrew_draft(draft_key, source_text, is_finished=finished, ok_to_translate=send_to_translators)
     return "OK"
 
+
+@tamtzit.route("/getUntranslatedAdditions", methods=["GET"])
+def get_untranslated_additions():
+    debug(f"get_untranslated_additions: heb_draft_id is {request.args.get('heb_draft_id')}")
+    draft_id = request.args.get('heb_draft_id')
+    lang = request.args.get('lang')
+    if draft_id is None:
+        debug("ERROR: /getUntranslatedAdditions got None draft_id!")
+        return None
+    draft = datastore_client.get(datastore_client.key("draft", int(draft_id)))
+    if draft is None:
+        debug("ERROR: /getUntranslatedAdditions got None matching draft!")
+        return None
+    try:
+        additions_by_section, translated_additions_by_section = get_translated_additions_since_ok_to_translate(draft, target_lang=lang)
+    except:
+        debug("There was an error trying to get deltas, returning no deltas.")
+        additions_by_section = translated_additions_by_section = {}
+
+    response = Markup(json.dumps({"additions":additions_by_section, "translated_additions":translated_additions_by_section}))
+    print(response)
+    return response
+        
 
 def process_translation_request(heb_text, target_language_code):
     # heb_lines = heb_text.split("\n")

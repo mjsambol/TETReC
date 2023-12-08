@@ -57,18 +57,10 @@
 
             var last_saved_translation = `{{translated}}`;
             var is_finished = "True" === "{{is_finished}}";
+            var in_progress = "True" === "{{in_progress}}";
 
-            function done() {
-                if (! is_finished) {
-                    copyToClipboard('translated_text');
-                    saveDraft();
-                    document.getElementById("finish_button").innerText = "DONE";
-                    is_finished = true;
-                } else {
-                    copyToClipboard('translated_text');
-                    saveDraft(true);
-                    window.location='/';
-                }
+            function copy_to_clipboard() {
+                copyToClipboard('translated_text');
             }
 
             function translation_changed() {
@@ -97,7 +89,7 @@
                     {
                         draft_key: "{{draft_key}}",
                         translation: curr_translation,
-                        is_finished: is_finished
+                        is_finished: is_finished            // this is historical - originally could change by button press, no longer.
                     },
                     function(data,status) {
                         console.log("Draft save status: " + status);
@@ -113,6 +105,16 @@
             function enable_edit() {
                 document.getElementById("translated_text").disabled = false;
                 document.getElementById("edit_anyway_button").style.visibility = "hidden";
+                document.getElementById("finish_button").disabled = false;
+                document.getElementById("heb_text_area").disabled = false;
+                document.getElementById("pull_additions_button").disabled = false;
+            }
+
+            function observe_only() {
+                document.getElementById("heb_text_area").disabled = true;
+                document.getElementById("translated_text").disabled = true;
+                document.getElementById("edit_anyway_button").style.visibility = "visible";
+                document.getElementById("pull_additions_button").disabled = true;
             }
 
             function search(string, regexp, from = 0) {
@@ -121,9 +123,12 @@
             }
 
             async function pullAdditions() {
-                alert("*IF* there have been additions to the Hebrew text " +
-                "since this translation was started, they will be added to the Hebrew and Translation here.\n\n" +
-                "Only *newly added entries* will be copied, no other changes. They will be marked in the Hebrew with +-+-+-+-.\n\n");
+                if (!confirm("*IF* there have been additions to the Hebrew text " +
+                "they will be added to the Hebrew and Translation here.\n\n" +
+                "Only *newly added entries* will be copied, no other changes. They will be marked in the Hebrew with\n\n" +
+                "                    ++++++++++.\n\n")) {
+                    return;
+                }
                 alert("Please wait, this update takes about 10 seconds. It can only be requested once per minute.");
                 document.getElementById("pull_additions_button").disabled = true;
                 document.getElementById("heb_text_area").disabled = true;
@@ -138,7 +143,7 @@
                     // this pattern is unexpected, had to be refined because:
                     // 1. the text is one long block, we're not actually looking for these things at the "start of the line" as there are no lines
                     // 2. the emphasis marks may or may not be there in the Hebrew, depending on where it came from, it may have been pasted without those
-                    var section_start_pat = "\\n\\n.[📌>] \\*?_?";
+                    var section_start_pat = "\\n\\n.?[📌>] \\*?_?";
 
                     for (key in server_says['additions']) {
                         ht = hta.value;
@@ -160,16 +165,19 @@
                         tail = ht.substring(next_section_start_pos);
                         updated_content = head + "\n\n++++++++++++++++++++++++++\n";
                         for (b=0; b<added_bullets.length; b++) {
-                            updated_content = updated_content + added_bullets[b] + "\n\n";
+                            updated_content = updated_content + added_bullets[b];
+                            if (b < added_bullets.length - 1) {
+                                updated_content = updated_content + "\n\n";
+                            }
                             num_additions += 1;
                         }
-                        updated_content = updated_content + "++++++++++++++++++++++++++";
+                        updated_content = updated_content + "\n++++++++++++++++++++++++++";
                         hta.value = updated_content + tail;
                     }
 
                     eta = document.getElementById('translated_text');
 
-                    var section_start_pat = "\\n\\n.[📌>] \\*";
+                    var section_start_pat = "\\n\\n.?[📌>] \\*";
 
                     for (key in server_says['translated_additions']) {
                         et = eta.value;
@@ -190,9 +198,12 @@
                         tail = et.substring(next_section_start_pos);
                         updated_content = head + "\n\n++++++++++++++++++++++++++\n";
                         for (b=0; b<added_bullets.length; b++) {
-                            updated_content = updated_content + added_bullets[b] + "\n\n";
+                            updated_content = updated_content + added_bullets[b];
+                            if (b < added_bullets.length - 1) {
+                                updated_content = updated_content + "\n\n";
+                            }
                         }
-                        updated_content = updated_content + "++++++++++++++++++++++++++";
+                        updated_content = updated_content + "\n++++++++++++++++++++++++++";
                         eta.value = updated_content + tail;
                     }
 
@@ -241,11 +252,18 @@
 </table>                    
 <table width="100%" border="0">
     <tr>
-        <td><button id="restart_button" style="font-size: 20px; padding:8px 8px" onclick="window.location='/'">Start Again</button></td>
+        <td><button id="restart_button" style="font-size: 20px; padding:8px 8px" onclick="window.location='/'">Go Home</button></td>
         <td align="center"><button id="preview_button" style="font-size: 20px; padding:8px 8px" onclick="showPreview();">Preview</button></td>
-        <td align="right"><button id="edit_anyway_button" style="font-size: 20px; padding:8px 8px;visibility: hidden;" onclick="enable_edit();">Edit Again</button>
-            <button id="finish_button" style="font-size: 20px; padding:8px 8px" onclick="done();">Copy to Clipboard</button></td>
-
+        <td>
+            <table border="0" width="100%"><tr>
+                <td align="center">
+                    <button id="edit_anyway_button" style="font-size: 20px; padding:8px 8px;visibility: hidden;" onclick="enable_edit();">Edit Again</button>
+                </td>
+                <td align="right">
+                    <button id="finish_button" style="font-size: 20px; padding:8px 8px" onclick="copy_to_clipboard();">Copy to Clipboard</button>
+                </td>
+            </tr></table>
+        </td>
     </tr>
 </table>
 
@@ -259,6 +277,10 @@
     if (is_finished) {
         document.getElementById("translated_text").disabled = true;
         document.getElementById("edit_anyway_button").style.visibility = "visible";
+    }
+
+    if (in_progress) {
+        observe_only();
     }
     update_char_count();
 </script>

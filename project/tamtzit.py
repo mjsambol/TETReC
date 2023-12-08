@@ -422,8 +422,9 @@ def refresh_cookies(request, response):
         response.set_cookie('tamtzit_prefs', site_prefs, expires=datetime.now() + timedelta(days=100))
 
 
-@tamtzit.route("/status")
-def route_get_status_json():
+@cachetools.func.ttl_cache(ttl=25)
+def get_cachable_status(fake_param):
+    debug("fetching uncached status info")
     status_per_lang = {}
     jlm = ZoneInfo("Asia/Jerusalem")
     now = datetime.now(tz=jlm)
@@ -445,6 +446,11 @@ def route_get_status_json():
         'by_lang': status_per_lang
     }
     return json.dumps(response)
+
+
+@tamtzit.route("/status")
+def route_get_status_json():
+    return get_cachable_status("FakeParam")
 
 
 @tamtzit.route("/use_invitation")
@@ -497,9 +503,10 @@ def route_hebrew_template():
         # here and the call below.
         date_info = make_date_info(dt, 'he')
 
-        response = make_response(render_template(next_page, date_info=date_info, heb_text=Markup(draft['hebrew_text']), draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
+        response = make_response(render_template(next_page, date_info=date_info, heb_text=Markup(draft['hebrew_text']), 
+                                draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
                                 ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
-                                is_finished=('is_finished' in draft and draft['is_finished']), 
+                                is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
                                 heb_font_size=get_heb_font_sz_pref(request), user_name=draft_creator_user_info["name_hebrew"]))
         refresh_cookies(request, response)
         return response
@@ -510,8 +517,9 @@ def route_hebrew_template():
 
     debug(f'Creating a new Hebrew draft with key {key.to_legacy_urlsafe().decode("utf8")}')
     date_info = make_date_info(dt, 'he')
-    response = make_response(render_template(next_page, date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"), ok_to_translate=False, is_finished=False,
-                                             heb_font_size=get_heb_font_sz_pref(request), user_name=draft_creator_user_info["name_hebrew"]))
+    response = make_response(render_template(next_page, date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"), 
+                            ok_to_translate=False, is_finished=False, in_progress=False,
+                            heb_font_size=get_heb_font_sz_pref(request), user_name=draft_creator_user_info["name_hebrew"]))
     refresh_cookies(request, response)
     return response
 
@@ -584,10 +592,10 @@ def continue_draft():
             }
             key = draft.key
 
-            return render_template(next_page, heb_text=heb_text, translated=translated, draft_timestamp=draft_timestamp, 
+            return render_template(next_page, heb_text=heb_text, translated=Markup(translated), draft_timestamp=draft_timestamp, 
                                    lang=draft['translation_lang'], **names,
                                    draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=draft['heb_draft_id'],
-                                   is_finished=('is_finished' in draft and draft['is_finished']))
+                                   is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True)
 
     return "Draft not found, please start again."
             
@@ -625,7 +633,7 @@ def process():
 
     # store the draft in DB so that someone else can continue the translation work
     key = create_draft(heb_text, basic_user_info, translation_text=translated, translation_lang=target_language_code, heb_draft_id=request.form.get('heb_draft_id'))
-    return render_template(next_page, heb_text=heb_text, translated=translated, lang=target_language_code,
+    return render_template(next_page, heb_text=heb_text, translated=translated, lang=target_language_code, in_progress=False,
                            draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=request.form.get('heb_draft_id'))
 
 

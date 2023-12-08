@@ -130,22 +130,27 @@ def pre_translation_swaps(text, target_language_code):
         text = re.sub(r'\b([למהבו])?עוטף עזה\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'the Gaza envelope', text, re.U)
         text = re.sub(r'\b([למהבו])?עוטף\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'the Gaza envelope [?]', text, re.U)
 
+        text = re.sub(r'\bהסברה\b', 'hasbara (public diplomacy)', text, re.U)
+
     elif target_language_code == 'fr':
         text = re.sub(r'\bהלילה\b', 'la nuit dernière', text, re.U)
 
         text = re.sub(r'\b([למהבו])?עוטף עזה\b', lambda m: tx_heb_prefix(m.group(1), "fr") + 'La zone autour de Gaza', text, re.U)
         text = re.sub(r'\b([למהבו])?עוטף\b', lambda m: tx_heb_prefix(m.group(1), "fr") + 'La zone autour de Gaza [?]', text, re.U)
 
+        text = re.sub(r'\bהסברה\b', 'diplomatie publique', text, re.U)
+
     return text
 
 
 def post_translation_swaps(text, target_language_code):
     if target_language_code == 'en':
-        text = re.sub('infrastructures', 'infrastructure', text)
-        text = re.sub(r'\b[Aa]larm(s?)\b', lambda m: "siren" + ('s' if m.group(1).startswith("s") else ''), text)
-        text = re.sub(r'\b([Aa])n siren', "\\1 siren", text)
+        text = re.sub('infrastructures', 'infrastructure', text, re.IGNORECASE)
+        text = re.sub(r'\balarm(s?)\b', lambda m: "siren" + ('s' if m.group(1).startswith("s") else ''), text, re.IGNORECASE)
+        text = re.sub(r'\b(a)n siren', "\\1 siren", text, re.IGNORECASE)
+        text = re.sub('martyrs?', 'fallen', text, re.IGNORECASE)
     elif target_language_code == 'fr':
-        text = re.sub(r'\b[Aa]larm(s?)\b', lambda m: "alert" + ('s' if m.group(1).startswith("s") else ''), text)
+        text = re.sub(r'\balarm(s?)\b', lambda m: "alert" + ('s' if m.group(1).startswith("s") else ''), text, re.IGNORECASE)
 
     return text
 

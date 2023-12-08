@@ -53,11 +53,20 @@
                 document.getElementById("done_button").disabled = false;
             }
 
+            function observe_only() {
+                document.getElementById("to_translation_button").disabled = true;
+                document.getElementById("done_button").disabled = true;
+                document.getElementById("heb_text").disabled = true;
+                document.getElementById("back_home").style.visibility = "visible";
+                document.getElementById("edit_anyway_button").style.visibility = "visible";
+            }
+
             function enable_edit() {
                 document.getElementById("heb_text").disabled = false;
                 document.getElementById("edit_anyway_button").style.visibility = "hidden";
                 document.getElementById("done_button").style.backgroundColor="#DDDDDD";
                 document.getElementById("done_button").disabled = false;
+                document.getElementById("to_translation_button").disabled = false;
                 document.getElementById("back_home").style.visibility = "hidden";
                 document.getElementById("edit_anyway_button").style.visibility = "hidden";
             }
@@ -228,6 +237,11 @@ https://link.mmb.org.il/news {% endif %}</textarea>
         disable_done_button();
         document.getElementById("edit_anyway_button").style.visibility = "visible";
     </script>
+{% endif %}
+{% if in_progress %}
+<script>
+    observe_only();
+</script>
 {% endif %}
     <script>
         update_char_count();

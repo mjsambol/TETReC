@@ -5,7 +5,7 @@ Ceci est une mise à jour résumée de l'actualité. L'édition régulière sera
 
 •   •   •
 {% else %}📻 *L'essentiel de l'actualité*
-*Édition de {{date_info.part_of_day}}: {{date_info.day_of_week}} {{date_info.hebrew_dom}} {{date_info.hebrew_month}} {{date_info.hebrew_year}}* / {{date_info.secular_dom}} {{date_info.secular_month}} {{date_info.secular_year}}
+*Édition {% if date_info.part_of_day in ('Matin','soir') %}du{% else %}de{% endif %} {{date_info.part_of_day}}: {{date_info.day_of_week}} {{date_info.hebrew_dom}} {{date_info.hebrew_month}} {{date_info.hebrew_year}}* / {{date_info.secular_dom}} {{date_info.secular_month}} {{date_info.secular_year}}
 
   •   •   •
 

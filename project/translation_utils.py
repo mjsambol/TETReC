@@ -58,14 +58,14 @@ title_translations = {
     'רב סמל': 'Sergeant First Class',
     'רס"ל': 'Sergeant First Class',
 
-    'רב סמל ראשון': 'Chief Sergeant First Class',
-    'רס"ר': 'Chief Sergeant First Class',
-    'רס"מ': 'Master Sergeant',
-    'רס"ם': 'Master Sergeant',
+    'רב סמל ראשון': 'Master Sergeant', # < switching to that based on other news sources and Ilana's friend. Originally had: 'Chief Sergeant First Class',
+    'רס"ר': 'Master Sergeant',       # < switching to that based on other news sources and Ilana's friend. Originally had: 'Chief Sergeant First Class',
+    'רס"מ': 'Sergeant Major',        # < switching to that based on other news sources and Ilana's friend. Originally had: 'Master Sergeant',
+    'רס"ם': 'Sergeant Major',        # < switching to that based on other news sources and Ilana's friend. Originally had: 'Master Sergeant',
 
     'רס"ב': 'First Sergeant',
-    'רנ"מ': 'Sergeant Major',
-    'רנ"ם': 'Sergeant Major',
+    'רנ"מ': 'Sergeant Major',        # "apparently doesn't exist anymore" per Ilana's friend
+    'רנ"ם': 'Sergeant Major',        # "apparently doesn't exist anymore" per Ilana's friend
     'רנ"ג': 'Command Sergeant Major',
 
     'סג"מ': 'Second Lieutenant',
@@ -94,7 +94,7 @@ title_translations = {
     # This section of translations is based on https://www.almaany.com/en/dict/en-he/commander/
     # which is a surprising source but nothing here seems controversial
     'מח"ט': 'Brigade Commander',
-    'רמטכ"ל': 'Commander in Chief',
+    'רמטכ"ל': 'Chief of General Staff',     # More accurate translation than this source's 'Commander in Chief',
     'מ"פ': 'Company Commander',
     'סמג"ד': 'Deputy Battalon Commander',
     'סמח"ט': 'Deputy Commander of Brigade',

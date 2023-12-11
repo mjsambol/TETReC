@@ -89,7 +89,7 @@
             </tr>
         </table>
 <!--        <br>
-        <input type="checkbox" name="disable_auto_save" id="disable_auto_save_checkbox" {% if user_info.disable_auto_save %}checked{% endif %}> Disable Auto-Saving-->
+        <input type="checkbox" name="disable_auto_save" id="disable_auto_save_checkbox" {% if "disable_auto_save" in user_info and user_info.disable_auto_save %}checked{% endif %}> Disable Auto-Saving-->
     </form>
     </center>
     <script>

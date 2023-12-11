@@ -135,8 +135,8 @@
     </head>
 
     <body>
-                <div id="orig_heb_panel" style="display: none;">
-                    <textarea rows="25" style="width:100%; font-size:17px;" dir="rtl">{{heb_text}}</textarea>
+                <div id="orig_heb_panel" style="display: none; font-size:17px;">
+                    <textarea rows="25" style="width:100%; font-size: inherit;" dir="rtl">{{heb_text}}</textarea>
                 </div>
 
                 <div id="translation_panel">
@@ -179,5 +179,8 @@
     </body>
 <script>
         update_char_count();
+        document.getElementById('orig_heb_panel').style.fontSize = "{{heb_font_size}}";
+        document.getElementById('preview_text').style.fontSize = "{{en_font_size}}";
+        document.getElementById('translated_text').style.fontSize = "{{en_font_size}}";
 </script>
 </html>

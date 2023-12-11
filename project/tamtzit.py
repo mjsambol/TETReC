@@ -394,25 +394,35 @@ def route_authenticate():
 def route_create():    
     return render_template(detect_mobile(request, 'index'))
 
-@tamtzit.route('/debug')
-def device_info():
-    heb_font_size = "30px"
+
+def get_font_sz_prefs(request):
+    heb_font_size = "30"
+    en_font_size = "18"
     site_prefs = request.cookies.get('tamtzit_prefs')
     if site_prefs:
         spd = json.loads(site_prefs)
-        fsz = spd["heb-font-size"]
-        if fsz:
-            heb_font_size = fsz
-            debug("/debug: overriding font size from cookie: " + heb_font_size)
+        if "heb-font-size" in spd:
+            heb_font_size = spd["heb-font-size"]
+            debug("/debug: overriding Hebrew font size from cookie: " + heb_font_size)
+        if "en-font-size" in spd:
+            en_font_size = spd["en-font-size"]
+            debug("/debug: overriding English font size from cookie: " + en_font_size)
+    return {"he":heb_font_size, "en":en_font_size}
 
-    return render_template('fonts.html', heb_font_size=heb_font_size)
+
+@tamtzit.route('/debug')
+def device_info():
+    fsz_prefs = get_font_sz_prefs(request)
+    return render_template('fonts.html', heb_font_size=fsz_prefs['he'], en_font_size=fsz_prefs['en'])
+
 
 @tamtzit.route("/setSettings", methods=['POST'])
 def route_set_settings():
-    font_preference = request.form.get("font-size")
-    debug("Changing settings: font size is now " + font_preference)
-    response = make_response(redirect("/heb"))
-    prefs = {"heb-font-size": font_preference}
+    he_font_preference = request.form.get("he-font-size")
+    en_font_preference = request.form.get("en-font-size")
+    debug(f"Changing settings: Hebrew font size is now {he_font_preference}, English is {en_font_preference}")
+    response = make_response(redirect("/"))
+    prefs = {"heb-font-size": he_font_preference, "en-font-size": en_font_preference}
     response.set_cookie('tamtzit_prefs', json.dumps(prefs), expires=datetime.now() + timedelta(days=100))
     return response
 
@@ -507,7 +517,7 @@ def route_hebrew_template():
                                 draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
                                 ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
                                 is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
-                                heb_font_size=get_heb_font_sz_pref(request), user_name=draft_creator_user_info["name_hebrew"]))
+                                heb_font_size=get_font_sz_prefs(request)['he'], user_name=draft_creator_user_info["name_hebrew"]))
         refresh_cookies(request, response)
         return response
             
@@ -519,20 +529,9 @@ def route_hebrew_template():
     date_info = make_date_info(dt, 'he')
     response = make_response(render_template(next_page, date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"), 
                             ok_to_translate=False, is_finished=False, in_progress=False,
-                            heb_font_size=get_heb_font_sz_pref(request), user_name=draft_creator_user_info["name_hebrew"]))
+                            heb_font_size=get_font_sz_prefs(request)['he'], user_name=draft_creator_user_info["name_hebrew"]))
     refresh_cookies(request, response)
     return response
-
-
-def get_heb_font_sz_pref(request):
-    heb_font_size = "30px"
-    site_prefs = request.cookies.get('tamtzit_prefs')
-    if site_prefs:
-        spd = json.loads(site_prefs)
-        fsz = spd["heb-font-size"]
-        if fsz:
-            heb_font_size = fsz
-    return heb_font_size
 
 
 @tamtzit.route("/start_translation")
@@ -590,11 +589,13 @@ def continue_draft():
                 "translator_in_heb":user_info["name_hebrew"],
                 "translator_in_en": user_info["name"]
             }
+            font_size_prefs = get_font_sz_prefs(request)
             key = draft.key
 
             return render_template(next_page, heb_text=heb_text, translated=Markup(translated), draft_timestamp=draft_timestamp, 
                                    lang=draft['translation_lang'], **names,  user_info=user_info,
                                    draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=draft['heb_draft_id'],
+                                   heb_font_size=font_size_prefs['he'], en_font_size=font_size_prefs['en'], 
                                    is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True)
 
     return "Draft not found, please start again."
@@ -624,6 +625,7 @@ def process():
         "translator_in_heb":user_info["name_hebrew"],
         "translator_in_en": user_info["name"]
     }
+    font_size_prefs = get_font_sz_prefs(request)
     
     info = process_translation_request(heb_text, target_language_code)
     draft_timestamp=datetime.now(tz=ZoneInfo('Asia/Jerusalem')).strftime('%Y%m%d-%H%M%S')
@@ -634,6 +636,7 @@ def process():
     # store the draft in DB so that someone else can continue the translation work
     key = create_draft(heb_text, basic_user_info, translation_text=translated, translation_lang=target_language_code, heb_draft_id=request.form.get('heb_draft_id'))
     return render_template(next_page, heb_text=heb_text, translated=translated, lang=target_language_code, in_progress=False, user_info=user_info,
+                           heb_font_size=font_size_prefs['he'], en_font_size=font_size_prefs['en'], 
                            draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=request.form.get('heb_draft_id'))
 
 
@@ -810,9 +813,9 @@ def make_date_info(dt, lang):
     oct6 = datetime(2023,10,6,tzinfo=ZoneInfo('Asia/Jerusalem'))
     heb_dt = dates.HebrewDate.from_pydate(dt)
     dt_edition = editions[lang][2]
-    if 0 <= dt.hour <= 12:
+    if 0 <= dt.hour < 12:
         dt_edition = editions[lang][0]
-    elif 12 < dt.hour < 18:
+    elif 12 <= dt.hour < 18:
         dt_edition = editions[lang][1]
 
     locale.setlocale(locale.LC_TIME, locales[lang])

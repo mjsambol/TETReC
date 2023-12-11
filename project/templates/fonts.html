@@ -17,23 +17,39 @@
         var ratio = Math.ceil(4000 / Math.min(screen.availWidth, 400) * Math.max(window.devicePixelRatio, 2.7));
         var other_ratio = Math.ceil(1920 / Math.min(screen.availWidth, 400) * Math.max(window.devicePixelRatio, 2.7));
         var delta = (4 * (30-ratio));
-        var scaled = 30 + delta;
-        var other_scaled = delta / 8;
+        var heb_scaled = 30 + delta;
+        var en_scaled = heb_scaled;
         var ratio = Math.ceil(4000 / Math.min(screen.availWidth, 400) * Math.max(window.devicePixelRatio, 2.7));
 
         function increase() {
-            scaled = scaled + 1;
-            sp = document.getElementById('sizes_panel');
-            sp.innerHTML = "Ratio: " + ratio + "<br><br>Scaled: " + scaled + "<br><br>Cookie: {{heb_font_size}}";
-            document.getElementById('preview_text').style.fontSize = scaled + "px";
-            document.getElementById('font-size-form-input').value = scaled;
+            if (document.getElementById('lang_select').value == "en") {
+                sp = document.getElementById('en_sizes_panel');
+                en_scaled = en_scaled + 1;
+                sp.innerHTML = "Ratio: " + ratio + "<br><br>Scaled: " + en_scaled + "<br><br>Cookie: {{en_font_size}}";
+                document.getElementById('en_metrics_panel').style.fontSize = en_scaled + "px";
+                document.getElementById('en-font-size-form-input').value = en_scaled;
+            } else {
+                sp = document.getElementById('he_sizes_panel');
+                heb_scaled = heb_scaled + 1;
+                sp.innerHTML = "Ratio: " + ratio + "<br><br>Scaled: " + heb_scaled + "<br><br>Cookie: {{heb_font_size}}";
+                document.getElementById('preview_text').style.fontSize = heb_scaled + "px";
+                document.getElementById('he-font-size-form-input').value = heb_scaled;
+            }
         }
         function decrease() {
-            scaled = scaled - 1;
-            sp = document.getElementById('sizes_panel');
-            sp.innerHTML = "Ratio: " + ratio + "<br><br>Scaled: " + scaled + "<br><br>Cookie: {{heb_font_size}}";
-            document.getElementById('preview_text').style.fontSize = scaled + "px";
-            document.getElementById('font-size-form-input').value = scaled;
+            if (document.getElementById('lang_select').value == "en") {
+                sp = document.getElementById('en_sizes_panel');
+                en_scaled = en_scaled - 1;
+                sp.innerHTML = "Ratio: " + ratio + "<br><br>Scaled: " + en_scaled + "<br><br>Cookie: {{en_font_size}}";
+                document.getElementById('en_metrics_panel').style.fontSize = en_scaled + "px";
+                document.getElementById('en-font-size-form-input').value = en_scaled;
+            } else {
+                sp = document.getElementById('he_sizes_panel');
+                heb_scaled = heb_scaled - 1;
+                sp.innerHTML = "Ratio: " + ratio + "<br><br>Scaled: " + heb_scaled + "<br><br>Cookie: {{heb_font_size}}";
+                document.getElementById('preview_text').style.fontSize = heb_scaled + "px";
+                document.getElementById('he-font-size-form-input').value = heb_scaled;
+            }
         }
 
     </script>
@@ -42,36 +58,50 @@
             כאן יש דוגמא של כמה מילים כדי לבדוק גודל הצגתם על המסך שלך
         </div>
 
-        <div id="orig_heb_panel" style="font-family: Arial, Helvetica, sans-serif; font-size:calc(.8em + 0.5vmin)">
+        <div id="en_metrics_panel" style="font-family: Arial, Helvetica, sans-serif; font-size:calc(.8em + 0.5vmin)">
         </div>
         <br><br>
         <table width="80%">
             <tr>
                 <td align="center"><img src="https://cdn-icons-png.flaticon.com/512/2/2486.png" width=200px onclick="increase();"></td>
+                <td align="center"><select style="font-family: Arial, Helvetica, sans-serif; font-size:45px" id="lang_select"><option value="he">עברית</option><option value="en">English</option></select></td>
                 <td align="center"><img src="https://cdn-icons-png.flaticon.com/512/61/61932.png" width=200px onclick="decrease();"></td>
             </tr>
             <tr>
-                <td colspan="2" align="center"><br><br>
+                <td colspan="3" align="center"><br><br>
                     <form action="/setSettings" method="POST">
-                        <input type="hidden" name="font-size" id="font-size-form-input">
+                        <input type="hidden" name="he-font-size" id="he-font-size-form-input">
+                        <input type="hidden" name="en-font-size" id="en-font-size-form-input">
                         <button type="submit" style="font-size: 45px; padding:8px 8px">נראה טוב</button>
                     </form>
                 </td>
             </tr>
         </table>
         <br>
-        <div id="sizes_panel" style="font-family: Arial, Helvetica, sans-serif; font-size:calc(.8em + 0.5vmin)"></div>
+        <table width="80%" border="1">
+            <tr><th style="font-family: Arial, Helvetica, sans-serif; font-size:45px">English</th><th style="font-family: Arial, Helvetica, sans-serif; font-size:45px">עברית</th></tr>
+            <tr>
+                <td width="50%" align="center">
+                    <div id="en_sizes_panel" style="font-family: Arial, Helvetica, sans-serif; font-size:45px"></div>
+                </td>
+                <td width="50%" align="center">
+                    <div id="he_sizes_panel" style="font-family: Arial, Helvetica, sans-serif; font-size:45px"></div>
+                </td>
+            </tr>
+        </table>
     </center>
     <script>
-        hp = document.getElementById('orig_heb_panel');
-        hp.style.fontSize = "calc(" + (0.8 + (delta / 20)) + "em + " + (0.5 + (delta/5)) + "vmin)";
+        hp = document.getElementById('en_metrics_panel');
+        //hp.style.fontSize = "calc(" + (0.8 + (delta / 20)) + "em + " + (0.5 + (delta/5)) + "vmin)";
         // skip this on first render - we're getting user's cookie prefs
         //document.getElementById('preview_text').style.fontSize = scaled + "px"; //Math.ceil(4000 / (Math.max(screen.availWidth, 400) * Math.min(window.devicePixelRatio, 2.7))) + "vw";
 
         hp.innerHTML = hp.innerHTML + "<br><br>Screen width is " + screen.availWidth + "<br><br>Pixel depth is " + screen.pixelDepth;
         hp.innerHTML = hp.innerHTML + "<br><br>Device Pixel Ratio " + window.devicePixelRatio + "<br><br>UserAgent: " + navigator.userAgent;
-        sp = document.getElementById('sizes_panel');
+        sp = document.getElementById('he_sizes_panel');
         sp.innerHTML = "Ratio: " + ratio + "<br><br>Scaled: " + (30 + (4 * (30-ratio))) + "<br><br>Cookie: {{heb_font_size}}";
+        sp = document.getElementById('en_sizes_panel');
+        sp.innerHTML = "Ratio: " + ratio + "<br><br>Scaled: " + (30 + (4 * (30-ratio))) + "<br><br>Cookie: {{en_font_size}}";
     </script>
   </body>    
 </html>

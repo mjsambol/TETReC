@@ -58,12 +58,19 @@
             var last_saved_translation = `{{translated}}`;
             var is_finished = "True" === "{{is_finished}}";
             var in_progress = "True" === "{{in_progress}}";
+            var manual_saves_only = "True" === "{{user_info['overrides'] is defined and 'manual_save_only' in user_info['overrides']}}";
 
             function copy_to_clipboard() {
                 copyToClipboard('translated_text');
+                if (manual_saves_only) {
+                    saveDraft(true);
+                }
             }
 
             function translation_changed() {
+                if (manual_saves_only) {
+                    return;
+                }
                 update_char_count();
                 if (document.getElementById("preview_panel").style.display=="initial") {
                     document.getElementById("preview_panel").innerHTML=makeWhatsappPreview(document.getElementById("translated_text").value);
@@ -73,17 +80,19 @@
                         document.getElementById("is_saved").innerText = "Changes NOT YET Saved!";
                         document.getElementById("is_saved").style.color = "#FF0000";
 
-                        document.getElementById("finish_button").innerText = "Copy to Clipboard";
                         is_finished = false;
                 } 
             }
 
-            function saveDraft(finalize=false) {
-                if (is_finished && !finalize) {
+            function saveDraft(force=false) {
+                if (manual_saves_only && !force) {
+                    return;
+                }
+                if (is_finished && !force) {
                     return;
                 }
                 curr_translation = document.getElementById('translated_text').value;
-                if (finalize || last_saved_translation.localeCompare(curr_translation) != 0) {
+                if (force || last_saved_translation.localeCompare(curr_translation) != 0) {
                 
                     $.post("/saveDraft",
                     {

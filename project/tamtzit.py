@@ -593,7 +593,7 @@ def continue_draft():
             key = draft.key
 
             return render_template(next_page, heb_text=heb_text, translated=Markup(translated), draft_timestamp=draft_timestamp, 
-                                   lang=draft['translation_lang'], **names,
+                                   lang=draft['translation_lang'], **names,  user_info=user_info,
                                    draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=draft['heb_draft_id'],
                                    is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True)
 
@@ -633,7 +633,7 @@ def process():
 
     # store the draft in DB so that someone else can continue the translation work
     key = create_draft(heb_text, basic_user_info, translation_text=translated, translation_lang=target_language_code, heb_draft_id=request.form.get('heb_draft_id'))
-    return render_template(next_page, heb_text=heb_text, translated=translated, lang=target_language_code, in_progress=False,
+    return render_template(next_page, heb_text=heb_text, translated=translated, lang=target_language_code, in_progress=False, user_info=user_info,
                            draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=request.form.get('heb_draft_id'))
 
 

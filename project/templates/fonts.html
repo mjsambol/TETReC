@@ -57,6 +57,7 @@
         <div id="preview_text" style="font-size: {{heb_font_size}};">
             כאן יש דוגמא של כמה מילים כדי לבדוק גודל הצגתם על המסך שלך
         </div>
+        <form action="/setSettings" method="POST">
 
         <div id="en_metrics_panel" style="font-family: Arial, Helvetica, sans-serif; font-size:calc(.8em + 0.5vmin)">
         </div>
@@ -69,11 +70,9 @@
             </tr>
             <tr>
                 <td colspan="3" align="center"><br><br>
-                    <form action="/setSettings" method="POST">
-                        <input type="hidden" name="he-font-size" id="he-font-size-form-input">
-                        <input type="hidden" name="en-font-size" id="en-font-size-form-input">
-                        <button type="submit" style="font-size: 45px; padding:8px 8px">נראה טוב</button>
-                    </form>
+                    <input type="hidden" name="he-font-size" id="he-font-size-form-input">
+                    <input type="hidden" name="en-font-size" id="en-font-size-form-input">
+                    <button type="submit" style="font-size: 45px; padding:8px 8px">נראה טוב</button>
                 </td>
             </tr>
         </table>
@@ -89,6 +88,9 @@
                 </td>
             </tr>
         </table>
+<!--        <br>
+        <input type="checkbox" name="disable_auto_save" id="disable_auto_save_checkbox" {% if user_info.disable_auto_save %}checked{% endif %}> Disable Auto-Saving-->
+    </form>
     </center>
     <script>
         hp = document.getElementById('en_metrics_panel');

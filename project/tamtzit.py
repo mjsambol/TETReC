@@ -655,8 +655,11 @@ def save_draft():
     source_text = request.form.get('source_text')
     if translated_text and len(translated_text) > 0:
         update_translation_draft(draft_key, translated_text, is_finished=finished)
-    else:
+    elif source_text and len(source_text) > 0:
         update_hebrew_draft(draft_key, source_text, is_finished=finished, ok_to_translate=send_to_translators)
+    else:
+        debug("ERROR: /saveDraft didn't get the input it was expecting!")
+        return "ERROR - saveDraft called without translation or source_text fields"
     return "OK"
 
 

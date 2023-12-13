@@ -309,15 +309,27 @@ def require_login(func):
 
     return authentication_check_wrapper
 
-def require_role(role_name):
+def confirm_user_has_role(request, roles_accepted):
+    debug(f"Checking role requirements, looking for {roles_accepted}")
+    db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
+    roles = db_user_info['role']
+    debug(f"user has roles {roles}")
+    has_role = False
+    if type(roles_accepted) == str:
+        has_role = roles_accepted in roles
+    elif type(roles_accepted) == list:
+        for role in roles_accepted:
+            if role in roles:
+                has_role = True
+    return has_role
+
+def require_role(roles_accepted):
+    # the roles_accepted parameter can be either a string or a list of strings. 
+    # If a list, they are treated as "OR" - access is granted if the user has any 
     def decorator_require_role(func):
         @functools.wraps(func)    # this is necessary so that Flask routing will work!!
         def role_check_wrapper(*args, **kwargs):
-            debug("Checking role requirements...")
-            db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID]) 
-            roles = db_user_info['role']
-            debug(f"user has roles {roles}")
-            if role_name in roles:
+            if confirm_user_has_role(request, roles_accepted):
                 return func(*args, **kwargs)
             else:
                 return render_template("error.html", msg="You don't have access to this section.",
@@ -654,9 +666,15 @@ def save_draft():
     translated_text=request.form.get('translation')
     source_text = request.form.get('source_text')
     if translated_text and len(translated_text) > 0:
-        update_translation_draft(draft_key, translated_text, is_finished=finished)
+        if confirm_user_has_role(request, "translator"):
+            update_translation_draft(draft_key, translated_text, is_finished=finished)
+        else:
+            return "Error: saveDraft called with change to translated text, but user does not have the appropriate role."
     elif source_text and len(source_text) > 0:
-        update_hebrew_draft(draft_key, source_text, is_finished=finished, ok_to_translate=send_to_translators)
+        if confirm_user_has_role(request, "Hebrew"):
+            update_hebrew_draft(draft_key, source_text, is_finished=finished, ok_to_translate=send_to_translators)
+        else:
+            return "Error: saveDraft called with change to Hebrew text, but user does not have the appropriate role."
     else:
         debug("ERROR: /saveDraft didn't get the input it was expecting!")
         return "ERROR - saveDraft called without translation or source_text fields"

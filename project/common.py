@@ -1,9 +1,12 @@
 import os
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from google.cloud import datastore
 
 def debug(stuff):
     if os.getenv("FLASK_DEBUG") == "1":
-        print("DEBUG: " + stuff)
+        now = datetime.now(tz=ZoneInfo("Asia/Jerusalem"))
+        print(f"DEBUG: [{now.strftime('%d/%m/%Y %H:%M:%S')}] {stuff}")
 
 def expand_lang_code(from_lang, to_lang='H'):
     if to_lang == 'H':

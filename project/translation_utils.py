@@ -20,33 +20,37 @@ def vav_hey(title):
 
 
 def tx_heb_prefix(word, lang):
+    # use caution - assumes that the letters בולמה are intended as prefixes
+    # do not use this with words which have one of those letters as part of the main word!
     if not word or not lang or word == "" or lang == "":
         debug(f"tx_heb_prefix: uhoh got {word} - {lang}")
         return ""
+    result = ""
     if lang == "en":
-        if word.startswith("ב"):
-            return "in "
-        if word.startswith("ו"):
-            return "and "
-        if word.startswith("ל"):
-            return "to "
-        if word.startswith("מ"):
-            return "from "
-        if word.startswith("ה"):
-            return "the "
-        return ""
+        for char in word:
+            if char == "ב":
+                result = result + "in "
+            if char == "ו":
+                result = result + "and "
+            if char == "ל":
+                result = result + "to "
+            if char == "מ":
+                result = result + "from "
+            if char == "ה":
+                result = result + "the "
     elif lang == "fr":
-        if word.startswith("ב"):
-            return "en "
-        if word.startswith("ו"):
-            return "et "
-        if word.startswith("ל"):
-            return "à "
-        if word.startswith("מ"):
-            return "dès "
-        if word.startswith("ה"):
-            return "la "
-        return ""
+        for char in word:
+            if char == "ב":
+                result = result + "en "
+            if char == "ו":
+                result = result + "et "
+            if char == "ל":
+                result = result + "à "
+            if char == "מ":
+                result = result + "dès "
+            if char == "ה":
+                result = result + "la "
+    return result
 
 
 title_translations = {
@@ -96,7 +100,9 @@ title_translations = {
     'מח"ט': 'Brigade Commander',
     'רמטכ"ל': 'Chief of General Staff',     # More accurate translation than this source's 'Commander in Chief',
     'מ"פ': 'Company Commander',
+    'מג"ד': 'Battalon Commander',
     'סמג"ד': 'Deputy Battalon Commander',
+    'מח"ט': 'Brigade Commander',
     'סמח"ט': 'Deputy Commander of Brigade',
     'מא"ז': 'District Commander',
     'מש"ט': 'Flight Commander',
@@ -127,16 +133,16 @@ def pre_translation_swaps(text, target_language_code):
 
         text = re.sub(r'\bהלילה\b', 'last night', text, re.U)
 
-        text = re.sub(r'\b([למהבו])?עוטף עזה\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'the Gaza envelope', text, re.U)
-        text = re.sub(r'\b([למהבו])?עוטף\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'the Gaza envelope [?]', text, re.U)
+        text = re.sub(r'\b([למהבו]+)?עוטף עזה\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'the Gaza envelope', text, re.U)
+        text = re.sub(r'\b([למהבו]+)?עוטף\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'the Gaza envelope [?]', text, re.U)
 
         text = re.sub(r'\bהסברה\b', 'hasbara (public diplomacy)', text, re.U)
 
     elif target_language_code == 'fr':
         text = re.sub(r'\bהלילה\b', 'la nuit dernière', text, re.U)
 
-        text = re.sub(r'\b([למהבו])?עוטף עזה\b', lambda m: tx_heb_prefix(m.group(1), "fr") + 'La zone autour de Gaza', text, re.U)
-        text = re.sub(r'\b([למהבו])?עוטף\b', lambda m: tx_heb_prefix(m.group(1), "fr") + 'La zone autour de Gaza [?]', text, re.U)
+        text = re.sub(r'\b([למהבו]+)?עוטף עזה\b', lambda m: tx_heb_prefix(m.group(1), "fr") + 'La zone autour de Gaza', text, re.U)
+        text = re.sub(r'\b([למהבו]+)?עוטף\b', lambda m: tx_heb_prefix(m.group(1), "fr") + 'La zone autour de Gaza [?]', text, re.U)
 
         text = re.sub(r'\bהסברה\b', 'diplomatie publique', text, re.U)
 
@@ -152,6 +158,8 @@ def post_translation_swaps(text, target_language_code):
     elif target_language_code == 'fr':
         text = re.sub(r'\balarm(s?)\b', lambda m: "alert" + ('s' if m.group(1).startswith("s") else ''), text, re.IGNORECASE)
 
+    text = re.sub(r'\bGalant\b', 'Gallant', text)
+    
     return text
 
 

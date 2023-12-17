@@ -13,6 +13,7 @@ from google.cloud import translate, datastore
 from google.cloud.datastore.key import Key
 from dataclasses import dataclass
 from pyluach import dates
+from pyluach.utils import Pronunciation
 from markupsafe import Markup
 import requests
 from requests.auth import HTTPBasicAuth
@@ -840,7 +841,7 @@ def make_date_info(dt, lang):
         dt_edition = editions[lang][1]
 
     locale.setlocale(locale.LC_TIME, locales[lang])
-    date_info = DateInfo(dt_edition, dt.strftime('%A'), heb_dt.day, heb_dt.month_name(), heb_dt.year, 
+    date_info = DateInfo(dt_edition, dt.strftime('%A'), heb_dt.day, heb_dt.month_name(transliteration=Pronunciation.MODERN_ISRAELI), heb_dt.year, 
                          dt.strftime('%B'), dt.day, dt.year, (dt - oct6).days, heb_dt.hebrew_day(), heb_dt.month_name(True), heb_dt.hebrew_year(),
                          (dt.isoweekday() == 6 and dt.hour < 19))
                          

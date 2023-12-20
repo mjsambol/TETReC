@@ -118,50 +118,53 @@ title_translations = {
 
 def pre_translation_swaps(text, target_language_code):
     for title in title_translations:
-        text = re.sub(fr'\b(ו?)(ה?){title}\b', vav_hey(title_translations[title]), text, re.U)
+        text = re.sub(fr'\b(ו?)(ה?){title}\b', vav_hey(title_translations[title]), text, flags=re.U)
 
     # our Motzei Shabbat header is confused for regular content, this is an easy way to get rid of it
-    text = re.sub(r'\*עדכון מוצאי שבת\*', '', text, re.U)
-    text = re.sub(r'קוראים יקרים, זהו עדכון מקוצר. מהדורה רגילה תישלח אחרי 21:00.', '', text, re.U)
+    text = re.sub(r'\*עדכון מוצאי שבת\*', '', text, flags=re.U)
+    text = re.sub(r'קוראים יקרים, זהו עדכון מקוצר. מהדורה רגילה תישלח אחרי 21:00.', '', text, flags=re.U)
 
     if target_language_code == 'en':
-        text = re.sub(r'\bהי"ד\b',   'HYD', text, re.U)
+        text = re.sub(r'\bהי"ד\b',   'HYD', text, flags=re.U)
         
         text = re.sub(r'\b(ב)צו?הריים\b', lambda m: ("in " if m.group(1).startswith("ב") else '') + 'the afternoon', 
-                    text, re.U)
-        text = re.sub(r'\b(אחר )?ה?צו?הריים\b', 'the afternoon', text, re.U)
+                    text, flags=re.U)
+        text = re.sub(r'\b(אחר )?ה?צו?הריים\b', 'the afternoon', text, flags=re.U)
 
-        text = re.sub(r'\bהלילה\b', 'last night', text, re.U)
+        text = re.sub(r'\bהלילה\b', 'last night', text, flags=re.U)
 
-        text = re.sub(r'\b([למהבו]+)?עוטף עזה\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'the Gaza envelope', text, re.U)
-        text = re.sub(r'\b([למהבו]+)?עוטף\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'the Gaza envelope [?]', text, re.U)
+        text = re.sub(r'\b([למהבו]+)?עוטף עזה\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'the Gaza envelope', text, flags=re.U)
+        text = re.sub(r'\b([למהבו]+)?עוטף\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'the Gaza envelope [?]', text, flags=re.U)
 
-        text = re.sub(r'\bהסברה\b', 'hasbara (public diplomacy)', text, re.U)
-        text = re.sub(r'\b([למהבו]+)?חלל(י)?\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'fallen', text, re.U)
-        text = re.sub(r'\b([למהבו]+)כטמ"ם\b', lambda m: tx_heb_prefix(m.group(1), "en") + "remotely operated UAV", text, re.U) 
-        text = re.sub(r'\b([למהבו]+)אמל"ח\b', lambda m: tx_heb_prefix(m.group(1), "en") + "weapons", text, re.U)
+        text = re.sub(r'\bהסברה\b', 'hasbara (public diplomacy)', text, flags=re.U)
+        text = re.sub(r'\b([למהבו]+)?חלל(י)?\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'fallen', text, flags=re.U)
+        text = re.sub(r'\b([למהבו]+)כטמ"ם\b', lambda m: tx_heb_prefix(m.group(1), "en") + "remotely operated UAV", text, flags=re.U) 
+        text = re.sub(r'\b([למהבו]+)אמל"ח\b', lambda m: tx_heb_prefix(m.group(1), "en") + "weapons", text, flags=re.U)
+        text = re.sub(r'\b([למהבו]+)חטוף\b', lambda m: tx_heb_prefix(m.group(1), "en") + "hostage", text, flags=re.U)
+        text = re.sub(r'\b([למהבו]+)חטופים\b', lambda m: tx_heb_prefix(m.group(1), "en") + "hostages", text, flags=re.U)
+        
 
     elif target_language_code == 'fr':
-        text = re.sub(r'\bהלילה\b', 'la nuit dernière', text, re.U)
+        text = re.sub(r'\bהלילה\b', 'la nuit dernière', text, flags=re.U)
 
-        text = re.sub(r'\b([למהבו]+)?עוטף עזה\b', lambda m: tx_heb_prefix(m.group(1), "fr") + 'La zone autour de Gaza', text, re.U)
-        text = re.sub(r'\b([למהבו]+)?עוטף\b', lambda m: tx_heb_prefix(m.group(1), "fr") + 'La zone autour de Gaza [?]', text, re.U)
+        text = re.sub(r'\b([למהבו]+)?עוטף עזה\b', lambda m: tx_heb_prefix(m.group(1), "fr") + 'La zone autour de Gaza', text, flags=re.U)
+        text = re.sub(r'\b([למהבו]+)?עוטף\b', lambda m: tx_heb_prefix(m.group(1), "fr") + 'La zone autour de Gaza [?]', text, flags=re.U)
 
-        text = re.sub(r'\bהסברה\b', 'diplomatie publique', text, re.U)
-        text = re.sub(r'\b([למהבו]+)כטמ"ם\b', lambda m: tx_heb_prefix(m.group(1), "fr") + "drone", text, re.U) 
+        text = re.sub(r'\bהסברה\b', 'diplomatie publique', text, flags=re.U)
+        text = re.sub(r'\b([למהבו]+)כטמ"ם\b', lambda m: tx_heb_prefix(m.group(1), "fr") + "drone", text, flags=re.U) 
 
     return text
 
 
 def post_translation_swaps(text, target_language_code):
     if target_language_code == 'en':
-        text = re.sub('infrastructures', 'infrastructure', text, re.IGNORECASE)
-        text = re.sub(r'\balarm(s?)\b', lambda m: "siren" + ('s' if m.group(1).startswith("s") else ''), text, re.IGNORECASE)
-        text = re.sub(r'\b(a)n siren', "\\1 siren", text, re.IGNORECASE)
-        text = re.sub('martyrs?', 'fallen', text, re.IGNORECASE)
-        text = re.sub('allowed to be published', 'released for publication', text, re.IGNORECASE)
+        text = re.sub('infrastructures', 'infrastructure', text, flags=re.IGNORECASE)
+        text = re.sub(r'\balarm(s?)\b', lambda m: "siren" + ('s' if m.group(1).startswith("s") else ''), text, flags=re.IGNORECASE)
+        text = re.sub(r'\b(a)n siren', "\\1 siren", text, flags=re.IGNORECASE)
+        text = re.sub('martyrs?', 'fallen', text, flags=re.IGNORECASE)
+        text = re.sub('allowed to be published', 'released for publication', text, flags=re.IGNORECASE)
     elif target_language_code == 'fr':
-        text = re.sub(r'\balarm(s?)\b', lambda m: "alert" + ('s' if m.group(1).startswith("s") else ''), text, re.IGNORECASE)
+        text = re.sub(r'\balarm(s?)\b', lambda m: "alert" + ('s' if m.group(1).startswith("s") else ''), text, flags=re.IGNORECASE)
 
     text = re.sub(r'\bGalant\b', 'Gallant', text)
     

@@ -8,9 +8,9 @@ from uuid import uuid4
 import functools
 import cachetools.func
 from flask import Blueprint, render_template, request, redirect, make_response
-#from flask_login import login_required, current_user
 from google.cloud import translate, datastore
 from google.cloud.datastore.key import Key
+from google.cloud.datastore.query import PropertyFilter
 from dataclasses import dataclass
 from pyluach import dates
 from pyluach.utils import Transliteration
@@ -96,7 +96,7 @@ def fetch_drafts(query_order="-timestamp"):
             datastore_client.delete(draft.key)
             # also delete all the history of edits to that draft
             query2 = datastore_client.query(kind="draft_backup")
-            query2.add_filter("draft_id", "=", draft.key.id)
+            query2.add_filter(filter=PropertyFilter("draft_id", "=", draft.key.id))
             draft_backups = query2.fetch()
             for dbkup in draft_backups:
                 debug("found a backup, deleting it")
@@ -195,7 +195,7 @@ def create_invitation(user):
 def consume_invitation(invitation):
     debug(f"Seeking DB invitation [{invitation}]")
     query = datastore_client.query(kind="invitation")
-    query.add_filter("link_id", "=", invitation)
+    query.add_filter(filter=PropertyFilter("link_id", "=", invitation))
     found_invs = query.fetch()
     now = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     for inv in found_invs:
@@ -259,7 +259,7 @@ def get_user(email=None, user_id=None):
     if email:
         query = datastore_client.query(kind="user")
         debug(f"Based on email {email}")
-        query.add_filter("email", "=", email)
+        query.add_filter(filter=PropertyFilter("email", "=", email))
         users = query.fetch()
         for user in users:
             return user

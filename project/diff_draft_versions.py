@@ -76,15 +76,11 @@ def get_pre_translation_backup(draft):
     return candidate
 
 
-def get_translated_additions_since_ok_to_translate(draft, target_lang="en"):
+def get_translated_additions_since_ok_to_translate(current_hebrew_text, heb_text_used_for_translation, target_lang="en"):
 
-    pre_translation_backup = get_pre_translation_backup(draft)
+    parsed_heb_draft = parse_for_comparison(current_hebrew_text.split('\n'))
 
-    # print(f"-----------------------------\n{pre_translation_backup['hebrew_text']}\n\n-------------------------------\n\n{draft['hebrew_text']}\n-----------------------\n")
-
-    parsed_heb_draft = parse_for_comparison(draft['hebrew_text'].split('\n'))
-
-    parsed_backup = parse_for_comparison(pre_translation_backup['hebrew_text'].split('\n'))
+    parsed_backup = parse_for_comparison(heb_text_used_for_translation.split('\n'))
 
     additions_by_section = get_substantial_additions(parsed_heb_draft, parsed_backup)
     debug(f"there were {len(additions_by_section)} sections with additions")

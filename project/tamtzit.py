@@ -686,17 +686,29 @@ def save_draft():
 @tamtzit.route("/getUntranslatedAdditions", methods=["GET"])
 def get_untranslated_additions():
     debug(f"get_untranslated_additions: heb_draft_id is {request.args.get('heb_draft_id')}")
-    draft_id = request.args.get('heb_draft_id')
+    heb_draft_id = request.args.get('heb_draft_id')
+    if heb_draft_id is None:
+        debug("ERROR: /getUntranslatedAdditions got None heb_draft_id!")
+        return None
+    # actually we want to compare with the draft as it was when the translation being worked on was created - which is saved in the hebrew_text field of the draft object!
+    translation_draft_id = Key.from_legacy_urlsafe(request.args.get('translation_draft_id'))
+    if translation_draft_id is None:
+        debug("ERROR: /getUntranslatedAdditions got None translation_draft_id!")
+        return
+
+    heb_draft = datastore_client.get(datastore_client.key("draft", int(heb_draft_id)))
+    if heb_draft is None:
+        debug("ERROR: /getUntranslatedAdditions got None matching hebrew_draft!")
+        return None
+
+    translated_draft = datastore_client.get(translation_draft_id)
+    if translated_draft is None:
+        debug("ERROR: /getUntranslatedAdditions got None matching translated_draft!")
+        return None
+
     lang = request.args.get('lang')
-    if draft_id is None:
-        debug("ERROR: /getUntranslatedAdditions got None draft_id!")
-        return None
-    draft = datastore_client.get(datastore_client.key("draft", int(draft_id)))
-    if draft is None:
-        debug("ERROR: /getUntranslatedAdditions got None matching draft!")
-        return None
     try:
-        additions_by_section, translated_additions_by_section = get_translated_additions_since_ok_to_translate(draft, target_lang=lang)
+        additions_by_section, translated_additions_by_section = get_translated_additions_since_ok_to_translate(heb_draft['hebrew_text'], translated_draft['hebrew_text'], target_lang=lang)
     except:
         debug("There was an error trying to get deltas, returning no deltas.")
         additions_by_section = translated_additions_by_section = {}

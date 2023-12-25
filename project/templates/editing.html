@@ -144,7 +144,7 @@
                 document.getElementById("translated_text").disabled = true;
 
                 // do the update...
-                var server_says = await (await fetch("/getUntranslatedAdditions?heb_draft_id={{heb_draft_id}}&lang={{lang}}")).json();
+                var server_says = await (await fetch("/getUntranslatedAdditions?heb_draft_id={{heb_draft_id}}&translation_draft_id={{draft_key}}&lang={{lang}}")).json();
                 if ('additions' in server_says) {
                     var num_section_additions = 0;
                     var num_additions = 0;

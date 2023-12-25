@@ -4,7 +4,12 @@ Dear readers, shavua tov. This is an abridged edition.
 A regular edition will be sent after 9 PM Israel time.
 
 •   •   •
-{% else %}📻 *Israel News Highlights*
+{% else %}{% if date_info.erev_shabbat %}*Dear readers,*
+*The next update will be sent about an hour after the end of Shabbat in Israel*
+
+•   •   •
+
+{% endif %}📻 *Israel News Highlights*
 *{{date_info.part_of_day}} Edition: {{date_info.day_of_week}}, {{date_info.hebrew_dom}} {{date_info.hebrew_month}}, {{date_info.hebrew_year}}* / {{date_info.secular_month}} {{date_info.secular_dom}}, {{date_info.secular_year}}
 
   •   •   •

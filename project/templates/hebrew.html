@@ -129,7 +129,13 @@
 קוראים יקרים, זהו עדכון מקוצר. מהדורה רגילה תישלח אחרי 21:00.
 
 •   •   •
-{% else %}📻 *תמצית החדשות*
+{% else %}{% if date_info.erev_shabbat %}
+*קוראים יקרים,*
+*המהדורה הבאה תישלח כשעה לאחר צאת השבת.*
+
+•   •   •
+
+{% endif %}📻 *תמצית החדשות*
 *מהדורת {{date_info.part_of_day}}, יום {{date_info.day_of_week}}, {{date_info.hebrew_dom_he}} ב{{date_info.hebrew_month_he}} {{date_info.hebrew_year_he}}*, {{date_info.secular_dom}} ב{{date_info.secular_month}} {{date_info.secular_year}}
 
 •   •   •

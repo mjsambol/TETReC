@@ -170,16 +170,18 @@ def update_hebrew_draft(draft_key, hebrew_text, is_finished=False, ok_to_transla
     store_draft_backup(draft, force_backup=ok_to_translate)
 
 
-def get_latest_published(lang_code):
-    drafts = fetch_drafts()[0]
-    debug(f"get_latest_published({lang_code}): ...")
-    for draft in drafts:
-        debug(f"Checking: {draft['translation_lang']}")
-        if lang_code == 'he' and 'is_finished' in draft and draft['is_finished'] == True:
-            return draft
-        if draft['translation_lang'] == lang_code and 'is_finished' in draft and draft['is_finished'] == True:
-            return draft
-    return None
+# This has been moved to the tamtzit_reader project
+#
+# def get_latest_published(lang_code):
+#     drafts = fetch_drafts()[0]
+#     debug(f"get_latest_published({lang_code}): ...")
+#     for draft in drafts:
+#         debug(f"Checking: {draft['translation_lang']}")
+#         if lang_code == 'he' and 'is_finished' in draft and draft['is_finished'] == True:
+#             return draft
+#         if draft['translation_lang'] == lang_code and 'is_finished' in draft and draft['is_finished'] == True:
+#             return draft
+#     return None
 
 
 def create_invitation(user):

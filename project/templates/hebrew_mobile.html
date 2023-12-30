@@ -42,6 +42,7 @@
 
             var last_saved_text = `{{heb_text}}`;
             var is_finished = "True" === "{{is_finished}}";
+            var ok_to_translate = "True" === "{{ok_to_translate}}";
 
             function done() {
                 disable_done_button();
@@ -53,7 +54,7 @@
                 document.getElementById("done_button").style.backgroundColor="#66BB66";
                 document.getElementById("done_button").disabled = true;
                 document.getElementById("heb_text").disabled = true;
-                document.getElementById("back_home").style.display = "initial";
+//                document.getElementById("back_home").style.display = "initial";
                 document.getElementById("edit_anyway_button").style.visibility = "visible";
             }
 
@@ -67,22 +68,26 @@
                 document.getElementById("to_translation_button").disabled = true;
                 document.getElementById("done_button").disabled = true;
                 document.getElementById("heb_text").disabled = true;
-                document.getElementById("back_home").style.display = "initial";
+//                document.getElementById("back_home").style.display = "initial";
                 document.getElementById("edit_anyway_button").style.visibility = "visible";
             }
 
             function enable_edit() {
                 document.getElementById("heb_text").disabled = false;
                 document.getElementById("edit_anyway_button").style.visibility = "hidden";
-                document.getElementById("done_button").style.backgroundColor="#DDDDDD";
-                document.getElementById("done_button").disabled = false;
-                document.getElementById("to_translation_button").disabled = false;
-                document.getElementById("back_home").style.display = "none";
-                document.getElementById("edit_anyway_button").style.visibility = "hidden";
+                if (ok_to_translate) {
+                    document.getElementById("done_button").style.backgroundColor="#DDDDDD";
+                    document.getElementById("done_button").disabled = false;
+                } else {
+                    document.getElementById("to_translation_button").disabled = false;
+                    document.getElementById("to_translation_button").style.backgroundColor="#DDDDDD";
+                }
+//                document.getElementById("back_home").style.display = "none";
             }
 
             function to_translators() {
                 disable_send_to_translators();
+                ok_to_translate = true;
                 saveDraft(finalize=false, ready_for_translation=true);
             }
 
@@ -95,7 +100,7 @@
                 } 
             }
 
-            function saveDraft(finalize=false, ready_for_translation=false) {
+            function saveDraft(finalize=false, ready_for_translation=ok_to_translate) {
                 if (is_finished && !finalize) {
                     return;
                 }
@@ -219,11 +224,11 @@
 יש לכם *_הערות, בקשות או עדכונים_* עבורנו? 
 *פנו אלינו למוקד הוואטסאפ:* 052-439-3118
 (פניות למנהלי הקהילות לא בהכרח ייענו)
-{% if 1==0 %}
+
 •   •   •
 
 *עזרו* לעוד אלפים להתחבר למיזם *החוסן הלאומי - תמצית החדשות - ושתפו* את הקישור להצטרפות👇
-https://link.mmb.org.il/news  {%endif%}{% endif %}</textarea>
+https://link.mmb.org.il/news {% endif %}</textarea>
 </div>
 
 <br><br>
@@ -246,7 +251,7 @@ https://link.mmb.org.il/news  {%endif%}{% endif %}</textarea>
     <tr>
         <td width="50%" align="left" valign="top">
             <button id="edit_anyway_button" style="font-size: 35px; padding:3px 3px;visibility: hidden;" onclick="enable_edit();">ערוך שוב</button>&nbsp;&nbsp;&nbsp;
-            <button id="back_home" style="font-size: 45px; padding:8px 8px; display:none;" onclick="window.location='/';">חזרה להתחלה</button>&nbsp;&nbsp;
+            <button id="back_home" style="font-size: 45px; padding:8px 8px;" onclick="window.location='/';">חזרה להתחלה</button>&nbsp;&nbsp;
             <button id="done_button" style="font-size: 45px; padding:8px 8px;" disabled="true" onclick="done();">סיים</button>            
             </td>
         <td width="50%" align="right" valign="top">

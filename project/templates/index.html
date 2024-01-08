@@ -2,7 +2,7 @@
     <head>
         <title>Tamtzit - Admin Portal</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
-        <script src="{{url_for('static', filename='tamtzit-common.js', version='20231206')}}"></script>
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240108')}}"></script>
         <!-- Google tag (gtag.js) -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
         <script>
@@ -11,6 +11,8 @@
         gtag('js', new Date());
 
         gtag('config', 'G-7WJQ95B6KX');
+
+        var user_role = "{{user_role}}";
         </script>
     </head>
     <body>
@@ -33,14 +35,16 @@
 
     </td></tr>
 </table>
-
+<br><br><br><br><br><br>
+<a href="admin">פעולות למנהלים בלבד</a>
         </center>
     </body>
 <script>
     updateStatus();  // this will also start a periodic auto-refresh
-    window.onfocus = function() {
-        focused = true;
-        updateStatus();
-    };
+    // window.onfocus = function() {
+    //     alert("onfocus got called");
+    //     focused = true;
+    //     updateStatus();
+    // };
 </script>
 </html>

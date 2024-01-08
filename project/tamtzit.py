@@ -407,8 +407,11 @@ def route_authenticate():
 
 @tamtzit.route('/')
 @require_login
-def route_create():    
-    return render_template(detect_mobile(request, 'index'))
+def route_create():
+    db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
+    role = db_user_info['role']
+
+    return render_template(detect_mobile(request, 'index'), user_role=role)
 
 
 def get_font_sz_prefs(request):
@@ -448,8 +451,8 @@ def refresh_cookies(request, response):
         response.set_cookie('tamtzit_prefs', site_prefs, expires=datetime.now() + timedelta(days=100))
 
 
-@cachetools.func.ttl_cache(ttl=25)
-def get_cachable_status(fake_param):
+@cachetools.func.ttl_cache(ttl=25)  # note that this only works when the method has an input param!
+def get_cachable_status(role):
     debug("fetching uncached status info")
     status_per_lang = {}
     jlm = ZoneInfo("Asia/Jerusalem")
@@ -467,6 +470,8 @@ def get_cachable_status(fake_param):
             "ok_to_translate": draft['ok_to_translate'],
             "done": draft['is_finished']
         }
+        if draft['is_finished'] and "admin" in role:
+            status_per_lang[draft['translation_lang']]['text'] = draft['hebrew_text'] if draft["translation_lang"] == '--' else draft['translation_text']
     response = {
         'as_of': now.strftime("%H:%M"),
         'by_lang': status_per_lang
@@ -475,8 +480,12 @@ def get_cachable_status(fake_param):
 
 
 @tamtzit.route("/status")
+@require_login
 def route_get_status_json():
-    return get_cachable_status("FakeParam")
+    db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
+    role = db_user_info['role']
+
+    return get_cachable_status(role)
 
 
 @tamtzit.route("/use_invitation")

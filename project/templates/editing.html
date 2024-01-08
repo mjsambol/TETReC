@@ -84,6 +84,13 @@
                 } 
             }
 
+            function publish() {
+                is_finished = true;
+                saveDraft(true);
+                document.getElementById("finish_button").style.backgroundColor="#66BB66";
+                observe_only();
+            }
+
             function saveDraft(force=false) {
                 if (manual_saves_only && !force) {
                     return;
@@ -98,7 +105,7 @@
                     {
                         draft_key: "{{draft_key}}",
                         translation: curr_translation,
-                        is_finished: is_finished            // this is historical - originally could change by button press, no longer.
+                        is_finished: is_finished
                     },
                     function(data,status) {
                         console.log("Draft save status: " + status);
@@ -122,7 +129,11 @@
             function observe_only() {
                 document.getElementById("heb_text_area").disabled = true;
                 document.getElementById("translated_text").disabled = true;
+                document.getElementById("finish_button").disabled = true;
                 document.getElementById("edit_anyway_button").style.visibility = "visible";
+                if (is_finished) {
+                    document.getElementById("finish_button").style.backgroundColor="#66BB66";
+                }
                 document.getElementById("pull_additions_button").disabled = true;
             }
 
@@ -269,7 +280,8 @@
                     <button id="edit_anyway_button" style="font-size: 20px; padding:8px 8px;visibility: hidden;" onclick="enable_edit();">Edit Again</button>
                 </td>
                 <td align="right">
-                    <button id="finish_button" style="font-size: 20px; padding:8px 8px" onclick="copy_to_clipboard();">Copy to Clipboard</button>
+                    <button id="finish_button" style="font-size: 20px; padding:8px 8px" onclick="publish();">Publish</button>
+                    <button id="copy_clip_button" style="font-size: 20px; padding:8px 8px" onclick="copy_to_clipboard();">Copy to Clipboard</button>
                 </td>
             </tr></table>
         </td>
@@ -283,12 +295,7 @@
             </tr>
     </table>
 <script>
-    if (is_finished) {
-        document.getElementById("translated_text").disabled = true;
-        document.getElementById("edit_anyway_button").style.visibility = "visible";
-    }
-
-    if (in_progress) {
+    if (is_finished || in_progress) {
         observe_only();
     }
     update_char_count();

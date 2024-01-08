@@ -7,13 +7,46 @@ function makeWhatsappPreview(input) {
     return result;
 }
 
+async function copyToClipboardTrick(textToCopy) {
+    // Navigator clipboard api needs a secure context (https)
+    if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(textToCopy);
+    } else {
+        // Use the 'out of viewport hidden text area' trick
+        const textArea = document.createElement("textarea");
+        textArea.value = textToCopy;
+            
+        // Move textarea out of the viewport so it's not visible
+        textArea.style.position = "absolute";
+        textArea.style.left = "-999999px";
+            
+        document.body.prepend(textArea);
+        textArea.select();
+
+        try {
+            document.execCommand('copy');
+        } catch (error) {
+            console.error(error);
+        } finally {
+            textArea.remove();
+        }
+    }
+}
+
+
 function copyToClipboard(from_where) {
     the_stuff = document.getElementById(from_where).value;
     the_stuff = the_stuff.replaceAll("++++++++++++++++++++++++++", "");
-    navigator.clipboard.writeText(the_stuff);
+    copyToClipboardTrick(the_stuff);
+}
+
+function copyEditionTextToClipboard(button_id) {
+    var txt = latest_status['by_lang'][button_id.substr(-2)]['text'];
+    copyToClipboardTrick(txt);
 }
 
 var focused = true;
+var latest_status = null;
 
 window.onfocus = function() {
     focused = true;
@@ -26,6 +59,7 @@ window.onblur = function() {
 async function updateStatus() {
     if (focused) {
         let obj = await (await fetch("/status")).json();
+        latest_status = obj;
         var status = "מצב העבודה נכון ל " + obj['as_of'] + ":";
         lang_order = ['--', 'en', 'fr', 'YY']
         var stuff_happening = false;
@@ -45,10 +79,21 @@ async function updateStatus() {
                         }
                         status = status + "מוכן לתרגום</font></b>";
                     }
+                    // if the user is an admin AND the text is in status "done", show a button to copy the text to clipboard
+                    if (obj['by_lang'][lang]['done'] && user_role.includes("admin")) {
+                        status = status + " -- <b>מוכן לשליחה</b> <button id=copyText" + lang + ">העתק תוכן</button>";
+                    }
                 }
             }
         }
         document.getElementById('translation_status').innerHTML= status; 
+        for (lang of lang_order) {
+            var thelink = document.getElementById('copyText' + lang);
+            if (thelink == null) {
+                continue;
+            }
+            thelink.addEventListener("click", function(event) {copyEditionTextToClipboard(event.target.id);});
+        }
     }
     if (stuff_happening) {
         setTimeout(function(){updateStatus()}, 30000);   // update again in 30 seconds

@@ -1,0 +1,25 @@
+<html>
+    <head>
+        <title>Tamtzit - Admin Portal</title>
+        <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240108')}}"></script>
+        <!-- Google tag (gtag.js) -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
+        <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-7WJQ95B6KX');
+
+        var user_role = "{{user_role}}";
+        </script>
+    </head>
+    <body>
+        <center><br><br>
+        <h1>ניהול תמצית החדשות</h1>
+        <br><br>
+        <div style="font-size: 25px;  font-family: Arial, Helvetica, sans-serif;"><a href="heb-restart">לאפס את המהדורה</a></div>
+        </center>
+    </body>
+</html>

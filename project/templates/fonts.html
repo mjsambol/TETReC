@@ -88,9 +88,14 @@
                 </td>
             </tr>
         </table>
+
+<br><br>
+<b>Cookies:</b><br>
+        <div width="600px" id="cookies_panel" style="font-family: Arial, Helvetica, sans-serif; font-size:25px"></div>
+
 <!--        <br>
         <input type="checkbox" name="disable_auto_save" id="disable_auto_save_checkbox" {% if "disable_auto_save" in user_info and user_info.disable_auto_save %}checked{% endif %}> Disable Auto-Saving-->
-    </form>
+    </form>        
     </center>
     <script>
         hp = document.getElementById('en_metrics_panel');
@@ -104,6 +109,19 @@
         sp.innerHTML = "Ratio: " + ratio + "<br><br>Scaled: " + (30 + (4 * (30-ratio))) + "<br><br>Cookie: {{heb_font_size}}";
         sp = document.getElementById('en_sizes_panel');
         sp.innerHTML = "Ratio: " + ratio + "<br><br>Scaled: " + (30 + (4 * (30-ratio))) + "<br><br>Cookie: {{en_font_size}}";
+
+        function listCookies() {
+            var theCookies = document.cookie.split(';');
+            var aString = '';
+            for (var i = 1 ; i <= theCookies.length; i++) {
+                aString += i + ' ' + theCookies[i-1].split('=')[0] + "<br><br>";
+            }
+            return aString;
+        }
+
+        sp = document.getElementById('cookies_panel');
+        sp.innerHTML = listCookies();
+
     </script>
   </body>    
 </html>

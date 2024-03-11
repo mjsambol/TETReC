@@ -1,0 +1,9 @@
+indexes:
+
+- kind: draft_backup
+  ancestor: no
+  properties:
+  - name: draft_id
+    direction: desc
+  - name: draft_timestamp
+    direction: desc

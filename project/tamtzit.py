@@ -210,10 +210,12 @@ def consume_invitation(invitation):
                 debug("It's expired, deleting it.")
                 datastore_client.delete(inv.key)
                 return None
+            debug("Invitation is valid, marking it used...")
             inv.update({"used_at_timestamp": now})
             datastore_client.put(inv)
             user_details = get_user(user_id=inv["user_id"])
             return user_details
+    debug("consume_invitation: Returning None")
     return None
 
 
@@ -265,6 +267,7 @@ def get_user(email=None, user_id=None):
         query.add_filter(filter=PropertyFilter("email", "=", email))
         users = query.fetch()
         for user in users:
+            debug(f"Got back {user}")
             return user
     elif user_id:
         debug(f"Based on user ID {user_id}")
@@ -272,6 +275,7 @@ def get_user(email=None, user_id=None):
         debug(f"Got back {user}")
         return user
 
+    debug("No matching user found.")
     return None
 
 def send_invitation(user_details, invitation):
@@ -286,7 +290,7 @@ def send_invitation(user_details, invitation):
     mailjet_resp = requests.post("https://api.mailjet.com/v3.1/send", auth=mailjet_basic_auth, 
                                 headers={"Content-Type":"application/json"}, data=json.dumps(data))
 
-    debug(f'Sending training launch notification email - status: {mailjet_resp.json()["Messages"][0]["Status"]}')     
+    debug(f'Sending invitation email - status: {mailjet_resp.json()["Messages"][0]["Status"]}')     
 
 
 def require_login(func):
@@ -298,12 +302,19 @@ def require_login(func):
         # if there is, let the method which called us continue. 
         # if not, redirect to /auth while passing the URL the user was requesting
         session_cookie = request.cookies.get(Cookies.ONE_DAY_SESSION)
-        if not session_cookie:
-            debug("No session cookie found")
+        if session_cookie:
+            today_session = get_cookie_dict(request, Cookies.ONE_DAY_SESSION)
+        else:
+            debug("No session cookie found (orig style)")
+            session_cookie = request.cookies.get("tz_autha")
+            if session_cookie:
+                today_session = get_cookie_dict(request, "tz_autha")
+
+        if 'today_session' not in locals():
+            debug("tried everything, can't find a cookie. redirecting to auth.")
             return redirect("/auth?requested=" + request.full_path)
 
         today_noise = get_today_noise()
-        today_session = get_cookie_dict(request, Cookies.ONE_DAY_SESSION)
         if Cookies.COOKIE_CERT in today_session and today_noise in today_session[Cookies.COOKIE_CERT]:
             debug("Decrypted cookie is valid!")
             return func(*args, **kwargs)
@@ -379,8 +390,11 @@ def route_authenticate():
             debug("weekly cookie is valid, refreshing it, setting daily cookie and redirecting to " + request.args.get('requested'))    
             weekly_session[Cookies.COOKIE_CERT] = get_today_noise()
             response = redirect(request.args.get('requested'))
-            response.set_cookie(Cookies.ONE_DAY_SESSION, make_cookie_from_dict(weekly_session), expires=datetime.now() + timedelta(days=1))
-            response.set_cookie(Cookies.ONE_WEEK_SESSION, make_cookie_from_dict(weekly_session), expires=datetime.now() + timedelta(days=7))
+            new_cookie = make_cookie_from_dict(weekly_session)
+            response.set_cookie(Cookies.ONE_DAY_SESSION, new_cookie, expires=datetime.now() + timedelta(days=1))
+            response.set_cookie(Cookies.ONE_WEEK_SESSION, new_cookie, expires=datetime.now() + timedelta(days=7))
+            response.set_cookie("tz_autha", new_cookie, max_age=60*60*24, domain='.' + request.host, samesite="Lax", secure=True)
+            response.set_cookie("tz_authb", new_cookie, max_age=60*60*24*7, domain='.' + request.host, samesite="Lax", secure=True)
             return response
         else:
             debug("Weekly cookie is not valid")
@@ -408,10 +422,20 @@ def route_authenticate():
 @tamtzit.route('/')
 @require_login
 def route_create():
+    debug("top-level: do we know this user?")
     db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
+    debug(f"user is {db_user_info}")
     role = db_user_info['role']
 
-    return render_template(detect_mobile(request, 'index'), user_role=role)
+    if request.method == "GET":
+        return render_template(detect_mobile(request, 'index'), user_role=role)
+    elif request.method == "HEAD":
+        debug("top-level: responding to head request with empty ...")
+        return '';
+    else:
+        debug(f"top-level got unexpected request type {request.method}")
+        return ("UH oh")
+
 
 
 def get_font_sz_prefs(request):
@@ -442,13 +466,13 @@ def route_set_settings():
     debug(f"Changing settings: Hebrew font size is now {he_font_preference}, English is {en_font_preference}")
     response = make_response(redirect("/"))
     prefs = {"heb-font-size": he_font_preference, "en-font-size": en_font_preference}
-    response.set_cookie('tamtzit_prefs', json.dumps(prefs), expires=datetime.now() + timedelta(days=100))
+    response.set_cookie('tamtzit_prefs', json.dumps(prefs), expires=datetime.now() + timedelta(days=100), domain='.' + request.host)
     return response
 
 def refresh_cookies(request, response):
     site_prefs = request.cookies.get('tamtzit_prefs')
     if site_prefs:
-        response.set_cookie('tamtzit_prefs', site_prefs, expires=datetime.now() + timedelta(days=100))
+        response.set_cookie('tamtzit_prefs', site_prefs, expires=datetime.now() + timedelta(days=100), domain='.' + request.host)
 
 
 @cachetools.func.ttl_cache(ttl=25)  # note that this only works when the method has an input param!
@@ -491,18 +515,38 @@ def route_get_status_json():
 @tamtzit.route("/use_invitation")
 def route_use_invitation_link():
     invitation = request.args.get("inv")
-    user_details = consume_invitation(invitation)
-    if user_details:
+    debug(f"use_invitation: checking invitation {invitation}")
+    if not invitation or len(invitation) < 36:
+        return ("Badly formatted request - missing invitation paramter")
+    if len(invitation) > 36:
+        invitation = invitation[0:36]
+        debug(f"use_invitation: checking *trimmed* invitation {invitation}")
+
+    if request.method == "GET":
         response = make_response(redirect("/"))
+    elif request.method == "HEAD":
+        debug("use_invitation: responding to head request with empty ...")
+        return ''
+    else:
+        debug(f"use_invitation got unexpected request type {request.method}")
+        return ("UH oh")
+
+    user_details = consume_invitation(invitation)
+
+    if user_details:
         
         debug(f"/use_invitation: valid invitation for user {user_details['email']}")
 
-        response.set_cookie(Cookies.ONE_DAY_SESSION, make_daily_cookie(user_details), expires=datetime.now() + timedelta(days=1))
+        new_cookie = make_daily_cookie(user_details)
+        response.set_cookie(Cookies.ONE_DAY_SESSION, new_cookie, expires=datetime.now() + timedelta(days=1))
+        response.set_cookie(Cookies.ONE_WEEK_SESSION, new_cookie, expires=datetime.now() + timedelta(days=7))
 
-        response.set_cookie(Cookies.ONE_WEEK_SESSION, make_weekly_cookie(user_details), expires=datetime.now() + timedelta(days=7))
+        response.set_cookie("tz_autha", new_cookie, max_age=60*60*24, domain='.' + request.host, samesite="Lax", secure=True)
+        response.set_cookie("tz_authb", new_cookie, max_age=60*60*24*7, domain='.' + request.host, samesite="Lax", secure=True)
 
         return response
     else:
+        debug(f"use_invitation: returning an error - invitation seems invalid.")
         return render_template("error.html", dont_show_home_link=True, msg="Invalid authentication link. Please contact an admin.",
                                heb_msg="הלינק לא תקין, צור קשר עם משה")
 
@@ -558,6 +602,44 @@ def route_hebrew_template():
     refresh_cookies(request, response)
     return response
 
+
+@tamtzit.route('/admin')
+@require_login
+@require_role("admin")
+def route_administration():
+    return render_template('admin.html')
+
+
+@tamtzit.route('/heb-restart')
+@require_login
+@require_role("admin")
+def route_hebrew_restart():
+    next_page = detect_mobile(request, "hebrew")
+    cookie_user_info = user_data_from_req(request)
+
+    # is there a Hebrew draft from the last 3 hours [not a criteria: that's not yet "Done"]
+    drafts, local_tses = fetch_drafts()
+    debug("Drafts is " + ("" if drafts is None else "not ") + "null")
+
+    dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
+    for draft in drafts:
+        if draft['translation_lang'] != '--': 
+            continue
+
+        draft_last_mod = draft['last_edit']
+        debug(f"/heb-restart: draft's last edit is {draft_last_mod}, it's now {dt}, delta is {dt - draft_last_mod}")
+        if (dt - draft_last_mod).seconds > (60 * 90):  # 1.5 hours per Yair's choice 
+            break
+        else:
+            debug("/heb-restart: Overriding last edit time of most recent Hebrew draft")
+            edit_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem')) + timedelta(hours=-2)
+            draft.update({"last_edit": edit_timestamp}) 
+            draft.update({"is_finished": True})
+            datastore_client.put(draft)
+            break
+
+    return make_response(redirect("/"))
+        
 
 @tamtzit.route("/start_translation")
 @require_login

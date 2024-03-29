@@ -236,6 +236,25 @@ class DateInfo():
     motzei_shabbat_early: bool
     erev_shabbat: bool
 
+    def __init__(self, dt, part_of_day, motzei_shabbat_early, erev_shabbat):
+        oct6 = datetime(2023,10,6,tzinfo=ZoneInfo('Asia/Jerusalem'))
+        heb_dt = dates.HebrewDate.from_pydate(dt)
+
+        self.part_of_day     = part_of_day
+        self.day_of_week     = dt.strftime('%A')
+        self.secular_month   = dt.strftime('%B') 
+        self.secular_dom     = dt.day
+        self.secular_year    = dt.year 
+        self.hebrew_dom      = heb_dt.day
+        self.hebrew_month    = heb_dt.month_name(transliteration=Transliteration.MODERN_ISRAELI)
+        self.hebrew_year     = heb_dt.year
+        self.day_of_war      = (dt - oct6).days
+        self.hebrew_dom_he   = heb_dt.hebrew_day()
+        self.hebrew_month_he = heb_dt.month_name(True)
+        self.hebrew_year_he  = heb_dt.hebrew_year()
+        self.erev_shabbat    = erev_shabbat
+        self.motzei_shabbat_early = motzei_shabbat_early
+
 tamtzit = Blueprint('tamtzit', __name__)
 
 def detect_mobile(request, page_name):
@@ -938,20 +957,18 @@ def process_translation_request(heb_text, target_language_code):
 
 
 def make_date_info(dt, lang):
-    oct6 = datetime(2023,10,6,tzinfo=ZoneInfo('Asia/Jerusalem'))
-    heb_dt = dates.HebrewDate.from_pydate(dt)
     dt_edition = editions[lang][2]
     if 0 <= dt.hour < 12:
         dt_edition = editions[lang][0]
     elif 12 <= dt.hour < 18:
         dt_edition = editions[lang][1]
 
+    is_summer_daylight_savings_time = bool(datetime.now(tz=ZoneInfo("Asia/Jerusalem")).dst())
+
     locale.setlocale(locale.LC_TIME, locales[lang])
-    date_info = DateInfo(dt_edition, dt.strftime('%A'), heb_dt.day, heb_dt.month_name(transliteration=Transliteration.MODERN_ISRAELI), heb_dt.year, 
-                         dt.strftime('%B'), dt.day, dt.year, (dt - oct6).days, heb_dt.hebrew_day(), heb_dt.month_name(True), heb_dt.hebrew_year(),
-                         (dt.isoweekday() == 6 and dt.hour < 19), (dt.isoweekday() == 5 and dt.hour >= 12))
-                         
-    return date_info
+    return DateInfo(dt, part_of_day=dt_edition, 
+                    motzei_shabbat_early=((not is_summer_daylight_savings_time) and dt.isoweekday() == 6 and dt.hour < 19), 
+                    erev_shabbat=(dt.isoweekday() == 5 and dt.hour >= 12))
 
 
 if __name__ == '__main__':

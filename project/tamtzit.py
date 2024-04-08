@@ -8,13 +8,14 @@ from uuid import uuid4
 import functools
 import cachetools.func
 from flask import Blueprint, render_template, request, redirect, make_response
-from google.cloud import translate, datastore
+from google.cloud import translate, datastore, storage
 from google.cloud.datastore.key import Key
 from google.cloud.datastore.query import PropertyFilter
 from dataclasses import dataclass
 from pyluach import dates
 from pyluach.utils import Transliteration
 from markupsafe import Markup
+from bs4 import BeautifulSoup
 import requests
 from requests.auth import HTTPBasicAuth
 from .translation_utils import *
@@ -30,6 +31,94 @@ client = translate.TranslationServiceClient()
 
 datastore_client = DatastoreClientProxy.get_instance()
 
+storage_client = storage.Client()
+archive_bucket = storage_client.bucket("tamtzit-archive")
+ARCHIVE_BASE = "https://storage.googleapis.com/tamtzit-archive/"
+JERUSALEM_TZ = ZoneInfo("Asia/Jerusalem")
+
+############################################
+# Notes on use of GCP Cloud Storage (GCS)
+#   
+# For downloading a file:
+# https://github.com/googleapis/python-storage/blob/main/samples/snippets/storage_download_file.py
+# 
+# For uploading a file:
+# https://github.com/googleapis/python-storage/blob/main/samples/snippets/storage_upload_file.py
+# or to upload from memory:
+# https://github.com/googleapis/python-storage/blob/main/samples/snippets/storage_upload_from_memory.py
+# or from a stream:
+# https://github.com/googleapis/python-storage/blob/main/samples/snippets/storage_upload_from_stream.py
+# 
+def update_archive(draft):
+    debug("updating archive...")
+    lang_code = 'he' if draft["translation_lang"] == '--' else draft["translation_lang"]
+    date_info = make_date_info(datetime.now(JERUSALEM_TZ), 'en')  # Forced to EN so that we get English anchor names
+    prev_archive = requests.get(f"{ARCHIVE_BASE}archive-{lang_code}.html").text
+
+    soup = BeautifulSoup(prev_archive, "html.parser")
+    next_entry_tag = soup.find(id='next-entry')
+
+    anchor = draft['timestamp'].astimezone(JERUSALEM_TZ).strftime('%Y-%m-%d') + '-' + date_info.part_of_day
+
+    new_entry = soup.new_tag("div")
+    new_entry.attrs['id'] = anchor
+    next_entry_tag.insert_after("\n\n", new_entry)
+
+    table_tag = soup.new_tag("table")
+    table_tag.attrs['border'] = '4'
+    table_tag.attrs['width'] = '750px'
+    table_tag.attrs['cellpadding'] = '20px'
+    new_entry.append(table_tag)
+
+    tr_tag = soup.new_tag("tr")
+    table_tag.append(tr_tag)
+
+    td_tag = soup.new_tag("td")
+    td_tag.attrs['id'] = anchor + "-td"
+    if lang_code == 'he':
+        td_tag.attrs['dir'] = 'rtl'
+        td_tag.attrs['align'] = 'right'
+    tr_tag.append(td_tag)
+
+    script_tag = soup.new_tag("script")
+    script_tag.string = f"document.getElementById('{anchor}-td').innerHTML = makeWhatsappPreview(`{draft['hebrew_text'] if lang_code == 'he' else draft['translation_text']}`);"
+    td_tag.append(script_tag)
+
+    other_langs_div = soup.new_tag("div")
+    other_langs_div.attrs['style'] = "padding-top: 10px; font-weight: bold;"
+    other_langs_div.string = "Other Languages:"
+    new_entry.append("\n")
+    new_entry.append(other_langs_div)
+
+    section_divider_tag = soup.new_tag("hr")
+    new_entry.insert_after(section_divider_tag)
+
+    if lang_code != 'fr':
+        link_to_fr = soup.new_tag("a")
+        link_to_fr.attrs['href'] = f'{ARCHIVE_BASE}archive-fr.html#{anchor}'
+        link_to_fr.attrs['style'] = "padding-left: 20px;"
+        link_to_fr.string = 'French'
+        other_langs_div.insert_after(link_to_fr)
+
+    if lang_code != 'en':
+        link_to_en = soup.new_tag("a")
+        link_to_en.attrs['href'] = f'{ARCHIVE_BASE}archive-en.html#{anchor}'
+        link_to_en.attrs['style'] = "padding-left: 20px;"
+        link_to_en.string = 'English'
+        other_langs_div.insert_after(link_to_en)
+
+    if lang_code != 'he':
+        link_to_he = soup.new_tag("a")
+        link_to_he.attrs['href'] = f'{ARCHIVE_BASE}archive-he.html#{anchor}'
+        link_to_he.attrs['style'] = "padding-left: 20px;"
+        link_to_he.string = 'Hebrew'
+        other_langs_div.insert_after(link_to_he)
+
+    blob = archive_bucket.blob(f"archive-{lang_code}.html")
+    blob.upload_from_string(str(soup))
+    blob.content_type = "text/html; charset=utf-8"
+    blob.patch()
+    debug("DONE uploading new archive")
 
 ############################################
 # Notes on use of GCP DataStore
@@ -87,11 +176,10 @@ def fetch_drafts(query_order="-timestamp"):
 
     now = datetime.now(tz=ZoneInfo('UTC'))
     drafts_local_timestamp = {}
-    jlm = ZoneInfo("Asia/Jerusalem")
 
     for draft in drafts:
         ts = draft['timestamp']
-        drafts_local_timestamp[ts] = ts.astimezone(jlm)
+        drafts_local_timestamp[ts] = ts.astimezone(JERUSALEM_TZ)
         if (now - ts).days > 0 or (now - ts).seconds > DRAFT_TTL:
             datastore_client.delete(draft.key)
             # also delete all the history of edits to that draft
@@ -151,6 +239,9 @@ def update_translation_draft(draft_key, translated_text, is_finished=False):   #
     # also store history in case of dramatic failure
     store_draft_backup(draft)
 
+    if is_finished:
+        update_archive(draft)
+
 
 def update_hebrew_draft(draft_key, hebrew_text, is_finished=False, ok_to_translate=False):
     draft = datastore_client.get(draft_key)
@@ -168,6 +259,9 @@ def update_hebrew_draft(draft_key, hebrew_text, is_finished=False, ok_to_transla
     # also store history in case of dramatic failure
     # and for reasons related to applying deltas in translation, we need to force save this as a backup
     store_draft_backup(draft, force_backup=ok_to_translate)
+
+    if is_finished:
+        update_archive(draft)
 
 
 # This has been moved to the tamtzit_reader project
@@ -498,8 +592,7 @@ def refresh_cookies(request, response):
 def get_cachable_status(role):
     debug("fetching uncached status info")
     status_per_lang = {}
-    jlm = ZoneInfo("Asia/Jerusalem")
-    now = datetime.now(tz=jlm)
+    now = datetime.now(tz=JERUSALEM_TZ)
     drafts = fetch_drafts(query_order="-last_edit")[0]
     for draft in drafts:
         if draft['translation_lang'] in status_per_lang:
@@ -507,8 +600,8 @@ def get_cachable_status(role):
         status_per_lang[draft['translation_lang']] = {
             "lang": expand_lang_code(draft["translation_lang"], to_lang="H"),
             "who": get_user(user_id=draft["created_by"])['name_hebrew'],
-            "started": draft['timestamp'].astimezone(jlm).strftime('%H:%M'),
-            "last_edit": draft['last_edit'].astimezone(jlm).strftime('%H:%M'),
+            "started": draft['timestamp'].astimezone(JERUSALEM_TZ).strftime('%H:%M'),
+            "last_edit": draft['last_edit'].astimezone(JERUSALEM_TZ).strftime('%H:%M'),
             "elapsed_since_last_edit": (now - draft['last_edit']).seconds,
             "ok_to_translate": draft['ok_to_translate'],
             "done": draft['is_finished']
@@ -949,6 +1042,9 @@ def process_translation_request(heb_text, target_language_code):
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
     date_info = make_date_info(dt, target_language_code)
 
+    if len(organized["UNKNOWN"]) == 0:
+        del organized["UNKNOWN"]
+        
     # for the first pass the translation isn't sent as a block of text but rather 
     # as small blocks broken down by section. Later after the first human review pass we'll save it
     # as a contiguous block in the DB and going forward work from that

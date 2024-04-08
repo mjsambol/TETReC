@@ -114,6 +114,11 @@ title_translations = {
 
     # this came up in conversation, seems straightforward though I don't have an official source
     'סמ"פ': 'Deputy Company Commander',
+
+    # from a stamp shared by Chana
+    'רבשצ': 'Military Security Coordinator',
+    'רבש"צ': 'Military Security Coordinator',
+    'כיתת הכוננות': 'First Response Squad'
 }
 
 def pre_translation_swaps(text, target_language_code):
@@ -163,6 +168,7 @@ def post_translation_swaps(text, target_language_code):
         text = re.sub(r'\b(a)n siren', "\\1 siren", text, flags=re.IGNORECASE)
         text = re.sub('martyrs?', 'fallen', text, flags=re.IGNORECASE)
         text = re.sub('allowed to be published', 'released for publication', text, flags=re.IGNORECASE)
+        text = re.sub("Judea and Samaria", "Yehuda and Shomron", text, flags=re.IGNORECASE)
     elif target_language_code == 'fr':
         text = re.sub(r'\balarm(s?)\b', lambda m: "alert" + ('s' if m.group(1).startswith("s") else ''), text, flags=re.IGNORECASE)
 

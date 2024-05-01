@@ -22,6 +22,12 @@
 
 *_מלחמת חרבות ברזל:_*
 {%endif%}
+{% if 'UNKNOWN' in organized and organized['UNKNOWN'] | length > 0 %}
+⬇️ *--לא ברור איפה זה שייך--*
+{% for line in organized['UNKNOWN'] %}
+{{line}}
+{% endfor %}{% endif %}
+
 {% if 'SOUTH' in organized and organized['SOUTH'] | length > 0 %}
 ⬇️ *הזירה הדרומית:*
 {% for line in organized['SOUTH'] %}
@@ -88,7 +94,7 @@
 
 •   •   •
 
-כתיבה: {{heb_author_in_heb}}. עריכת תוכן: {{translator_in_heb}}.
+כתיבה: {{heb_author_in_heb}}. עריכה לשונית: שירה עבאדי.
 
 •   •   •
 

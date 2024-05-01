@@ -143,11 +143,14 @@ def pre_translation_swaps(text, target_language_code):
 
         text = re.sub(r'\bהסברה\b', 'hasbara (public diplomacy)', text, flags=re.U)
         text = re.sub(r'\b([למהבו]+)?חלל(י)?\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'fallen', text, flags=re.U)
-        text = re.sub(r'\b([למהבו]+)כטמ"ם\b', lambda m: tx_heb_prefix(m.group(1), "en") + "remotely operated UAV", text, flags=re.U) 
-        text = re.sub(r'\b([למהבו]+)אמל"ח\b', lambda m: tx_heb_prefix(m.group(1), "en") + "weapons", text, flags=re.U)
-        text = re.sub(r'\b([למהבו]+)חטוף\b', lambda m: tx_heb_prefix(m.group(1), "en") + "hostage", text, flags=re.U)
-        text = re.sub(r'\b([למהבו]+)חטופים\b', lambda m: tx_heb_prefix(m.group(1), "en") + "hostages", text, flags=re.U)
-        
+        text = re.sub(r'\b([למהבו]+)?כטמ"ם\b', lambda m: tx_heb_prefix(m.group(1), "en") + "remotely operated UAV", text, flags=re.U) 
+        text = re.sub(r'\b([למהבו]+)?אמל"ח\b', lambda m: tx_heb_prefix(m.group(1), "en") + "weapons", text, flags=re.U)
+        text = re.sub(r'\b([למהבו]+)?חטוף\b', lambda m: tx_heb_prefix(m.group(1), "en") + "hostage", text, flags=re.U)
+        text = re.sub(r'\b([למהבו]+)?חטופים\b', lambda m: tx_heb_prefix(m.group(1), "en") + "hostages", text, flags=re.U)
+        text = re.sub(r'\bחטיבת ה?אש\b', "artillery brigade", text, flags=re.U)
+        text = re.sub(r'\b([למהבו]+)?יחידת ה?לוט"ר\b', lambda m: tx_heb_prefix(m.group(1), "en") + "LOTAR (counter-terrorism special forces) unit", text, flags=re.U)
+        text = re.sub(r'\b([למהבו]+)?אגורות\b', lambda m: tx_heb_prefix(m.group(1), "en") + "agorot", text, flags=re.U)
+        text = re.sub(r'\b([למהבו]+)?אגורה\b', lambda m: tx_heb_prefix(m.group(1), "en") + "agora", text, flags=re.U)
 
     elif target_language_code == 'fr':
         text = re.sub(r'\bהלילה\b', 'la nuit dernière', text, flags=re.U)
@@ -169,6 +172,8 @@ def post_translation_swaps(text, target_language_code):
         text = re.sub('martyrs?', 'fallen', text, flags=re.IGNORECASE)
         text = re.sub('allowed to be published', 'released for publication', text, flags=re.IGNORECASE)
         text = re.sub("Judea and Samaria", "Yehuda and Shomron", text, flags=re.IGNORECASE)
+        text = re.sub("Beer Sheva", "Be'er Sheva", text, flags=re.IGNORECASE)
+
     elif target_language_code == 'fr':
         text = re.sub(r'\balarm(s?)\b', lambda m: "alert" + ('s' if m.group(1).startswith("s") else ''), text, flags=re.IGNORECASE)
 

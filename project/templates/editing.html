@@ -168,12 +168,29 @@
                     for (key in server_says['additions']) {
                         ht = hta.value;
                         // console.log("processing key " + key);
-                        var pat = section_start_pat + key + ":";
+                        var pat = section_start_pat + key + ":\\*\\n\\n";
                         var re = new RegExp(pat, "g");
                         var section_start_pos = ht.search(re);
-                        // console.log("Found that section starting at index " + section_start_pos + " which looks like this:");
-                        // console.log(ht.substring(section_start_pos, section_start_pos + 50));
-                        var next_section_start_pos = search(ht, section_start_pat, section_start_pos + 10);
+                        var next_section_start_pos = -1;
+                        var newlines_before = true;
+                        if (section_start_pos == -1) {
+                            // the section is absent - it was deleted manually, then re-added, or it's "unknown"
+                            last_three_dots_pos = et.lastIndexOf(' •   •   •');
+                            prev_three_dots_pos = et.lastIndexOf(' •   •   •', last_three_dots_pos);
+                            prev_three_dots_pos = et.lastIndexOf(' •   •   •', prev_three_dots_pos);
+                            next_section_start_pos = prev_three_dots_pos - 2;
+                        } else {
+                            // console.log("Found that section starting at index " + section_start_pos + " which looks like this:");
+                            // console.log(ht.substring(section_start_pos, section_start_pos + 50));
+                            var next_section_start_pos = search(ht, section_start_pat, section_start_pos + 10);
+                            newlines_before = (next_section_start_pos != -1);
+                            if (next_section_start_pos == -1) {
+                                // this happens if the addition is to the last section, which is common
+                                // so instead we'll add it immediately after the section header we just found
+                                m = ht.match(pat, "g")
+                                next_section_start_pos = section_start_pos + m[0].length;
+                            }
+                        }
                         // console.log("The next section starts at index " + next_section_start_pos + " which looks like this:");
                         // console.log(ht.substring(next_section_start_pos, next_section_start_pos + 50));
                         num_section_additions += 1;
@@ -183,7 +200,12 @@
                         // add them
                         head = ht.substring(0, next_section_start_pos);
                         tail = ht.substring(next_section_start_pos);
-                        updated_content = head + "\n\n++++++++++++++++++++++++++\n";
+                        if (newlines_before) {
+                            updated_content = head + "\n\n++++++++++++++++++++++++++\n";
+                        } else {
+                            updated_content = head + "++++++++++++++++++++++++++\n";
+                        }
+
                         for (b=0; b<added_bullets.length; b++) {
                             updated_content = updated_content + added_bullets[b];
                             if (b < added_bullets.length - 1) {
@@ -202,12 +224,28 @@
                     for (key in server_says['translated_additions']) {
                         et = eta.value;
                         // console.log("processing key " + key);
-                        var pat = section_start_pat + key + ":";
+                        var pat = section_start_pat + key + ":\\*\\n\\n";
                         var re = new RegExp(pat, "g");
                         var section_start_pos = et.search(re);
-                        // console.log("Found that section starting at index " + section_start_pos + " which looks like this:");
-                        // console.log(et.substring(section_start_pos, section_start_pos + 50));
-                        var next_section_start_pos = search(et, section_start_pat, section_start_pos + 10);
+                        var next_section_start_pos = -1;
+                        var newlines_before = true;
+                        if (section_start_pos == -1) {
+                            // the section is absent - it was deleted manually, then re-added, or it's "unknown"
+                            last_three_dots_pos = et.lastIndexOf(' •   •   •');
+                            prev_three_dots_pos = et.lastIndexOf(' •   •   •', last_three_dots_pos);
+                            next_section_start_pos = prev_three_dots_pos - 2;
+                        } else {
+                            // console.log("Found that section starting at index " + section_start_pos + " which looks like this:");
+                            // console.log(et.substring(section_start_pos, section_start_pos + 50));
+                            next_section_start_pos = search(et, section_start_pat, section_start_pos + 10);
+                            newlines_before = (next_section_start_pos != -1);
+                            if (next_section_start_pos == -1) {
+                                // this happens if the addition is to the last section, which is common
+                                // so instead we'll add it immediately after the section header we just found
+                                m = et.match(pat, "g")
+                                next_section_start_pos = section_start_pos + m[0].length;
+                            }
+                        }
                         // console.log("The next section starts at index " + next_section_start_pos + " which looks like this:");
                         // console.log(et.substring(next_section_start_pos, next_section_start_pos + 50));
                         added_bullets = server_says['translated_additions'][key];
@@ -216,7 +254,12 @@
                         // add them
                         head = et.substring(0, next_section_start_pos);
                         tail = et.substring(next_section_start_pos);
-                        updated_content = head + "\n\n++++++++++++++++++++++++++\n";
+                        if (newlines_before) {
+                            updated_content = head + "\n\n++++++++++++++++++++++++++\n";
+                        } else {
+                            updated_content = head + "++++++++++++++++++++++++++\n";
+                        }
+
                         for (b=0; b<added_bullets.length; b++) {
                             updated_content = updated_content + added_bullets[b];
                             if (b < added_bullets.length - 1) {

@@ -168,16 +168,16 @@
                     for (key in server_says['additions']) {
                         ht = hta.value;
                         // console.log("processing key " + key);
-                        var pat = section_start_pat + key + ":\\*\\n\\n";
+                        var pat = section_start_pat + key + ":_?\\*?\\n\\n";
                         var re = new RegExp(pat, "g");
                         var section_start_pos = ht.search(re);
                         var next_section_start_pos = -1;
                         var newlines_before = true;
                         if (section_start_pos == -1) {
                             // the section is absent - it was deleted manually, then re-added, or it's "unknown"
-                            last_three_dots_pos = et.lastIndexOf(' •   •   •');
-                            prev_three_dots_pos = et.lastIndexOf(' •   •   •', last_three_dots_pos);
-                            prev_three_dots_pos = et.lastIndexOf(' •   •   •', prev_three_dots_pos);
+                            last_three_dots_pos = ht.lastIndexOf(' •   •   •');
+                            prev_three_dots_pos = ht.lastIndexOf(' •   •   •', last_three_dots_pos);
+                            prev_three_dots_pos = ht.lastIndexOf(' •   •   •', prev_three_dots_pos);
                             next_section_start_pos = prev_three_dots_pos - 2;
                         } else {
                             // console.log("Found that section starting at index " + section_start_pos + " which looks like this:");

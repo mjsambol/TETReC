@@ -143,7 +143,7 @@ def pre_translation_swaps(text, target_language_code):
 
         text = re.sub(r'\bהסברה\b', 'hasbara (public diplomacy)', text, flags=re.U)
         text = re.sub(r'\b([למהבו]+)?חלל(י)?\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'fallen', text, flags=re.U)
-        text = re.sub(r'\b([למהבו]+)?כטמ"ם\b', lambda m: tx_heb_prefix(m.group(1), "en") + "remotely operated UAV", text, flags=re.U) 
+        text = re.sub(r'\b([למהבו]+)?כטמ"[מם]\b', lambda m: tx_heb_prefix(m.group(1), "en") + "remotely operated UAV", text, flags=re.U) 
         text = re.sub(r'\b([למהבו]+)?אמל"ח\b', lambda m: tx_heb_prefix(m.group(1), "en") + "weapons", text, flags=re.U)
         text = re.sub(r'\b([למהבו]+)?חטוף\b', lambda m: tx_heb_prefix(m.group(1), "en") + "hostage", text, flags=re.U)
         text = re.sub(r'\b([למהבו]+)?חטופים\b', lambda m: tx_heb_prefix(m.group(1), "en") + "hostages", text, flags=re.U)
@@ -159,7 +159,7 @@ def pre_translation_swaps(text, target_language_code):
         text = re.sub(r'\b([למהבו]+)?עוטף\b', lambda m: tx_heb_prefix(m.group(1), "fr") + 'La zone autour de Gaza [?]', text, flags=re.U)
 
         text = re.sub(r'\bהסברה\b', 'diplomatie publique', text, flags=re.U)
-        text = re.sub(r'\b([למהבו]+)כטמ"ם\b', lambda m: tx_heb_prefix(m.group(1), "fr") + "drone", text, flags=re.U) 
+        text = re.sub(r'\b([למהבו]+)כטמ"[מם]\b', lambda m: tx_heb_prefix(m.group(1), "fr") + "drone", text, flags=re.U) 
 
     return text
 

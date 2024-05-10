@@ -102,3 +102,30 @@ async function updateStatus() {
     }
 
 };
+
+var link_to_subscribe = null;
+
+function update_char_count() {
+    translated_text = document.getElementById(TEXT_BEING_EDITED).value;
+    entry_len = translated_text.length;
+    document.getElementById("char_count").innerHTML=LENGTH_LABEL + " " + entry_len + " " + CHARACTERS_LABEL;
+    section_divider = "•   •   •\n\n";
+    strip_from = translated_text.lastIndexOf(section_divider) + section_divider.length;
+    last_chunk = translated_text.substring(strip_from);
+    if (entry_len > 4000) {
+        document.getElementById("char_count").style.color="#FF0000";
+        // remove the link to subscribe, it's not going to be rendered correctly anyway
+        if (last_chunk.indexOf("https://") > 0) {
+            link_to_subscribe = last_chunk.substring(0, last_chunk.indexOf("\n\n") + 2);            
+            translated_text = translated_text.substring(0, strip_from) + last_chunk.substring(last_chunk.indexOf("\n\n") + 2);
+            document.getElementById(TEXT_BEING_EDITED).value = translated_text;
+        }
+    } else {
+        document.getElementById("char_count").style.color="#000000";
+        if ((last_chunk.indexOf("https://") == -1) && (entry_len + link_to_subscribe < 4000)) {
+            // include the link to subscribe
+            translated_text = translated_text.substring(0, strip_from) + link_to_subscribe + last_chunk;
+            document.getElementById(TEXT_BEING_EDITED).value = translated_text;
+        }
+    }
+}

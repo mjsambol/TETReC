@@ -2,7 +2,7 @@
     <head>
         <title>Tamtzit - Editing {{lang}}</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
-        <script src="{{url_for('static', filename='tamtzit-common.js', version='20231206b')}}"></script>
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240510')}}"></script>
         <!-- Google tag (gtag.js) -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
         <script>
@@ -14,6 +14,10 @@
         </script>        
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
         <script>
+            const TEXT_BEING_EDITED = "translated_text";
+            const LENGTH_LABEL = "Length:";
+            const CHARACTERS_LABEL = "characters";
+
             function fix_alignment(text) {
                 var lang = "{{lang}}";
                 if (lang == "YY") {
@@ -43,16 +47,6 @@
                 document.getElementById("translation_panel").style.width="58%";
                 document.getElementById("preview_button").textContent="Preview";
                 document.getElementById("preview_button").setAttribute("onclick","javascript: showPreview();");
-            }
-
-            function update_char_count() {
-                entry_len = document.getElementById("translated_text").value.length;
-                document.getElementById("char_count").innerHTML="Length: " + entry_len + " characters";
-                if (entry_len > 4000) {
-                    document.getElementById("char_count").style.color="#FF0000";
-                } else {
-                    document.getElementById("char_count").style.color="#000000";
-                }
             }
 
             var last_saved_translation = `{{translated}}`;

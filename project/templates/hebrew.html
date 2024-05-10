@@ -2,7 +2,7 @@
     <head>
         <title>Tamtzit - Hebrew Editing</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
-        <script src="{{url_for('static', filename='tamtzit-common.js', version='20231206')}}"></script>
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240510')}}"></script>
         <!-- Google tag (gtag.js) -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
         <script>
@@ -15,15 +15,9 @@
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 
         <script>
-            function update_char_count() {
-                entry_len = document.getElementById("heb_text").value.length;
-                document.getElementById("char_count").innerHTML="אורך: " + entry_len + " אותיות";
-                if (entry_len > 4000) {
-                    document.getElementById("char_count").style.color="#FF0000";
-                } else {
-                    document.getElementById("char_count").style.color="#000000";
-                }
-            }
+            const TEXT_BEING_EDITED = "heb_text";
+            const LENGTH_LABEL = "אורך:";
+            const CHARACTERS_LABEL = "אותיות";
 
             function updatePreview() {
                 update_char_count();

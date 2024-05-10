@@ -785,7 +785,7 @@ def route_start_translation():
 '''
 /translate and /draft are very similar:
    /translate creates a new entry based on the submission of the form at /start_translate  (POST)
-   /draft     edits an existing entry based on a link on the main page      (GET)
+   /draft     edits an existing entry based on a link       (GET)
 '''
 @tamtzit.route("/draft", methods=['GET'])
 @require_login

@@ -29,20 +29,26 @@
 {% endfor %}{% endif %}
 
 {% if 'SOUTH' in organized and organized['SOUTH'] | length > 0 %}
-⬇️ *הזירה הדרומית:*
+⬇️ *החזית הדרומית:*
 {% for line in organized['SOUTH'] %}
 {{line}}
 {% endfor %}{% endif %}
 
 {% if 'NORTH' in organized and organized['NORTH'] | length > 0 %}
-⬆️ *הזירה הצפונית:*
+⬆️ *החזית הצפונית:*
 {% for line in organized['NORTH'] %}
 {{line}}
 {% endfor %}{% endif %}
 
 {% if 'YandS' in organized and organized['YandS'] | length > 0 %}
-*יהודה ושומרון:*
+*חזית איו"ש:*
 {% for line in organized['YandS'] %}
+{{line}}
+{% endfor %}{% endif %}
+
+{% if 'Security' in organized and organized['Security'] | length > 0 %}
+🛡️ *_ביטחון:_*
+{% for line in organized['Security'] %}
 {{line}}
 {% endfor %}{% endif %}
 

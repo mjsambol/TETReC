@@ -129,6 +129,8 @@ def pre_translation_swaps(text, target_language_code):
     text = re.sub(r'\*עדכון מוצאי שבת\*', '', text, flags=re.U)
     text = re.sub(r'קוראים יקרים, זהו עדכון מקוצר. מהדורה רגילה תישלח אחרי 21:00.', '', text, flags=re.U)
 
+    text = re.sub(r'\bמשגב עם\b', 'Misgav Am', text, flags=re.U)
+
     if target_language_code == 'en':
         text = re.sub(r'\bהי"ד\b',   'HYD', text, flags=re.U)
         

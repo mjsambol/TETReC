@@ -101,30 +101,30 @@ def get_translated_additions_since_ok_to_translate(current_hebrew_text, heb_text
     return (additions_by_section, translated_additions_by_section)
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    datastore_client = DatastoreClientProxy.get_instance()
+#     datastore_client = DatastoreClientProxy.get_instance()
 
-    draft_query = datastore_client.query(kind="draft")
-    draft_query.order = ["-timestamp"]
-    # need to add indexes...
-    # draft_query.add_filter("ok_to_translate", "=", True)
+#     draft_query = datastore_client.query(kind="draft")
+#     draft_query.order = ["-timestamp"]
+#     # need to add indexes...
+#     # draft_query.add_filter("ok_to_translate", "=", True)
 
-    drafts = draft_query.fetch()
-    for draft in drafts:
-        debug(f"Checking: {draft['translation_lang']}")
-        if draft['translation_lang'] == '--' and draft['ok_to_translate']:
-            break
+#     drafts = draft_query.fetch()
+#     for draft in drafts:
+#         debug(f"Checking: {draft['translation_lang']}")
+#         if draft['translation_lang'] == '--' and draft['ok_to_translate']:
+#             break
 
-    debug(f"Processing a Hebrew draft with ID {draft.key.id} from {draft['timestamp']}")
-    heb_additions_by_section, translated_additions_by_section = get_translated_additions_since_ok_to_translate(draft, "en")
-    debug("Here are all the added bullets:")
-    for section in heb_additions_by_section:
-        debug(section + ":")
-        for addition in heb_additions_by_section[section]:
-            debug(addition)
-        translated_section_name = sections["en"][sections['keys_from_Hebrew'][section]]
-        debug(translated_section_name + ":")
-        for addition in translated_additions_by_section[translated_section_name]:
-            debug(addition)
-        debug("\n")
+#     debug(f"Processing a Hebrew draft with ID {draft.key.id} from {draft['timestamp']}")
+#     heb_additions_by_section, translated_additions_by_section = get_translated_additions_since_ok_to_translate(draft, "en")
+#     debug("Here are all the added bullets:")
+#     for section in heb_additions_by_section:
+#         debug(section + ":")
+#         for addition in heb_additions_by_section[section]:
+#             debug(addition)
+#         translated_section_name = sections["en"][sections['keys_from_Hebrew'][section]]
+#         debug(translated_section_name + ":")
+#         for addition in translated_additions_by_section[translated_section_name]:
+#             debug(addition)
+#         debug("\n")

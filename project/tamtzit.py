@@ -21,6 +21,7 @@ from requests.auth import HTTPBasicAuth
 from .translation_utils import *
 from .cookies import *
 from .common import *
+from .common import _set_debug
 from .language_mappings import *
 from .diff_draft_versions import get_translated_additions_since_ok_to_translate
 
@@ -752,6 +753,13 @@ def route_hebrew_restart():
 
     return make_response(redirect("/"))
         
+
+@tamtzit.route("/set-debug-mode")
+@require_login
+@require_role("admin")
+def route_set_debug_mode():
+    return str(_set_debug(request.args.get("to")))
+
 
 @tamtzit.route("/start_translation")
 @require_login

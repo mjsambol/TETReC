@@ -3,8 +3,18 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from google.cloud import datastore
 
+debug_state = os.getenv("FLASK_DEBUG") == "1"
+
+def _set_debug(new_state):
+    global debug_state
+    if type(new_state) == bool:
+        debug_state = new_state
+    else:
+        debug_state = type(new_state) == str and new_state.lower() in ['on', 'true', 'debug', "1"]
+    return debug_state
+
 def debug(stuff):
-    if os.getenv("FLASK_DEBUG") == "1":
+    if debug_state:
         now = datetime.now(tz=ZoneInfo("Asia/Jerusalem"))
         print(f"DEBUG: [{now.strftime('%d/%m/%Y %H:%M:%S')}] {stuff}")
 

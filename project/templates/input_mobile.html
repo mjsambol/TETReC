@@ -2,15 +2,7 @@
     <head>
         <title>Tamtzit - Translation Creation (Mobile)</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
-        <!-- Google tag (gtag.js) -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
-        <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-
-        gtag('config', 'G-7WJQ95B6KX');
-        </script>        
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240514d')}}"></script>
     </head>    
     <body>
         <div style="font-size: 25px;  font-family: Arial, Helvetica, sans-serif;">
@@ -24,18 +16,19 @@
         <input type="hidden" name="heb_draft_id" value="{{draft_id}}">
         <input type="hidden" name="heb_author_id" value="{{creator_id}}">
 
-        <textarea name="orig_text" rows="25" cols="45" dir="rtl" style="font-size: 32px;">{{heb_text}}</textarea>
+        <textarea name="orig_text" id="orig_text" rows="25" cols="45" dir="rtl" style="font-size: 32px;">{{heb_text}}</textarea>
 
         <table border="0" width="100%">
             <tr>
-                <td width="75%" align="center"><span style="font-size: 45px;">Translate to:</span> 
+                <td width="67%" align="center"><span style="font-size: 45px;">Translate to:</span> 
                     <select name="target-lang" style="font-size: 50px; padding:8px 8px">
                         <option value="en">English</option>
                         <option value="fr">Francais</option>
                         <option value="YY">נוער</option>
                     </select></td>
-                <td align="right">
-                    <input type="submit" style="font-size: 50px; padding:8px 8px">
+                <td width="15%" align="center" id="heb_status_label">...</td>
+                <td width="18%" align="right">
+        <input type="submit" id="submit-button" style="font-size: 50px; padding:8px 8px">
                 </td>
             </tr>
         </table>
@@ -53,5 +46,36 @@
         {% endif %}            
     {% endfor %}
     </div>
-    </body>
+    <script>
+        function input_page_updates(latest_status) {
+            states = latest_status["by_lang"]["--"]["states"];
+            // if relevant, update the color of the submit button
+            submit_button = document.getElementById("submit-button");
+            if (submit_button) {
+                color = "#000000";
+                if (states[states.length - 1]["state"] == "WRITING") {
+                    color = "#FF0000"; 
+                } else if (states[states.length - 1]["state"] == "EDIT_READY") {
+                    color = "#ff6600";
+                } else if (states[states.length - 1]["state"] == "EDIT_ONGOING") {
+                    color = "#ffAA22";
+                } else if (states[states.length - 1]["state"] == "EDIT_NEAR_DONE") {
+                    color = "#ffffb3";            
+                } else if (states[states.length - 1]["state"] == "PUBLISHED") {
+                    color = "#00cc66";
+                } else {  // publish_ready and anything unexpected
+                    color = "#f0f0f0";
+                }
+                submit_button.style.backgroundColor=color;
+
+                hebrew_text = document.getElementById("orig_text");
+                if (hebrew_text) {
+                    hebrew_text.value = latest_status["by_lang"]["--"]["text"];
+                }
+            }
+        }
+        getLatestStatus(input_page_updates);
+        setInterval(function(){getLatestStatus(input_page_updates)}, 20000);
+    </script>
+  </body>
 </html>

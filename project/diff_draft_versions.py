@@ -17,13 +17,13 @@ def parse_for_comparison(text):
             current_entry = None
             continue
         # two consecutive lines not separated by a blank line will be considered the same entry
-        if not re.match("^[•📌>]", line):  # it doesn't start with any prefix
+        if not re.match("^[•📌>-]", line):  # it doesn't start with any prefix
             if current_entry:
                 result[section][-1] = result[section][-1] + "\n" + line
  #               print("Appending this line to the previous one")
  #           else:
  #               print(f"skipping a no-prefix non-blank line: {line}")
-        elif not line.startswith("•"):
+        elif not (line.startswith("•") or line.startswith("-")):
             section = line  ## this should always get replaced, but just in case...
             for heb_section in sections['keys_from_Hebrew']:
                 if heb_section in line:
@@ -48,8 +48,8 @@ def get_substantial_additions(parsed_heb_draft, parsed_backup):
             if len(bullet) < 5:
                 continue
             best_fit = max([SequenceMatcher(None, backup_bullet, bullet).ratio() for backup_bullet in backup_section])
-            if best_fit < 0.5:
-#                print(f"More than half ({best_fit}) has been changed, let's consider it added to section {section}:")
+            if best_fit < 0.66:
+#                print(f"More than one third ({best_fit}) has been changed, let's consider it added to section {section}:")
 #                print(bullet)
                 additions[section].append(bullet)
     return additions
@@ -78,10 +78,11 @@ def get_pre_translation_backup(draft):
 
 def get_translated_additions_since_ok_to_translate(current_hebrew_text, heb_text_used_for_translation, target_lang="en"):
 
+    debug(f"get_translated_additions_since_ok_to_translate: heb is:\n{current_hebrew_text}\n\nbackup is:\n{heb_text_used_for_translation}\n\n")
     parsed_heb_draft = parse_for_comparison(current_hebrew_text.split('\n'))
 
     parsed_backup = parse_for_comparison(heb_text_used_for_translation.split('\n'))
-
+    debug(f"get_translated_additions_since_ok_to_translate: heb is:\n{parsed_heb_draft}\n\nbackup is:\n{parsed_backup}\n\n")
     additions_by_section = get_substantial_additions(parsed_heb_draft, parsed_backup)
     debug(f"there were {len(additions_by_section)} sections with additions")
     translated_additions_by_section = defaultdict(list)

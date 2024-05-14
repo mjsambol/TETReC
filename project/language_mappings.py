@@ -83,7 +83,7 @@ keywords['en'] = {
     "intro_pin": "war of iron swords",
     "northern":"northern ",
     "southern":"southern ",
-    "jands":"judea and samaria",
+    "jands":"iosh",
     "security":"security",
     "policy":"policy",
     "politics":"politics",
@@ -101,16 +101,16 @@ keywords['fr'] = {
     "northern": "nord ",
     "southern": "sud ",
     "security": "sécurité",
-    "jands": "judée et samarie",
+    "jands": "iosh",
     "policy": "politique",
     "politics": "politique",
     "in the world":"UNKNOWN",
     "in israel": "en israël",
     "world": "le monde",
     "weather": "météo",
-    "economy": "economie",
+    "economy": "économie",
     "sport": "sport",
-    "finish": "finir"
+    "finish": "bien"
 }
 keywords['YY'] = {
     "edition": "מהדורת",

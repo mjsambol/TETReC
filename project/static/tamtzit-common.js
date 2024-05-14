@@ -77,11 +77,14 @@ async function updateStatus() {
                         } else {
                             status = status + ' -- <b><font color="#d6153c">לא ';
                         }
-                        status = status + "מוכן לתרגום</font></b>";
+                        status = status + "מוכן לעריכה</font></b>";
                     }
                     // if the user is an admin AND the text is in status "done", show a button to copy the text to clipboard
-                    if (obj['by_lang'][lang]['done'] && user_role.includes("admin")) {
-                        status = status + " -- <b>מוכן לשליחה</b> <button id=copyText" + lang + ">העתק תוכן</button>";
+                    if (obj['by_lang'][lang]['done']) {
+                        status = status + " -- <b>מוכן לשליחה</b>";
+                        if (user_role.includes("admin")) {
+                            status = status + " <button id=copyText" + lang + ">העתק תוכן</button>";
+                        }
                     }
                 }
             }
@@ -102,6 +105,22 @@ async function updateStatus() {
     }
 
 };
+
+async function getLatestStatus(also_call) {
+    // this is very similar to updateStatus() 
+    // which is specifically meant for updating the main index page's status summary
+    // this method is for updating status labels on other pages
+    latest_status = await (await fetch("/status")).json();
+
+    // update the heb_status_label
+    status_label = document.getElementById("heb_status_label");
+    states = latest_status["by_lang"]["--"]["states"];
+    status_label.innerHTML = STATE_NAMES[states[states.length - 1]["state"]] + "<br>Since " + states[states.length - 1]["at"].substring(9,11) + ":" + states[states.length - 1]["at"].substring(11,13)
+    + "<br>Last edit: " + latest_status["by_lang"]["--"]["last_edit"];
+
+    also_call(latest_status);
+}
+
 
 var link_to_subscribe = null;
 
@@ -128,4 +147,13 @@ function update_char_count() {
             document.getElementById(TEXT_BEING_EDITED).value = translated_text;
         }
     }
+}
+
+const STATE_NAMES = {
+    "WRITING": "Writing",
+    "EDIT_READY": "Ready for Editing",
+    "EDIT_ONGOING": "Being Edited",
+    "EDIT_NEAR_DONE": "Mostly Edited",
+    "PUBLISH_READY": "Ready to be Sent",
+    "PUBLISHED": "Published"
 }

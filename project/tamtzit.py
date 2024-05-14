@@ -53,6 +53,9 @@ JERUSALEM_TZ = ZoneInfo("Asia/Jerusalem")
 def update_archive(draft):
     debug("updating archive...")
     lang_code = 'he' if draft["translation_lang"] == '--' else draft["translation_lang"]
+    if lang_code == 'YY':
+        return  # we're not archiving those editions as they're just a subset of the regular Hebrew content
+    
     date_info = make_date_info(datetime.now(JERUSALEM_TZ), 'en')  # Forced to EN so that we get English anchor names
     prev_archive = requests.get(f"{ARCHIVE_BASE}archive-{lang_code}.html").text
 
@@ -164,7 +167,8 @@ def create_draft(heb_text, user_info, translation_text='', translation_lang='en'
     entity.update({"hebrew_text": heb_text, "heb_draft_id": heb_draft_id, 
                    "translation_text": translation_text, "translation_lang": translation_lang, 
                    "timestamp": draft_timestamp, "last_edit": draft_timestamp, 
-                   "is_finished": False, "ok_to_translate": False, "created_by": user_info["user_id"]}) 
+                   "is_finished": False, "ok_to_translate": False, "created_by": user_info["user_id"],
+                   "states":[{"state": DraftStates.WRITING.name, "at": draft_timestamp.strftime('%Y%m%d-%H%M%S'), "by": user_info[Cookies.COOKIE_USER_NAME]}]}) 
     datastore_client.put(entity)
     entity = datastore_client.get(entity.key)
     return entity.key
@@ -199,6 +203,7 @@ def create_draft_history(draft):
     entity.update({"draft_id":draft.key.id, "hebrew_text": draft["hebrew_text"], "translation_text": draft["translation_text"], 
                    "translation_lang": draft["translation_lang"], "draft_timestamp": draft["timestamp"], "last_edit": draft["last_edit"], 
                    "is_finished": draft["is_finished"], "ok_to_translate": draft["ok_to_translate"], "created_by": draft["created_by"],
+                   "states": draft["states"],
                    "backup_timestamp": datetime.now(tz=ZoneInfo('Asia/Jerusalem'))})
     datastore_client.put(entity)
     entity = datastore_client.get(entity.key)
@@ -228,13 +233,19 @@ def store_draft_backup(draft, force_backup=False):
         create_draft_history(draft)
 
 
-def update_translation_draft(draft_key, translated_text, is_finished=False):   # can't change the original Hebrew
+def update_translation_draft(draft_key, translated_text, user_info, is_finished=False):   # can't change the original Hebrew
     draft = datastore_client.get(draft_key)
     prev_last_edit = draft["last_edit"]
     draft.update({"translation_text": translated_text})
     draft.update({"is_finished": is_finished})
     edit_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     draft.update({"last_edit": edit_timestamp}) 
+    prev_states = draft["states"]
+    # this method is specific to translation and the only states the tool supports right now for translation
+    # are writing and publish_ready. Later it will be good to add additional states, at least edit_ready and published
+    if is_finished and DraftStates.PUBLISH_READY.name not in [states_entry["state"] for states_entry in prev_states]:
+        prev_states.append({"state":DraftStates.PUBLISH_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), "by": user_info["name"]})
+
     datastore_client.put(draft)
 
     # also store history in case of dramatic failure
@@ -244,7 +255,39 @@ def update_translation_draft(draft_key, translated_text, is_finished=False):   #
         update_archive(draft)
 
 
-def update_hebrew_draft(draft_key, hebrew_text, is_finished=False, ok_to_translate=False):
+@cachetools.func.ttl_cache(ttl=600)
+def cache_heb_draft_text_before_edits(draft_id):
+    query2 = datastore_client.query(kind="draft_backup")
+    query2.order = ["-backup_timestamp"]
+    #query2.add_filter("draft_id", "=", draft.key.id)
+    draft_backups = query2.fetch()
+    for dbkup in draft_backups:
+        if dbkup["draft_id"] == draft_id and DraftStates.EDIT_ONGOING.name not in [states_entry["state"] for states_entry in dbkup["states"]]: 
+            return dbkup
+            
+
+def do_edits_reach_last_two_sections(draft):
+    # be careful - we can't actually check against the 20% end of the string because the changes prior to it change where the last 20% starts!
+    # so instead we have to find the 2nd to last section heading in the original text, find that same heading in the new text, and see if there 
+    # are changes from there onward. If that heading isn't found in the new text, the answer is yes.
+    # first challenge - get SHIRA'S original version of the Hebrew text currently being changed
+    current_text = draft["hebrew_text"]
+    text_at_ready_to_edit = cache_heb_draft_text_before_edits(draft.key.id)["hebrew_text"]
+
+    orig_last_heading = text_at_ready_to_edit.rfind("📌")
+    orig_second_last_heading = text_at_ready_to_edit.rfind("📌", 0, orig_last_heading)
+    orig_last_chunk = text_at_ready_to_edit[orig_second_last_heading:]
+    curr_last_heading = current_text.rfind("📌")
+    curr_second_last_heading = current_text.rfind("📌", 0, curr_last_heading)
+    curr_last_chunk = current_text[curr_second_last_heading:]
+    # debug("Checking whether edits have reached the last section. Originally it was:")
+    # debug(orig_last_chunk)
+    # debug("Now the last section is:")
+    # debug(curr_last_chunk)
+    return curr_last_chunk != orig_last_chunk
+
+
+def update_hebrew_draft(draft_key, hebrew_text, user_info, is_finished=False, ok_to_translate=False):
     draft = datastore_client.get(draft_key)
     prev_last_edit = draft["last_edit"]
     draft.update({"hebrew_text": hebrew_text})
@@ -255,6 +298,24 @@ def update_hebrew_draft(draft_key, hebrew_text, is_finished=False, ok_to_transla
     edit_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     draft.update({"last_edit": edit_timestamp}) 
     draft.update({"translation_lang": '--'})
+    prev_states = draft["states"]
+
+    if ok_to_translate and DraftStates.EDIT_READY.name not in [states_entry["state"] for states_entry in prev_states]:
+        prev_states.append({"state":DraftStates.EDIT_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), "by": user_info["name"]})
+    
+    if "editor" in user_info["role"]:
+        if DraftStates.EDIT_ONGOING.name not in [states_entry["state"] for states_entry in prev_states]:
+            prev_states.append({"state":DraftStates.EDIT_ONGOING.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), "by": user_info["name"]})
+
+        # has the bottom 20% of text changed from what it was originally?
+        bottom_20_percent_changed = do_edits_reach_last_two_sections(draft)
+
+        if bottom_20_percent_changed and DraftStates.EDIT_NEAR_DONE.name not in [states_entry["state"] for states_entry in prev_states]:
+            prev_states.append({"state":DraftStates.EDIT_NEAR_DONE.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), "by": user_info["name"]})
+        
+    if is_finished and DraftStates.PUBLISH_READY.name not in [states_entry["state"] for states_entry in prev_states]:
+        prev_states.append({"state":DraftStates.PUBLISH_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), "by": user_info["name"]})
+
     datastore_client.put(draft)
 
     # also store history in case of dramatic failure
@@ -605,10 +666,13 @@ def get_cachable_status(role):
             "last_edit": draft['last_edit'].astimezone(JERUSALEM_TZ).strftime('%H:%M'),
             "elapsed_since_last_edit": (now - draft['last_edit']).seconds,
             "ok_to_translate": draft['ok_to_translate'],
-            "done": draft['is_finished']
+            "done": draft['is_finished'],
+            "states": draft['states']
         }
-        if draft['is_finished'] and "admin" in role:
-            status_per_lang[draft['translation_lang']]['text'] = draft['hebrew_text'] if draft["translation_lang"] == '--' else draft['translation_text']
+        if draft['translation_lang'] == '--':
+            status_per_lang['--']['text'] = draft['hebrew_text']
+        if draft['is_finished'] and "admin" in role and draft['translation_lang'] != '--':
+            status_per_lang[draft['translation_lang']]['text'] = draft['translation_text']
     response = {
         'as_of': now.strftime("%H:%M"),
         'by_lang': status_per_lang
@@ -699,7 +763,8 @@ def route_hebrew_template():
                                 draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
                                 ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
                                 is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
-                                heb_font_size=get_font_sz_prefs(request)['he'], user_name=draft_creator_user_info["name_hebrew"]))
+                                heb_font_size=get_font_sz_prefs(request)['he'], user_name=draft_creator_user_info["name_hebrew"],
+                                states=draft['states']))
         refresh_cookies(request, response)
         return response
             
@@ -711,7 +776,8 @@ def route_hebrew_template():
     date_info = make_date_info(dt, 'he')
     response = make_response(render_template(next_page, date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"), 
                             ok_to_translate=False, is_finished=False, in_progress=False,
-                            heb_font_size=get_font_sz_prefs(request)['he'], user_name=draft_creator_user_info["name_hebrew"]))
+                            heb_font_size=get_font_sz_prefs(request)['he'], user_name=draft_creator_user_info["name_hebrew"], 
+                            states=[{"state":DraftStates.WRITING.name, "at":dt.strftime('%Y%m%d-%H%M%S'), "by": draft_creator_user_info["name"]}]))
     refresh_cookies(request, response)
     return response
 
@@ -748,6 +814,9 @@ def route_hebrew_restart():
             edit_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem')) + timedelta(hours=-2)
             draft.update({"last_edit": edit_timestamp}) 
             draft.update({"is_finished": True})
+            prev_states = draft["states"]
+            prev_states.append({"state":DraftStates.ADMIN_CLOSED.name, "at": dt.strftime('%Y%m%d-%H%M%S'), "by": cookie_user_info[Cookies.COOKIE_USER_NAME]})
+            draft.update({"states": prev_states})
             datastore_client.put(draft)
             break
 
@@ -774,7 +843,7 @@ def route_start_translation():
         if (dt - draft_last_mod).seconds > (60 * 60 * 3):
             return render_template("error.html", msg="There is no current edition ready for translation.")
 
-        if draft['translation_lang'] == '--' and 'ok_to_translate' in draft and draft['ok_to_translate'] == True:
+        if draft['translation_lang'] == '--' and DraftStates.EDIT_READY.name in [states_entry["state"] for states_entry in draft['states']]:
             # this is the most recent Hebrew text
             latest_heb = draft['hebrew_text']
             latest_creator = draft['created_by']
@@ -788,7 +857,7 @@ def route_start_translation():
     drafts, local_tses = fetch_drafts() 
     next_page = detect_mobile(request, "input")
     return render_template(next_page, heb_text=latest_heb, creator_id=latest_creator, draft_id=draft_id, 
-                           drafts=drafts, local_timestamps=local_tses, supported_langs=supported_langs_mapping)
+                           drafts=drafts, local_timestamps=local_tses, supported_langs=supported_langs_mapping, states=draft['states'])
 
 '''
 /translate and /draft are very similar:
@@ -819,11 +888,11 @@ def continue_draft():
             font_size_prefs = get_font_sz_prefs(request)
             key = draft.key
 
-            return render_template(next_page, heb_text=heb_text, translated=Markup(translated), draft_timestamp=draft_timestamp, 
+            return render_template(next_page, heb_text=Markup(heb_text), translated=Markup(translated), draft_timestamp=draft_timestamp, 
                                    lang=draft['translation_lang'], **names,  user_info=user_info,
                                    draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=draft['heb_draft_id'],
                                    heb_font_size=font_size_prefs['he'], en_font_size=font_size_prefs['en'], 
-                                   is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True)
+                                   is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True, states=draft['states'])
 
     return "Draft not found, please start again."
             
@@ -855,15 +924,17 @@ def process():
     font_size_prefs = get_font_sz_prefs(request)
     
     info = process_translation_request(heb_text, target_language_code)
-    draft_timestamp=datetime.now(tz=ZoneInfo('Asia/Jerusalem')).strftime('%Y%m%d-%H%M%S')
+    dt = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
+    draft_timestamp=dt.strftime('%Y%m%d-%H%M%S')
 
     translated = render_template(target_language.lower() + '.html', **info, draft_timestamp=draft_timestamp, **names)
     translated = re.sub('\n{3,}', '\n\n', translated)  # this is necessary because the template can generate large gaps due to unused sections
 
     # store the draft in DB so that someone else can continue the translation work
     key = create_draft(heb_text, basic_user_info, translation_text=translated, translation_lang=target_language_code, heb_draft_id=request.form.get('heb_draft_id'))
-    return render_template(next_page, heb_text=heb_text, translated=translated, lang=target_language_code, in_progress=False, user_info=user_info,
+    return render_template(next_page, heb_text=Markup(heb_text), translated=Markup(translated), lang=target_language_code, in_progress=False, user_info=user_info,
                            heb_font_size=font_size_prefs['he'], en_font_size=font_size_prefs['en'], 
+                           states=[{"state":DraftStates.WRITING.name, "at":draft_timestamp, "by":user_info["name"]}],
                            draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=request.form.get('heb_draft_id'))
 
 
@@ -882,12 +953,14 @@ def save_draft():
     source_text = request.form.get('source_text')
     if translated_text and len(translated_text) > 0:
         if confirm_user_has_role(request, "translator"):
-            update_translation_draft(draft_key, translated_text, is_finished=finished)
+            user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
+            update_translation_draft(draft_key, translated_text, user_info, is_finished=finished)
         else:
             return "Error: saveDraft called with change to translated text, but user does not have the appropriate role."
     elif source_text and len(source_text) > 0:
         if confirm_user_has_role(request, "Hebrew"):
-            update_hebrew_draft(draft_key, source_text, is_finished=finished, ok_to_translate=send_to_translators)
+            user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
+            update_hebrew_draft(draft_key, source_text, user_info, is_finished=finished, ok_to_translate=send_to_translators)
         else:
             return "Error: saveDraft called with change to Hebrew text, but user does not have the appropriate role."
     else:
@@ -1011,7 +1084,10 @@ def process_translation_request(heb_text, target_language_code):
             if kw['intro_pin'] in line.lower():
                 debug("skipping what looks like the intro pin line")
                 continue            
-            if kw["in israel"] in line.lower():
+            if kw["security"] in line.lower():
+                debug("starting Security section")
+                section = organized['Security']
+            elif kw["in israel"] in line.lower():
                 debug("starting inIsrael section")
                 section = organized['InIsrael']
             elif kw["world"] in line.lower():

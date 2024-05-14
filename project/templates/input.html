@@ -2,15 +2,7 @@
     <head>
         <title>Tamtzit - Translation Creation</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
-        <!-- Google tag (gtag.js) -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
-        <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-
-        gtag('config', 'G-7WJQ95B6KX');
-        </script>        
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240514d')}}"></script>
     </head>    
     <body>
         <form method="POST" action="/translate">
@@ -28,7 +20,7 @@
                 </tr>
                 <tr>
                     <td>
-                        <textarea name="orig_text" rows="50" cols="80" dir="rtl">{{heb_text}}</textarea>
+                        <textarea name="orig_text" id="orig_text" rows="50" cols="80" dir="rtl">{{heb_text}}</textarea>
                     </td>
                     <td width="10"> </td>
                     <td valign="top">
@@ -46,14 +38,15 @@
                     <td>
                         <table border="0" width="100%">
                             <tr>
-                                <td width="75%" align="center"><span style="font-size: 14px;">Translate to:</span> 
+                                <td width="67%" align="center"><span style="font-size: 14px;">Translate to:</span> 
                                     <select name="target-lang" style="font-size: 16px; padding:8px 8px">
                                         <option value="en">English</option>
                                         <option value="fr">Francais</option>
                                         <option value="YY">נוער</option>
                                     </select></td>
-                                <td align="right">
-                                    <input type="submit" style="font-size: 20px; padding:8px 8px">
+                                <td width="15%" align="center" id="heb_status_label">...</td>
+                                <td width="18%" align="right">
+                                    <input type="submit" id="submit-button" style="font-size: 20px; padding:8px 8px">
                                 </td>
                             </tr>
                         </table>
@@ -63,5 +56,36 @@
                 </tr>
             </table>
         </form>        
+        <script>
+            function input_page_updates(latest_status) {
+                states = latest_status["by_lang"]["--"]["states"];
+                // if relevant, update the color of the submit button
+                submit_button = document.getElementById("submit-button");
+                if (submit_button) {
+                    color = "#000000";
+                    if (states[states.length - 1]["state"] == "WRITING") {
+                        color = "#FF0000"; 
+                    } else if (states[states.length - 1]["state"] == "EDIT_READY") {
+                        color = "#ff6600";
+                    } else if (states[states.length - 1]["state"] == "EDIT_ONGOING") {
+                        color = "#ffAA22";
+                    } else if (states[states.length - 1]["state"] == "EDIT_NEAR_DONE") {
+                        color = "#ffffb3";            
+                    } else if (states[states.length - 1]["state"] == "PUBLISHED") {
+                        color = "#00cc66";
+                    } else {  // publish_ready and anything unexpected
+                        color = "#f0f0f0";
+                    }
+                    submit_button.style.backgroundColor=color;
+
+                    hebrew_text = document.getElementById("orig_text");
+                    if (hebrew_text) {
+                        hebrew_text.value = latest_status["by_lang"]["--"]["text"];
+                    }
+                }
+            }
+            getLatestStatus(input_page_updates);
+            setInterval(function(){getLatestStatus(input_page_updates)}, 20000);
+        </script>
     </body>
 </html>

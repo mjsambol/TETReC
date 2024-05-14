@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from google.cloud import datastore
+from enum import Enum, auto
 
 debug_state = os.getenv("FLASK_DEBUG") == "1"
 
@@ -38,6 +39,16 @@ def expand_lang_code(from_lang, to_lang='H'):
         if from_lang == 'YY':
             return "Youth"
     return '??'
+
+
+class DraftStates(Enum):
+    WRITING = auto()
+    EDIT_READY = auto()
+    EDIT_ONGOING = auto()
+    EDIT_NEAR_DONE = auto()
+    PUBLISH_READY = auto()
+    PUBLISHED = auto()
+    ADMIN_CLOSED = auto()
 
 class DatastoreClientProxy:
 

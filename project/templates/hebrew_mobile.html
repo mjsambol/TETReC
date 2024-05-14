@@ -3,8 +3,6 @@
         <title>Tamtzit - Hebrew Editing (mobile)</title>
         <script src="{{url_for('static', filename='tamtzit-common.js', version='20240510')}}"></script>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
-        <!-- Google tag (gtag.js) -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
         <script>
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
@@ -41,7 +39,7 @@
             function done() {
                 disable_done_button();
                 is_finished = true;
-                saveDraft(true);
+                saveDraft(force=true);
             }
 
             function disable_done_button() {
@@ -82,7 +80,7 @@
             function to_translators() {
                 disable_send_to_translators();
                 ok_to_translate = true;
-                saveDraft(finalize=false, ready_for_translation=true);
+                saveDraft(force=true);
             }
 
             function translation_changed() {
@@ -94,19 +92,19 @@
                 } 
             }
 
-            function saveDraft(finalize=false, ready_for_translation=ok_to_translate) {
-                if (is_finished && !finalize) {
+            function saveDraft(force=false) {
+                if (is_finished && !force) {
                     return;
                 }
                 curr_text = document.getElementById('heb_text').value;
-                if (finalize || ready_for_translation || last_saved_text.localeCompare(curr_text) != 0) {
+                if (force || last_saved_text.localeCompare(curr_text) != 0) {
                     console.log("saving, text was\n\n"+last_saved_text+"\n\ntext is now\n\n" + curr_text);
                     $.post("/saveDraft",
                     {
                         draft_key: "{{draft_key}}",
                         source_text: curr_text,
                         is_finished: is_finished,
-                        to_translators: ready_for_translation
+                        to_translators: ok_to_translate
                     },
                     function(data,status) {
                         console.log("Draft save status: " + status);
@@ -258,7 +256,7 @@
             <button id="done_button" style="font-size: 45px; padding:8px 8px;" disabled="true" onclick="done();">מוכן לשליחה</button>            
             </td>
         <td width="50%" align="right" valign="top">
-            <button id="to_translation_button" style="font-size: 45px; padding:8px 8px;" onclick="to_translators();">מוכן לתרגום</button>  
+            <button id="to_translation_button" style="font-size: 45px; padding:8px 8px;" onclick="to_translators();">מוכן לעריכה</button>  
             <br>
         </td>
     </tr>

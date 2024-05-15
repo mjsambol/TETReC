@@ -50,19 +50,19 @@ async function notifyServerOfPublish(button_id) {
     await fetch("/mark_published?lang=" + published_lang);
 }
 
-var focused = true;
+// var focused = true;
 var latest_status = null;
 
-window.onfocus = function() {
-    focused = true;
-};
-window.onblur = function() {
-    focused = false;
-    stuff_happening = false;
-};
+// window.onfocus = function() {
+//     focused = true;
+// };
+// window.onblur = function() {
+//     focused = false;
+//     stuff_happening = false;
+// };
 
 async function updateStatus() {
-    if (focused) {
+    if (document.visibilityState == "visible") {
         let obj = await (await fetch("/status")).json();
         latest_status = obj;
         var status = "מצב העבודה נכון ל " + obj['as_of'] + ":";
@@ -102,6 +102,8 @@ async function updateStatus() {
             }
             thelink.addEventListener("click", function(event) {copyEditionTextToClipboard(event.target.id);notifyServerOfPublish(event.target.id);});
         }
+    } else {
+        stuff_happening = false;
     }
     if (stuff_happening) {
         setTimeout(function(){updateStatus()}, 10000);   // update again in 10 seconds

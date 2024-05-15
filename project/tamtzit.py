@@ -235,7 +235,6 @@ def store_draft_backup(draft, force_backup=False):
 
 def update_translation_draft(draft_key, translated_text, user_info, is_finished=False):   # can't change the original Hebrew
     draft = datastore_client.get(draft_key)
-    prev_last_edit = draft["last_edit"]
     draft.update({"translation_text": translated_text})
     draft.update({"is_finished": is_finished})
     edit_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
@@ -262,8 +261,10 @@ def cache_heb_draft_text_before_edits(draft_id):
     #query2.add_filter("draft_id", "=", draft.key.id)
     draft_backups = query2.fetch()
     for dbkup in draft_backups:
+        # this query says: give me the last backup *before* the text went into Edit mode
         if dbkup["draft_id"] == draft_id and DraftStates.EDIT_ONGOING.name not in [states_entry["state"] for states_entry in dbkup["states"]]: 
             return dbkup
+    return None  # should not happen but could: admin user creates a draft and this method is called on the first attempt to save
             
 
 def do_edits_reach_last_two_sections(draft):
@@ -272,7 +273,10 @@ def do_edits_reach_last_two_sections(draft):
     # are changes from there onward. If that heading isn't found in the new text, the answer is yes.
     # first challenge - get SHIRA'S original version of the Hebrew text currently being changed
     current_text = draft["hebrew_text"]
-    text_at_ready_to_edit = cache_heb_draft_text_before_edits(draft.key.id)["hebrew_text"]
+    last_backup_before_editing = cache_heb_draft_text_before_edits(draft.key.id)
+    if not last_backup_before_editing:
+        return False
+    text_at_ready_to_edit = last_backup_before_editing["hebrew_text"]
 
     orig_last_heading = text_at_ready_to_edit.rfind("📌")
     orig_second_last_heading = text_at_ready_to_edit.rfind("📌", 0, orig_last_heading)
@@ -289,7 +293,6 @@ def do_edits_reach_last_two_sections(draft):
 
 def update_hebrew_draft(draft_key, hebrew_text, user_info, is_finished=False, ok_to_translate=False):
     draft = datastore_client.get(draft_key)
-    prev_last_edit = draft["last_edit"]
     draft.update({"hebrew_text": hebrew_text})
     draft.update({"is_finished": is_finished})
     if ok_to_translate:  
@@ -828,6 +831,42 @@ def route_hebrew_restart():
 @require_role("admin")
 def route_set_debug_mode():
     return str(_set_debug(request.args.get("to")))
+
+
+@tamtzit.route("/mark_published")
+@require_login
+@require_role("admin")
+def route_mark_published():
+    edition_lang = request.args.get("lang")
+    cookie_user_info = user_data_from_req(request)
+
+    debug(f"mark_published: {edition_lang} has been copied by {cookie_user_info[Cookies.COOKIE_USER_NAME]}")
+
+    drafts, local_tses = fetch_drafts()
+    debug("Drafts is " + ("" if drafts is None else "not ") + "null")
+
+    dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
+    for draft in drafts:
+        if draft['translation_lang'] != edition_lang: 
+            continue
+
+        draft_last_mod = draft['last_edit']
+        debug(f"/heb-restart: draft's last edit is {draft_last_mod}, it's now {dt}, delta is {dt - draft_last_mod}")
+        if (dt - draft_last_mod).seconds > (60 * 90):  # 1.5 hours - if admin is going to publish by copying from the dash, it will certainly be within that time!
+            break
+        else:
+            prev_states = draft["states"]
+            if DraftStates.PUBLISHED.name in [st["state"] for st in prev_states]:
+                debug("/mark_published: most recent Hebrew draft has already been published")
+                break
+            if DraftStates.PUBLISH_READY.name in [st["state"] for st in prev_states]:
+                debug("/mark_published: marking most recent Hebrew draft as published")
+                prev_states.append({"state":DraftStates.PUBLISHED.name, "at": dt.strftime('%Y%m%d-%H%M%S'), "by": cookie_user_info[Cookies.COOKIE_USER_NAME]})
+            draft.update({"states": prev_states})
+            datastore_client.put(draft)
+            break
+
+    return "OK"
 
 
 @tamtzit.route("/start_translation")

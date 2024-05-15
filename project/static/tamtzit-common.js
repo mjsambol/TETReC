@@ -45,6 +45,11 @@ function copyEditionTextToClipboard(button_id) {
     copyToClipboardTrick(txt);
 }
 
+async function notifyServerOfPublish(button_id) {
+    published_lang = button_id.substr(-2);
+    await fetch("/mark_published?lang=" + published_lang);
+}
+
 var focused = true;
 var latest_status = null;
 
@@ -95,13 +100,13 @@ async function updateStatus() {
             if (thelink == null) {
                 continue;
             }
-            thelink.addEventListener("click", function(event) {copyEditionTextToClipboard(event.target.id);});
+            thelink.addEventListener("click", function(event) {copyEditionTextToClipboard(event.target.id);notifyServerOfPublish(event.target.id);});
         }
     }
     if (stuff_happening) {
-        setTimeout(function(){updateStatus()}, 30000);   // update again in 30 seconds
+        setTimeout(function(){updateStatus()}, 10000);   // update again in 10 seconds
     } else {
-        setTimeout(function(){updateStatus()}, 120000);  // update again in 2 minutes. 
+        setTimeout(function(){updateStatus()}, 30000);  // update again in 30 seconds
     }
 
 };

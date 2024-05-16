@@ -3,19 +3,14 @@
         <title>Tamtzit - Hebrew Editing</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
         <script src="{{url_for('static', filename='tamtzit-common.js', version='20240510')}}"></script>
-        <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-
-        gtag('config', 'G-7WJQ95B6KX');
-        </script>        
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 
         <script>
             const TEXT_BEING_EDITED = "heb_text";
             const LENGTH_LABEL = "אורך:";
             const CHARACTERS_LABEL = "אותיות";
+
+            var user_role = "{{user_role}}"; // required for the status box
 
             function updatePreview() {
                 update_char_count();
@@ -43,7 +38,7 @@
             function disable_send_to_translators() {
                 document.getElementById("to_translation_button").style.backgroundColor="#66BB66";
                 document.getElementById("to_translation_button").disabled = true;
-                document.getElementById("done_button").disabled = false;
+                // document.getElementById("done_button").disabled = false;    // why is this here? Commenting this out 2024-05-16
             }
 
             function observe_only() {
@@ -57,9 +52,11 @@
             function enable_edit() {
                 document.getElementById("heb_text").disabled = false;
                 document.getElementById("edit_anyway_button").style.visibility = "hidden";
-                if (ok_to_translate) {
-                    document.getElementById("done_button").style.backgroundColor="#DDDDDD";
-                    document.getElementById("done_button").disabled = false;
+                if (ok_to_translate) { 
+                    if (user_role.includes("editor") || user_role.includes("admin")) {
+                        document.getElementById("done_button").style.backgroundColor="#DDDDDD";
+                        document.getElementById("done_button").disabled = false;
+                    }
                 } else {
                     document.getElementById("to_translation_button").disabled = false;
                     document.getElementById("to_translation_button").style.backgroundColor="#DDDDDD";
@@ -69,6 +66,7 @@
 
             function to_translators() {
                 disable_send_to_translators();
+                observe_only();
                 ok_to_translate = true;
                 saveDraft(force=true);
             }

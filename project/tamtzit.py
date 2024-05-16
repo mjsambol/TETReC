@@ -167,8 +167,9 @@ def create_draft(heb_text, user_info, translation_text='', translation_lang='en'
     entity.update({"hebrew_text": heb_text, "heb_draft_id": heb_draft_id, 
                    "translation_text": translation_text, "translation_lang": translation_lang, 
                    "timestamp": draft_timestamp, "last_edit": draft_timestamp, 
-                   "is_finished": False, "ok_to_translate": False, "created_by": user_info["user_id"],
-                   "states":[{"state": DraftStates.WRITING.name, "at": draft_timestamp.strftime('%Y%m%d-%H%M%S'), "by": user_info[Cookies.COOKIE_USER_NAME]}]}) 
+                   "is_finished": False, "ok_to_translate": False, "created_by": user_info.key.id,
+                   "states":[{"state": DraftStates.WRITING.name, "at": draft_timestamp.strftime('%Y%m%d-%H%M%S'), 
+                              "by": user_info["name"], "by_heb": user_info["name_hebrew"]}]}) 
     datastore_client.put(entity)
     entity = datastore_client.get(entity.key)
     return entity.key
@@ -243,7 +244,8 @@ def update_translation_draft(draft_key, translated_text, user_info, is_finished=
     # this method is specific to translation and the only states the tool supports right now for translation
     # are writing and publish_ready. Later it will be good to add additional states, at least edit_ready and published
     if is_finished and DraftStates.PUBLISH_READY.name not in [states_entry["state"] for states_entry in prev_states]:
-        prev_states.append({"state":DraftStates.PUBLISH_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), "by": user_info["name"]})
+        prev_states.append({"state":DraftStates.PUBLISH_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), 
+                            "by": user_info["name"], "by_heb": user_info["name_hebrew"]})
 
     datastore_client.put(draft)
 
@@ -304,20 +306,24 @@ def update_hebrew_draft(draft_key, hebrew_text, user_info, is_finished=False, ok
     prev_states = draft["states"]
 
     if ok_to_translate and DraftStates.EDIT_READY.name not in [states_entry["state"] for states_entry in prev_states]:
-        prev_states.append({"state":DraftStates.EDIT_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), "by": user_info["name"]})
+        prev_states.append({"state":DraftStates.EDIT_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), 
+                            "by": user_info["name"], "by_heb": user_info["name_hebrew"]})
     
     if "editor" in user_info["role"]:
         if DraftStates.EDIT_ONGOING.name not in [states_entry["state"] for states_entry in prev_states]:
-            prev_states.append({"state":DraftStates.EDIT_ONGOING.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), "by": user_info["name"]})
+            prev_states.append({"state":DraftStates.EDIT_ONGOING.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), 
+                                "by": user_info["name"], "by_heb": user_info["name_hebrew"]})
 
         # has the bottom 20% of text changed from what it was originally?
         bottom_20_percent_changed = do_edits_reach_last_two_sections(draft)
 
         if bottom_20_percent_changed and DraftStates.EDIT_NEAR_DONE.name not in [states_entry["state"] for states_entry in prev_states]:
-            prev_states.append({"state":DraftStates.EDIT_NEAR_DONE.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), "by": user_info["name"]})
+            prev_states.append({"state":DraftStates.EDIT_NEAR_DONE.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), 
+                                "by": user_info["name"], "by_heb": user_info["name_hebrew"]})
         
     if is_finished and DraftStates.PUBLISH_READY.name not in [states_entry["state"] for states_entry in prev_states]:
-        prev_states.append({"state":DraftStates.PUBLISH_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), "by": user_info["name"]})
+        prev_states.append({"state":DraftStates.PUBLISH_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), 
+                            "by": user_info["name"], "by_heb": user_info["name_hebrew"]})
 
     datastore_client.put(draft)
 
@@ -435,7 +441,7 @@ def validate_weekly_birthcert(bcert):
             return True
     return False
 
-@cachetools.func.ttl_cache(ttl=600)
+@cachetools.func.ttl_cache(ttl=300)
 def get_user(email=None, user_id=None):
     debug("getting users from DB...")
 
@@ -653,7 +659,7 @@ def refresh_cookies(request, response):
         response.set_cookie('tamtzit_prefs', site_prefs, expires=datetime.now() + timedelta(days=100), domain='.' + request.host)
 
 
-@cachetools.func.ttl_cache(ttl=25)  # note that this only works when the method has an input param!
+@cachetools.func.ttl_cache(ttl=15)  # note that this only works when the method has an input param!
 def get_cachable_status(role):
     debug("fetching uncached status info")
     status_per_lang = {}
@@ -736,7 +742,6 @@ def route_use_invitation_link():
 @require_role("Hebrew")
 def route_hebrew_template():
     next_page = detect_mobile(request, "hebrew")
-    cookie_user_info = user_data_from_req(request)
 
     # is there a Hebrew draft from the last 3 hours [not a criteria: that's not yet "Done"]
     drafts, local_tses = fetch_drafts()
@@ -767,20 +772,22 @@ def route_hebrew_template():
                                 ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
                                 is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
                                 heb_font_size=get_font_sz_prefs(request)['he'], user_name=draft_creator_user_info["name_hebrew"],
-                                states=draft['states']))
+                                states=draft['states'], user_role=draft_creator_user_info['role']))
         refresh_cookies(request, response)
         return response
             
     # if no current draft was found, create a new one so that we have a key to work with and save to while editing
-    key = create_draft('', cookie_user_info, translation_lang='--')
-    draft_creator_user_info = get_user(user_id=cookie_user_info[Cookies.COOKIE_USER_ID])
+    draft_creator_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
+    key = create_draft('', draft_creator_user_info, translation_lang='--')
 
     debug(f'Creating a new Hebrew draft with key {key.to_legacy_urlsafe().decode("utf8")}')
     date_info = make_date_info(dt, 'he')
     response = make_response(render_template(next_page, date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"), 
                             ok_to_translate=False, is_finished=False, in_progress=False,
                             heb_font_size=get_font_sz_prefs(request)['he'], user_name=draft_creator_user_info["name_hebrew"], 
-                            states=[{"state":DraftStates.WRITING.name, "at":dt.strftime('%Y%m%d-%H%M%S'), "by": draft_creator_user_info["name"]}]))
+                            states=[{"state":DraftStates.WRITING.name, "at":dt.strftime('%Y%m%d-%H%M%S'), 
+                                     "by": draft_creator_user_info["name"], "by_heb": draft_creator_user_info["name_hebrew"]}],
+                                     user_role=draft_creator_user_info['role']))
     refresh_cookies(request, response)
     return response
 
@@ -797,7 +804,7 @@ def route_administration():
 @require_role("admin")
 def route_hebrew_restart():
     next_page = detect_mobile(request, "hebrew")
-    cookie_user_info = user_data_from_req(request)
+    db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
 
     # is there a Hebrew draft from the last 3 hours [not a criteria: that's not yet "Done"]
     drafts, local_tses = fetch_drafts()
@@ -818,7 +825,8 @@ def route_hebrew_restart():
             draft.update({"last_edit": edit_timestamp}) 
             draft.update({"is_finished": True})
             prev_states = draft["states"]
-            prev_states.append({"state":DraftStates.ADMIN_CLOSED.name, "at": dt.strftime('%Y%m%d-%H%M%S'), "by": cookie_user_info[Cookies.COOKIE_USER_NAME]})
+            prev_states.append({"state":DraftStates.ADMIN_CLOSED.name, "at": dt.strftime('%Y%m%d-%H%M%S'), 
+                                "by": db_user_info["name"], "by_heb": db_user_info["name_hebrew"]})
             draft.update({"states": prev_states})
             datastore_client.put(draft)
             break
@@ -838,9 +846,9 @@ def route_set_debug_mode():
 @require_role("admin")
 def route_mark_published():
     edition_lang = request.args.get("lang")
-    cookie_user_info = user_data_from_req(request)
+    db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
 
-    debug(f"mark_published: {edition_lang} has been copied by {cookie_user_info[Cookies.COOKIE_USER_NAME]}")
+    debug(f"mark_published: {edition_lang} has been copied by {db_user_info['name']}")
 
     drafts, local_tses = fetch_drafts()
     debug("Drafts is " + ("" if drafts is None else "not ") + "null")
@@ -851,7 +859,7 @@ def route_mark_published():
             continue
 
         draft_last_mod = draft['last_edit']
-        debug(f"/heb-restart: draft's last edit is {draft_last_mod}, it's now {dt}, delta is {dt - draft_last_mod}")
+        debug(f"/mark_published: draft's last edit is {draft_last_mod}, it's now {dt}, delta is {dt - draft_last_mod}")
         if (dt - draft_last_mod).seconds > (60 * 90):  # 1.5 hours - if admin is going to publish by copying from the dash, it will certainly be within that time!
             break
         else:
@@ -861,7 +869,8 @@ def route_mark_published():
                 break
             if DraftStates.PUBLISH_READY.name in [st["state"] for st in prev_states]:
                 debug("/mark_published: marking most recent Hebrew draft as published")
-                prev_states.append({"state":DraftStates.PUBLISHED.name, "at": dt.strftime('%Y%m%d-%H%M%S'), "by": cookie_user_info[Cookies.COOKIE_USER_NAME]})
+                prev_states.append({"state":DraftStates.PUBLISHED.name, "at": dt.strftime('%Y%m%d-%H%M%S'), 
+                                    "by": db_user_info["name"], "by_heb": db_user_info["name_hebrew"]})
             draft.update({"states": prev_states})
             datastore_client.put(draft)
             break
@@ -970,10 +979,10 @@ def process():
     translated = re.sub('\n{3,}', '\n\n', translated)  # this is necessary because the template can generate large gaps due to unused sections
 
     # store the draft in DB so that someone else can continue the translation work
-    key = create_draft(heb_text, basic_user_info, translation_text=translated, translation_lang=target_language_code, heb_draft_id=request.form.get('heb_draft_id'))
+    key = create_draft(heb_text, user_info, translation_text=translated, translation_lang=target_language_code, heb_draft_id=request.form.get('heb_draft_id'))
     return render_template(next_page, heb_text=Markup(heb_text), translated=Markup(translated), lang=target_language_code, in_progress=False, user_info=user_info,
                            heb_font_size=font_size_prefs['he'], en_font_size=font_size_prefs['en'], 
-                           states=[{"state":DraftStates.WRITING.name, "at":draft_timestamp, "by":user_info["name"]}],
+                           states=[{"state":DraftStates.WRITING.name, "at":draft_timestamp, "by":user_info["name"], "by_heb": user_info["name_hebrew"]}],
                            draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=request.form.get('heb_draft_id'))
 
 

@@ -745,7 +745,8 @@ def route_hebrew_template():
 
     # is there a Hebrew draft from the last 3 hours [not a criteria: that's not yet "Done"]
     drafts, local_tses = fetch_drafts()
-    debug("Drafts is " + ("" if drafts is None else "not ") + "null")
+    current_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
+    debug(f"/heb: user={current_user_info['name']}, Drafts is {'' if drafts is None else 'not '} null")
 
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
     for draft in drafts:
@@ -771,23 +772,22 @@ def route_hebrew_template():
                                 draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
                                 ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
                                 is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
-                                heb_font_size=get_font_sz_prefs(request)['he'], user_name=draft_creator_user_info["name_hebrew"],
-                                states=draft['states'], user_role=draft_creator_user_info['role']))
+                                heb_font_size=get_font_sz_prefs(request)['he'], author_user_name=draft_creator_user_info["name_hebrew"],
+                                states=draft['states'], user_role=current_user_info['role']))
         refresh_cookies(request, response)
         return response
             
     # if no current draft was found, create a new one so that we have a key to work with and save to while editing
-    draft_creator_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
-    key = create_draft('', draft_creator_user_info, translation_lang='--')
+    key = create_draft('', current_user_info, translation_lang='--')
 
     debug(f'Creating a new Hebrew draft with key {key.to_legacy_urlsafe().decode("utf8")}')
     date_info = make_date_info(dt, 'he')
     response = make_response(render_template(next_page, date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"), 
                             ok_to_translate=False, is_finished=False, in_progress=False,
-                            heb_font_size=get_font_sz_prefs(request)['he'], user_name=draft_creator_user_info["name_hebrew"], 
+                            heb_font_size=get_font_sz_prefs(request)['he'], author_user_name=current_user_info["name_hebrew"], 
                             states=[{"state":DraftStates.WRITING.name, "at":dt.strftime('%Y%m%d-%H%M%S'), 
-                                     "by": draft_creator_user_info["name"], "by_heb": draft_creator_user_info["name_hebrew"]}],
-                                     user_role=draft_creator_user_info['role']))
+                                     "by": draft_creator_user_info["name"], "by_heb": current_user_info["name_hebrew"]}],
+                                     user_role=current_user_info['role']))
     refresh_cookies(request, response)
     return response
 

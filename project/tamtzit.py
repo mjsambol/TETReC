@@ -786,7 +786,7 @@ def route_hebrew_template():
                             ok_to_translate=False, is_finished=False, in_progress=False,
                             heb_font_size=get_font_sz_prefs(request)['he'], author_user_name=current_user_info["name_hebrew"], 
                             states=[{"state":DraftStates.WRITING.name, "at":dt.strftime('%Y%m%d-%H%M%S'), 
-                                     "by": draft_creator_user_info["name"], "by_heb": current_user_info["name_hebrew"]}],
+                                     "by": current_user_info["name"], "by_heb": current_user_info["name_hebrew"]}],
                                      user_role=current_user_info['role']))
     refresh_cookies(request, response)
     return response

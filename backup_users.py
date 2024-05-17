@@ -1,4 +1,4 @@
-from common import *
+from project.common import *
 import json
 
 datastore_client = DatastoreClientProxy.get_instance()

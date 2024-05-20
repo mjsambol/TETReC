@@ -11,24 +11,20 @@
             <table border="0">
                 <tr>
                     <td>
-                        Enter the original Hebrew post below.<br>
-                        The header and footer are <b>not necessary</b>, they will be ignored and replaced.            
+                        <textarea name="orig_text" id="orig_text" rows="45" cols="80" dir="rtl">{{heb_text}}</textarea>
                     </td>
                     <td width="10"> </td>
-                    <td>Alternatively, if a draft is available,<br>
-                        You can select it below. </td>
-                </tr>
-                <tr>
-                    <td>
-                        <textarea name="orig_text" id="orig_text" rows="50" cols="80" dir="rtl">{{heb_text}}</textarea>
-                    </td>
-                    <td width="10"> </td>
-                    <td valign="top">
-                        <br>
+                    <td valign="top"><br>
+                        If a draft is available,<br>
+                            You can select it below.
+                            <br><br><br>
                         {% for draft in drafts %}
-                           {% if draft['translation_lang'] != '--' %}                                
-                             <a href="/draft?ts={{ draft['timestamp'].strftime('%Y%m%d-%H%M%S') }}">{{ local_timestamps[draft['timestamp']].strftime('%Y.%m.%d-%H:%M:%S') }}</a> 
-                                    ({{supported_langs[draft['translation_lang']]}})
+                           {% if draft['translation_lang'] != '--' %}                               
+                           <b>{{ local_timestamps[draft['timestamp']][0].strftime('%Y.%m.%d') }}:</b> 
+                             <a href="/draft?ts={{ draft['timestamp'].strftime('%Y%m%d-%H%M%S') }}">
+                                {{ local_timestamps[draft['timestamp']][0].strftime('%H:%M') }}
+                                 - {{ local_timestamps[draft['timestamp']][1].strftime('%H:%M') }}</a> 
+                                    ({{supported_langs[draft['translation_lang']]}}, by {{draft['states'][0]['by']}})
                              <br><br>
                            {% endif %}
                         {% endfor %}

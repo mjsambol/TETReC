@@ -5,12 +5,6 @@
         <script src="{{url_for('static', filename='tamtzit-common.js', version='20240516c')}}"></script>
     </head>    
     <body>
-        <div style="font-size: 25px;  font-family: Arial, Helvetica, sans-serif;">
-        
-        Enter the original Hebrew post below.<br>
-        The header and footer are <b>not necessary</b>, they will be ignored and replaced.            
-        </div>
-    <br><br>
 
     <form method="POST" action="/translate">
         <input type="hidden" name="heb_draft_id" value="{{draft_id}}">
@@ -39,9 +33,12 @@
     Alternatively, select a draft:
     <br><br>
     {% for draft in drafts %}       
-        {% if draft['translation_lang'] != '--' %}                                
-            <a href="/draft?ts={{ draft['timestamp'].strftime('%Y%m%d-%H%M%S') }}">{{ local_timestamps[draft['timestamp']].strftime('%Y.%m.%d-%H:%M:%S') }}</a> 
-                ({{supported_langs[draft['translation_lang']]}})
+        {% if draft['translation_lang'] != '--' %}         
+        <b>{{ local_timestamps[draft['timestamp']][0].strftime('%Y.%m.%d') }}:</b> 
+        <a href="/draft?ts={{ draft['timestamp'].strftime('%Y%m%d-%H%M%S') }}">
+           {{ local_timestamps[draft['timestamp']][0].strftime('%H:%M') }}
+            - {{ local_timestamps[draft['timestamp']][1].strftime('%H:%M') }}</a> 
+               ({{supported_langs[draft['translation_lang']]}}, by {{draft['states'][0]['by']}})
             <br><br>
         {% endif %}            
     {% endfor %}

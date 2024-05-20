@@ -52,82 +52,74 @@ async function notifyServerOfPublish(button_id) {
 
 // var focused = true;
 var latest_status = null;
-
-// window.onfocus = function() {
-//     focused = true;
-// };
-// window.onblur = function() {
-//     focused = false;
-//     stuff_happening = false;
-// };
+const lang_order = ['--', 'en', 'fr', 'YY'];
 
 async function updateStatus() {
-    if (document.visibilityState == "visible") {
-        let obj = await (await fetch("/status")).json();
-        latest_status = obj;
-        var status_msg = "מצב העבודה נכון ל " + obj['as_of'] + ":";
-        lang_order = ['--', 'en', 'fr', 'YY']
-        var stuff_happening = false;
-        for (lang of lang_order) {
-            if (lang in obj['by_lang']) {
-                status_msg = status_msg + "<br><br><b>" + obj['by_lang'][lang]['lang'] + ':</b> ';
-                if (obj['by_lang'][lang]['elapsed_since_last_edit'] > 3600) {
-                    status_msg = status_msg + "לא בתהליך";
-                } else {
-                    stuff_happening = true;
-
-                    edition_state = getLatestState(obj['by_lang'][lang]["states"]);
-                    status_msg = status_msg + edition_state['by_heb'] + " עבד\\ה עד ל" + obj['by_lang'][lang]['last_edit'];
-
-                    if (edition_state["state"] == "WRITING" || edition_state["state"] == "EDIT_READY") {
-
-                        if (lang == '--') {
-                            if (edition_state["state"] == "EDIT_READY") {
-                                status_msg = status_msg + ' -- <b><font color="#1a9c3b">';
-                            } else {
-                                status_msg = status_msg + ' -- <b><font color="#d6153c">לא ';
-                            }
-                            status_msg = status_msg + "מוכן לעריכה</font></b>";
+    var stuff_happening = false;
+    console.log(document.visibilityState);
+    if (document.visibilityState == "visible" || latest_status == null) {  // for some reason it's not executing on the first call on new tab, hopefully this helps
+        fetch("/status").then(
+            (response) => {return response.json();}
+        ).then(
+            (obj) => {
+                latest_status = obj;
+                var status_msg = "מצב העבודה נכון ל " + obj['as_of'] + ":";                
+                for (lang of lang_order) {
+                    if (lang in obj['by_lang']) {
+                        status_msg = status_msg + "<br><br><b>" + obj['by_lang'][lang]['lang'] + ':</b> ';
+                        if (obj['by_lang'][lang]['elapsed_since_last_edit'] > 3600) {
+                            status_msg = status_msg + "לא בתהליך";
+                        } else {
+                            stuff_happening = true;
+        
+                            edition_state = getLatestState(obj['by_lang'][lang]["states"]);
+                            status_msg = status_msg + edition_state['by_heb'] + " עבד\\ה עד ל" + obj['by_lang'][lang]['last_edit'];
+        
+                            if (edition_state["state"] == "WRITING" || edition_state["state"] == "EDIT_READY") {
+        
+                                if (lang == '--') {
+                                    if (edition_state["state"] == "EDIT_READY") {
+                                        status_msg = status_msg + ' -- <b><font color="#1a9c3b">';
+                                    } else {
+                                        status_msg = status_msg + ' -- <b><font color="#d6153c">לא ';
+                                    }
+                                    status_msg = status_msg + "מוכן לעריכה</font></b>";
+                                }
+                            } else if (edition_state["state"] == "EDIT_ONGOING" || edition_state["state"] == "EDIT_NEAR_DONE") {
+        
+                                status_msg = status_msg + " -- <b>" + STATE_NAMES_HEBREW[edition_state["state"]] + "</b>";
+        
+                            } else if (edition_state["state"] == "PUBLISH_READY" || edition_state["state"] == "PUBLISHED") {
+                                status_msg = status_msg + " <b>" + STATE_NAMES_HEBREW[edition_state["state"]] + "</b>";
+                                // the variable user_role is passed by the templating engine
+                                if (user_role.includes("admin")) {
+                                    status_msg = status_msg + " <button id=copyText" + lang + ">העתק תוכן</button>";
+                                }
+                            }        
                         }
-                    } else if (edition_state["state"] == "EDIT_ONGOING" || edition_state["state"] == "EDIT_NEAR_DONE") {
-
-                        status_msg = status_msg + " -- <b>" + STATE_NAMES_HEBREW[edition_state["state"]] + "</b>";
-
-                    } else if (edition_state["state"] == "PUBLISH_READY" || edition_state["state"] == "PUBLISHED") {
-                        status_msg = status_msg + " <b>" + STATE_NAMES_HEBREW[edition_state["state"]] + "</b>";
-                        // the variable user_role is passed by the templating engine
-                        if (user_role.includes("admin")) {
-                            status_msg = status_msg + " <button id=copyText" + lang + ">העתק תוכן</button>";
-                        }
-
                     }
-
-
-                    // if latest state is PUBLISH_READY show מוכן לשליחה
-
-                    // once published, נשלח
-
+                }
+                document.getElementById('translation_status').innerHTML= status_msg; 
+                for (lang of lang_order) {
+                    var thelink = document.getElementById('copyText' + lang);
+                    if (thelink == null) {
+                        continue;
+                    }
+                    thelink.addEventListener("click", function(event) {copyEditionTextToClipboard(event.target.id);notifyServerOfPublish(event.target.id);});
                 }
             }
-        }
-        document.getElementById('translation_status').innerHTML= status_msg; 
-        for (lang of lang_order) {
-            var thelink = document.getElementById('copyText' + lang);
-            if (thelink == null) {
-                continue;
-            }
-            thelink.addEventListener("click", function(event) {copyEditionTextToClipboard(event.target.id);notifyServerOfPublish(event.target.id);});
-        }
-    } else {
-        stuff_happening = false;
-    }
+        ).catch(function(error) {
+            console.log(error);
+        });
+    } 
+    
     if (stuff_happening) {
         setTimeout(function(){updateStatus()}, 10000);   // update again in 10 seconds
     } else {
         setTimeout(function(){updateStatus()}, 30000);  // update again in 30 seconds
     }
-
-};
+}
+            
 
 async function getLatestStatus(also_call) {
     // this is very similar to updateStatus() 

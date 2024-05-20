@@ -174,6 +174,8 @@ def create_draft(heb_text, user_info, translation_text='', translation_lang='en'
     entity = datastore_client.get(entity.key)
     return entity.key
 
+# this method is used to build a list of recent translations for the list which is shown on the 
+# input.html page, the main page where translators start a new draft
 def fetch_drafts(query_order="-timestamp"):
     query = datastore_client.query(kind="draft")
     query.order = [query_order]
@@ -181,12 +183,12 @@ def fetch_drafts(query_order="-timestamp"):
     drafts = query.fetch()
 
     now = datetime.now(tz=ZoneInfo('UTC'))
-    drafts_local_timestamp = {}
+    drafts_local_timestamps = {}
+    drafts_to_return = []
 
     for draft in drafts:
-        ts = draft['timestamp']
-        drafts_local_timestamp[ts] = ts.astimezone(JERUSALEM_TZ)
-        if (now - ts).days > 0 or (now - ts).seconds > DRAFT_TTL:
+        draft_start_ts = draft['timestamp']
+        if (now - draft_start_ts).days > 0 or (now - draft_start_ts).seconds > DRAFT_TTL:
             datastore_client.delete(draft.key)
             # also delete all the history of edits to that draft
             query2 = datastore_client.query(kind="draft_backup")
@@ -195,8 +197,13 @@ def fetch_drafts(query_order="-timestamp"):
             for dbkup in draft_backups:
                 debug("found a backup, deleting it")
                 datastore_client.delete(dbkup.key)
+        else:
+            draft_last_change_ts = draft['last_edit']
+            drafts_local_timestamps[draft_start_ts] = (draft_start_ts.astimezone(JERUSALEM_TZ), draft_last_change_ts.astimezone(JERUSALEM_TZ))
+            drafts_to_return.append(draft)
             
-    return query.fetch(), drafts_local_timestamp
+    return drafts_to_return, drafts_local_timestamps
+    
 
 def create_draft_history(draft):
     key = datastore_client.key("draft_backup")
@@ -333,20 +340,6 @@ def update_hebrew_draft(draft_key, hebrew_text, user_info, is_finished=False, ok
 
     if is_finished:
         update_archive(draft)
-
-
-# This has been moved to the tamtzit_reader project
-#
-# def get_latest_published(lang_code):
-#     drafts = fetch_drafts()[0]
-#     debug(f"get_latest_published({lang_code}): ...")
-#     for draft in drafts:
-#         debug(f"Checking: {draft['translation_lang']}")
-#         if lang_code == 'he' and 'is_finished' in draft and draft['is_finished'] == True:
-#             return draft
-#         if draft['translation_lang'] == lang_code and 'is_finished' in draft and draft['is_finished'] == True:
-#             return draft
-#     return None
 
 
 def create_invitation(user):

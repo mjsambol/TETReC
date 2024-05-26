@@ -2,7 +2,7 @@
     <head>
         <title>Tamtzit - Editing {{lang}}</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
-        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240516c')}}"></script>
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240522')}}"></script>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
         <script>
             const TEXT_BEING_EDITED = "translated_text";
@@ -300,7 +300,7 @@
         <table width="100%" border="0" cellspacing="10">
             <tr>
                 <td width="40%" valign="top" id="orig_heb_panel">
-                    <textarea id="heb_text_area" rows="40" style="width:100%; font-size:17px;" dir="rtl">{{heb_text}}</textarea>
+                    <textarea id="heb_text_area" rows="40" style="width:100%; font-size:17px; font-family:Calibri, sans-serif;" dir="rtl">{{heb_text}}</textarea>
                     <table width="100%">
                         <tr><br><br>
                             <td align="center"><button id="swap_hebrew_view" style="font-size: 16px; padding:6px 6px" onclick="swap_hebrew_view();" disabled>Show latest</button></td>                            

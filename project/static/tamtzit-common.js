@@ -63,43 +63,47 @@ async function updateStatus() {
         ).then(
             (obj) => {
                 latest_status = obj;
-                var status_msg = "מצב העבודה נכון ל " + obj['as_of'] + ":";                
+                var status_msg = "מצב העבודה נכון ל " + obj['as_of'] + ":";   
+                status_msg += "<br><br><table border=0 cellspacing='10px'>";
                 for (lang of lang_order) {
                     if (lang in obj['by_lang']) {
-                        status_msg = status_msg + "<br><br><b>" + obj['by_lang'][lang]['lang'] + ':</b> ';
+                        status_msg = status_msg + "<tr><td><b>" + obj['by_lang'][lang]['lang'] + ':</b> </td><td>';
                         if (obj['by_lang'][lang]['elapsed_since_last_edit'] > 3600) {
                             status_msg = status_msg + "לא בתהליך";
                         } else {
                             stuff_happening = true;
         
                             edition_state = getLatestState(obj['by_lang'][lang]["states"]);
-                            status_msg = status_msg + edition_state['by_heb'] + " עבד\\ה עד ל" + obj['by_lang'][lang]['last_edit'];
-        
+                            status_msg = status_msg + formatStateHistory(obj['by_lang'][lang]["states"]); 
+                            status_msg = status_msg.substring(0, status_msg.length - 4);
                             if (edition_state["state"] == "WRITING" || edition_state["state"] == "EDIT_READY") {
-        
+                                status_msg = status_msg + " עד ל " + obj['by_lang'][lang]['last_edit'];
                                 if (lang == '--') {
                                     if (edition_state["state"] == "EDIT_READY") {
                                         status_msg = status_msg + ' -- <b><font color="#1a9c3b">';
                                     } else {
                                         status_msg = status_msg + ' -- <b><font color="#d6153c">לא ';
                                     }
-                                    status_msg = status_msg + "מוכן לעריכה</font></b>";
+                                    status_msg = status_msg + "מוכן לעריכה</font></b></td>";
                                 }
                             } else if (edition_state["state"] == "EDIT_ONGOING" || edition_state["state"] == "EDIT_NEAR_DONE") {
         
                                 status_msg = status_msg + " -- <b>" + STATE_NAMES_HEBREW[edition_state["state"]] + "</b>";
+                                status_msg = status_msg + " עד ל" + obj['by_lang'][lang]['last_edit'] + "</td>";
         
                             } else if (edition_state["state"] == "PUBLISH_READY" || edition_state["state"] == "PUBLISHED") {
-                                status_msg = status_msg + " <b>" + STATE_NAMES_HEBREW[edition_state["state"]] + "</b>";
+                                status_msg = status_msg + "</td><td> <b>" + STATE_NAMES_HEBREW[edition_state["state"]] + "</b></td><td>";
                                 // the variable user_role is passed by the templating engine
                                 if (user_role.includes("admin")) {
                                     status_msg = status_msg + " <button id=copyText" + lang + ">העתק תוכן</button>";
                                 }
+                                status_msg = status_msg + "</td>";
                             }        
                         }
+                        status_msg = status_msg + "</tr>";
                     }
                 }
-                document.getElementById('translation_status').innerHTML= status_msg; 
+                document.getElementById('translation_status').innerHTML= status_msg + "</table>"; 
                 for (lang of lang_order) {
                     var thelink = document.getElementById('copyText' + lang);
                     if (thelink == null) {
@@ -156,7 +160,7 @@ function update_char_count() {
         }
     } else {
         document.getElementById("char_count").style.color="#000000";
-        if ((last_chunk.indexOf("https://") == -1) && (entry_len + link_to_subscribe < 4000)) {
+        if ((last_chunk.indexOf("https://") == -1) && (entry_len + link_to_subscribe.length < 4000)) {
             // include the link to subscribe
             translated_text = translated_text.substring(0, strip_from) + link_to_subscribe + last_chunk;
             document.getElementById(TEXT_BEING_EDITED).value = translated_text;
@@ -182,35 +186,28 @@ const STATE_NAMES_HEBREW = {
 }
 
 function getLatestState(state_arr) {
-    for (st of state_arr) {
-        if (st["state"] == "PUBLISHED") {
-            return st;
-        }
+    var states_in_order = ["PUBLISHED", "PUBLISH_READY", "EDIT_NEAR_DONE", "EDIT_ONGOING", "EDIT_READY", "WRITING"];
+    for (state_step of states_in_order) {
+        for (st of state_arr) {
+            if (st["state"] == state_step) {
+                return st;
+            }
+        }    
     }
-    for (st of state_arr) {
-        if (st["state"] == "PUBLISH_READY") {
-            return st;
-        }
+}
+
+function formatStateHistory(state_arr) {
+    var result_str = "";
+    var states_in_order = ["WRITING", "EDIT_READY", "EDIT_ONGOING", "EDIT_NEAR_DONE", "PUBLISH_READY"];//, "PUBLISHED"];
+    var prev_contributor = "";
+    for (state_step of states_in_order) {
+        for (st of state_arr) {
+            if ((st["state"] == state_step) && (st["by_heb"]) != prev_contributor) {
+                result_str += st["by_heb"] + " -> ";
+                prev_contributor = st["by_heb"];
+                break;
+            }
+        }    
     }
-    for (st of state_arr) {
-        if (st["state"] == "EDIT_NEAR_DONE") {
-            return st;
-        }
-    }
-    for (st of state_arr) {
-        if (st["state"] == "EDIT_ONGOING") {
-            return st;
-        }
-    }
-    for (st of state_arr) {
-        if (st["state"] == "EDIT_READY") {
-            return st;
-        }
-    }
-    for (st of state_arr) {
-        if (st["state"] == "WRITING") {
-            return st;
-        }
-    }
-    return st[0];
+    return result_str;
 }

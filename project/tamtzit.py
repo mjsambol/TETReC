@@ -64,59 +64,7 @@ def update_archive(draft):
 
     anchor = draft['timestamp'].astimezone(JERUSALEM_TZ).strftime('%Y-%m-%d') + '-' + date_info.part_of_day
 
-    new_entry = soup.new_tag("div")
-    new_entry.attrs['id'] = anchor
-    next_entry_tag.insert_after("\n\n", new_entry)
-
-    table_tag = soup.new_tag("table")
-    table_tag.attrs['border'] = '4'
-    table_tag.attrs['width'] = '750px'
-    table_tag.attrs['cellpadding'] = '20px'
-    new_entry.append(table_tag)
-
-    tr_tag = soup.new_tag("tr")
-    table_tag.append(tr_tag)
-
-    td_tag = soup.new_tag("td")
-    td_tag.attrs['id'] = anchor + "-td"
-    if lang_code == 'he':
-        td_tag.attrs['dir'] = 'rtl'
-        td_tag.attrs['align'] = 'right'
-    tr_tag.append(td_tag)
-
-    script_tag = soup.new_tag("script")
-    script_tag.string = f"document.getElementById('{anchor}-td').innerHTML = makeWhatsappPreview(`{draft['hebrew_text'] if lang_code == 'he' else draft['translation_text']}`);"
-    td_tag.append(script_tag)
-
-    other_langs_div = soup.new_tag("div")
-    other_langs_div.attrs['style'] = "padding-top: 10px; font-weight: bold;"
-    other_langs_div.string = "Other Languages:"
-    new_entry.append("\n")
-    new_entry.append(other_langs_div)
-
-    section_divider_tag = soup.new_tag("hr")
-    new_entry.insert_after(section_divider_tag)
-
-    if lang_code != 'fr':
-        link_to_fr = soup.new_tag("a")
-        link_to_fr.attrs['href'] = f'{ARCHIVE_BASE}archive-fr.html#{anchor}'
-        link_to_fr.attrs['style'] = "padding-left: 20px;"
-        link_to_fr.string = 'French'
-        other_langs_div.insert_after(link_to_fr)
-
-    if lang_code != 'en':
-        link_to_en = soup.new_tag("a")
-        link_to_en.attrs['href'] = f'{ARCHIVE_BASE}archive-en.html#{anchor}'
-        link_to_en.attrs['style'] = "padding-left: 20px;"
-        link_to_en.string = 'English'
-        other_langs_div.insert_after(link_to_en)
-
-    if lang_code != 'he':
-        link_to_he = soup.new_tag("a")
-        link_to_he.attrs['href'] = f'{ARCHIVE_BASE}archive-he.html#{anchor}'
-        link_to_he.attrs['style'] = "padding-left: 20px;"
-        link_to_he.string = 'Hebrew'
-        other_langs_div.insert_after(link_to_he)
+    make_new_archive_entry(soup, next_entry_tag, draft, anchor, lang_code)
 
     blob = archive_bucket.blob(f"archive-{lang_code}.html")
     blob.upload_from_string(str(soup))
@@ -608,10 +556,10 @@ def route_create():
         return render_template(detect_mobile(request, 'index'), user_role=role)
     elif request.method == "HEAD":
         debug("top-level: responding to head request with empty ...")
-        return '';
+        return ''
     else:
         debug(f"top-level got unexpected request type {request.method}")
-        return ("UH oh")
+        return "UH oh"
 
 
 
@@ -1043,7 +991,164 @@ def get_untranslated_additions():
     response = Markup(json.dumps({"additions":additions_by_section, "translated_additions":translated_additions_by_section}))
     print(response)
     return response
+
+
+def make_new_archive_entry(soup, next_entry_tag, draft, anchor, lang_code):
+    new_entry = soup.new_tag("div")
+    new_entry.attrs['id'] = anchor
+    next_entry_tag.insert_after("\n\n", new_entry)
+
+    table_tag = soup.new_tag("table")
+    table_tag.attrs['border'] = '4'
+    table_tag.attrs['width'] = '750px'
+    table_tag.attrs['cellpadding'] = '20px'
+    new_entry.append(table_tag)
+
+    tr_tag = soup.new_tag("tr")
+    table_tag.append(tr_tag)
+
+    td_tag = soup.new_tag("td")
+    td_tag.attrs['id'] = anchor + "-td"
+    if lang_code == 'he':
+        td_tag.attrs['dir'] = 'rtl'
+        td_tag.attrs['align'] = 'right'
+    tr_tag.append(td_tag)
+
+    script_tag = soup.new_tag("script")
+    script_tag.string = f"document.getElementById('{anchor}-td').innerHTML = makeWhatsappPreview(`{draft['hebrew_text'] if lang_code == 'he' else draft['translation_text']}`);"
+    td_tag.append(script_tag)
+
+    other_langs_div = soup.new_tag("div")
+    other_langs_div.attrs['id'] = anchor + "-other-langs"
+    other_langs_div.attrs['style'] = "padding-top: 10px; font-weight: bold;"
+    other_langs_div.string = "Other Languages:"
+    new_entry.append("\n")
+    new_entry.append(other_langs_div)
+
+    section_divider_tag = soup.new_tag("hr")
+    new_entry.insert_after(section_divider_tag)
+
+    if lang_code != 'fr':
+        link_to_fr = soup.new_tag("a")
+        link_to_fr.attrs['href'] = f'{ARCHIVE_BASE}archive-fr.html#{anchor}'
+        link_to_fr.attrs['style'] = "padding-left: 20px;"
+        link_to_fr.string = 'French'
+        other_langs_div.append(link_to_fr)
+
+    if lang_code != 'en':
+        link_to_en = soup.new_tag("a")
+        link_to_en.attrs['href'] = f'{ARCHIVE_BASE}archive-en.html#{anchor}'
+        link_to_en.attrs['style'] = "padding-left: 20px;"
+        link_to_en.string = 'English'
+        other_langs_div.append(link_to_en)
+
+    if lang_code != 'he':
+        link_to_he = soup.new_tag("a")
+        link_to_he.attrs['href'] = f'{ARCHIVE_BASE}archive-he.html#{anchor}'
+        link_to_he.attrs['style'] = "padding-left: 20px;"
+        link_to_he.string = 'Hebrew'
+        other_langs_div.append(link_to_he)
+
+
+@tamtzit.route('/nightly_archive_cleanup')
+def nightly_archive_cleanup():
+    # as this is meant to be called only by the App Engine scheduler, we check an expected header
+    # and if it's not there, reject the request
+    # X-Appengine-Cron: true
+    debug("Cleaning the day's archive entries...")
+    if 'X-Appengine-Cron' not in request.headers or request.headers['X-Appengine-Cron'] != 'true':
+        debug("This request does not come from AppEngine, so ignoring it.")
+        # return
+    
+    debug(f"n_a_c headers look good, progressing")
+    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+
+    # make a map of each language's most mature editions from the last day
+    latest_drafts, _ = fetch_drafts()
+    yesterdays_editions = defaultdict(dict)
+    for draft in latest_drafts:
+        draft_lang = 'he' if draft['translation_lang'] == '--' else draft['translation_lang']
+        draft_time_of_day = get_edition_name_from_text(draft)
+        debug(f"Checking latest draft - is this one that was publish ready? {draft['states']}")
+        if ("PUBLISH_READY" in [st["state"] for st in draft['states']]) and (draft_time_of_day not in yesterdays_editions[draft_lang]):
+            yesterdays_editions[draft_lang][draft_time_of_day] = draft
+            debug(f"added {draft_time_of_day} to yesterdays_Editions for lang {draft_lang}")
         
+    # For each language which is archived:
+    for lang in ['he', 'en', 'fr']:
+        debug(f"n_a_c cleaning up archive for {lang}")
+
+        # step 1: get the relevant archive page
+        prev_archive = requests.get(f"{ARCHIVE_BASE}archive-{lang}.html").text
+        soup = BeautifulSoup(prev_archive, "html.parser")
+        next_entry_tag = soup.find(id='next-entry')  # we'll use it later to insert content
+        debug(f"n_a_c archive fetched")
+
+        # step 2: strip out all of yesterday's entries from the archives, if any
+        for div in soup.find_all("div"):
+            if div is None:
+                debug("Strange - got a None div, continuing...")
+                continue
+            if div.decomposed:
+                debug("Skipping an inner decomposed div")
+                continue
+            if div.attrs is None:
+                debug("Strange - div's attrs is None. Probably the inner div of the div we just deleted, continuing...")
+                continue
+            if 'id' not in div.attrs:
+                debug(f"Deleting a div with no id: {div}")
+                div.decompose()  
+                continue
+            if div.attrs['id'] == 'next-entry':
+                debug("skipping next-entry div")
+                continue
+            if div.attrs['id'].startswith(yesterday):
+                debug(f"deleting a yesterday div: \n{div}")
+                div.decompose()
+                continue
+        debug("n_a_c Done deleting yesterday's entries")
+
+        # step 3: insert (in reverse chronological order) 1 entry for each of yestderday's editions        
+        for edition_time_of_day in reversed(yesterdays_editions[lang]):
+
+            edition = yesterdays_editions[lang][edition_time_of_day]
+            anchor = edition['timestamp'].astimezone(JERUSALEM_TZ).strftime('%Y-%m-%d') + '-' + edition_time_of_day
+
+            make_new_archive_entry(soup, next_entry_tag, edition, anchor, lang)
+            debug(f"n_a_c inserted entry for {edition_time_of_day}")
+
+            # step 3b: save state change history to our audit table
+            key=datastore_client.key("audit")        
+            entity = datastore.Entity(key=key)
+            entity.update({"date":yesterday, "edition":edition_time_of_day, "lang":lang, "states":edition['states']}) 
+            datastore_client.put(entity)
+
+        # step 4: push the updated page back to cloud storage
+        blob = archive_bucket.blob(f"archive-{lang}.html")
+        blob.upload_from_string(str(soup))
+        blob.content_type = "text/html; charset=utf-8"
+        blob.patch()
+        debug("DONE uploading new archive")
+
+    return "OK"
+
+
+def get_edition_name_from_text(edition, as_english_always=True):
+    lang = edition['translation_lang']
+    text = edition['hebrew_text']
+    debug(f"g_e_n_f_t: lang={lang}")
+    m = re.search("^\*?מהדורת ([א-ת]+),", text, re.MULTILINE)
+    if m:
+        debug(f"g_e_n_f_t found {m.group(1)}, localizing...")
+        edition_index = editions['he'].index(m.group(1))
+        if as_english_always:
+            return editions['en'][edition_index]
+        if lang == '--':
+            return m.group(1)
+        return editions[lang][edition_index]
+    debug(f"g_e_n_f_t: lang={lang}, can't find edition name, returning UNKNOWN, text was: \n\n{text}\n\n")
+    return "UNKNOWN"
+
 
 def process_translation_request(heb_text, target_language_code):
     # heb_lines = heb_text.split("\n")

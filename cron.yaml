@@ -1,0 +1,5 @@
+cron:
+- description: "nightly archive cleanup"
+  url: /nightly_archive_cleanup
+  schedule: every day 01:00
+  timezone: Asia/Jerusalem

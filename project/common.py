@@ -1,8 +1,15 @@
+from google.cloud import datastore
+from pyluach import dates
+from pyluach.utils import Transliteration
+
 import os
+from dataclasses import dataclass
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from google.cloud import datastore
 from enum import Enum, auto
+
+ARCHIVE_BASE = "https://storage.googleapis.com/tamtzit-archive/"
+JERUSALEM_TZ = ZoneInfo("Asia/Jerusalem")
 
 debug_state = os.getenv("FLASK_DEBUG") == "1"
 
@@ -50,6 +57,7 @@ class DraftStates(Enum):
     PUBLISHED = auto()
     ADMIN_CLOSED = auto()
 
+
 class DatastoreClientProxy:
 
     _proxy_instance = None
@@ -81,3 +89,40 @@ class DatastoreClientProxy:
     
     def query(self, kind):
         return self.client.query(kind =("debug_" if self.debug_mode else "") + kind)
+
+
+@dataclass
+class DateInfo():
+    part_of_day: str
+    day_of_week: str
+    hebrew_dom: int
+    hebrew_month: str
+    hebrew_year: int
+    secular_month: str
+    secular_dom: int
+    secular_year: int
+    day_of_war: int
+    hebrew_dom_he: str
+    hebrew_month_he: str
+    hebrew_year_he: str
+    motzei_shabbat_early: bool
+    erev_shabbat: bool
+
+    def __init__(self, dt, part_of_day, motzei_shabbat_early, erev_shabbat):
+        oct6 = datetime(2023,10,6,tzinfo=ZoneInfo('Asia/Jerusalem'))
+        heb_dt = dates.HebrewDate.from_pydate(dt)
+
+        self.part_of_day     = part_of_day
+        self.day_of_week     = dt.strftime('%A')
+        self.secular_month   = dt.strftime('%B') 
+        self.secular_dom     = dt.day
+        self.secular_year    = dt.year 
+        self.hebrew_dom      = heb_dt.day
+        self.hebrew_month    = heb_dt.month_name(transliteration=Transliteration.MODERN_ISRAELI)
+        self.hebrew_year     = heb_dt.year
+        self.day_of_war      = (dt - oct6).days
+        self.hebrew_dom_he   = heb_dt.hebrew_day()
+        self.hebrew_month_he = heb_dt.month_name(True)
+        self.hebrew_year_he  = heb_dt.hebrew_year()
+        self.erev_shabbat    = erev_shabbat
+        self.motzei_shabbat_early = motzei_shabbat_early

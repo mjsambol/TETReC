@@ -1,76 +1,30 @@
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
-import locale
-from collections import defaultdict
-import re
-import json
-from uuid import uuid4
-import functools
 import cachetools.func
-from flask import Blueprint, render_template, request, redirect, make_response
-from google.cloud import translate, datastore, storage
-from google.cloud.datastore.key import Key
-from google.cloud.datastore.query import PropertyFilter
-from dataclasses import dataclass
-from pyluach import dates
-from pyluach.utils import Transliteration
-from markupsafe import Markup
+from collections import defaultdict
+from datetime import datetime, timedelta
+import json
+import re
+from zoneinfo import ZoneInfo
+
 from bs4 import BeautifulSoup
+from flask import Blueprint, render_template, request, redirect, make_response
+from google.cloud import translate, datastore
+from google.cloud.datastore.key import Key
+from markupsafe import Markup
 import requests
-from requests.auth import HTTPBasicAuth
-from .translation_utils import *
-from .cookies import *
-from .common import *
-from .common import _set_debug
-from .language_mappings import *
+
+from .auth_utils import confirm_user_has_role, consume_invitation, create_invitation, get_user, require_login, require_role 
+from .auth_utils import send_invitation, validate_weekly_birthcert
+from .common import _set_debug, ARCHIVE_BASE, debug, DatastoreClientProxy, expand_lang_code, JERUSALEM_TZ
+from .cookies import Cookies, get_cookie_dict, get_today_noise, make_cookie_from_dict, make_daily_cookie, user_data_from_req
+from .draft_utils import create_draft, DraftStates, fetch_drafts, get_latest_day_worth_of_editions, make_date_info, make_new_archive_entry
+from .draft_utils import upload_to_cloud_storage, update_hebrew_draft, update_translation_draft
 from .diff_draft_versions import get_translated_additions_since_ok_to_translate
+from .language_mappings import editions, keywords, sections, supported_langs_mapping
+from .translation_utils import translate_text
 
-mailjet_basic_auth = HTTPBasicAuth('dbe7d877e71f69f13e19d2af6671f6cb', 'a7e171ca7aeb40920bc93f69d79459d6')   
-DRAFT_TTL = 60 * 60 * 24
-
-client = translate.TranslationServiceClient()
+translation_client = translate.TranslationServiceClient()
 
 datastore_client = DatastoreClientProxy.get_instance()
-
-storage_client = storage.Client()
-archive_bucket = storage_client.bucket("tamtzit-archive")
-ARCHIVE_BASE = "https://storage.googleapis.com/tamtzit-archive/"
-JERUSALEM_TZ = ZoneInfo("Asia/Jerusalem")
-
-############################################
-# Notes on use of GCP Cloud Storage (GCS)
-#   
-# For downloading a file:
-# https://github.com/googleapis/python-storage/blob/main/samples/snippets/storage_download_file.py
-# 
-# For uploading a file:
-# https://github.com/googleapis/python-storage/blob/main/samples/snippets/storage_upload_file.py
-# or to upload from memory:
-# https://github.com/googleapis/python-storage/blob/main/samples/snippets/storage_upload_from_memory.py
-# or from a stream:
-# https://github.com/googleapis/python-storage/blob/main/samples/snippets/storage_upload_from_stream.py
-# 
-def update_archive(draft):
-    debug("updating archive...")
-    lang_code = 'he' if draft["translation_lang"] == '--' else draft["translation_lang"]
-    if lang_code == 'YY':
-        return  # we're not archiving those editions as they're just a subset of the regular Hebrew content
-    
-    date_info = make_date_info(datetime.now(JERUSALEM_TZ), 'en')  # Forced to EN so that we get English anchor names
-    prev_archive = requests.get(f"{ARCHIVE_BASE}archive-{lang_code}.html").text
-
-    soup = BeautifulSoup(prev_archive, "html.parser")
-    next_entry_tag = soup.find(id='next-entry')
-
-    anchor = draft['timestamp'].astimezone(JERUSALEM_TZ).strftime('%Y-%m-%d') + '-' + date_info.part_of_day
-
-    make_new_archive_entry(soup, next_entry_tag, draft, anchor, lang_code)
-
-    blob = archive_bucket.blob(f"archive-{lang_code}.html")
-    blob.upload_from_string(str(soup))
-    blob.content_type = "text/html; charset=utf-8"
-    blob.patch()
-    debug("DONE uploading new archive")
 
 ############################################
 # Notes on use of GCP DataStore
@@ -102,265 +56,7 @@ def update_archive(draft):
 # to delete, use the key:
 # key.delete()
 
-def create_draft(heb_text, user_info, translation_text='', translation_lang='en', heb_draft_id=None):
-    '''Create a new entry in the Datastore, save the original text and, optionally, the translation, and return the new key and timestamp'''
-
-    if len(heb_text) > 0 and heb_draft_id is None:
-        debug("create_draft() ERROR: received heb_text but no heb_draft_id")
-        raise ValueError("No draft ID though text is present")
-
-    key=datastore_client.key("draft")
-    draft_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
-    entity = datastore.Entity(key=key, exclude_from_indexes=["hebrew_text","translation_text"])
-    entity.update({"hebrew_text": heb_text, "heb_draft_id": heb_draft_id, 
-                   "translation_text": translation_text, "translation_lang": translation_lang, 
-                   "timestamp": draft_timestamp, "last_edit": draft_timestamp, 
-                   "is_finished": False, "ok_to_translate": False, "created_by": user_info.key.id,
-                   "states":[{"state": DraftStates.WRITING.name, "at": draft_timestamp.strftime('%Y%m%d-%H%M%S'), 
-                              "by": user_info["name"], "by_heb": user_info["name_hebrew"]}]}) 
-    datastore_client.put(entity)
-    entity = datastore_client.get(entity.key)
-    return entity.key
-
-# this method is used to build a list of recent translations for the list which is shown on the 
-# input.html page, the main page where translators start a new draft
-def fetch_drafts(query_order="-timestamp"):
-    query = datastore_client.query(kind="draft")
-    query.order = [query_order]
-
-    drafts = query.fetch()
-
-    now = datetime.now(tz=ZoneInfo('UTC'))
-    drafts_local_timestamps = {}
-    drafts_to_return = []
-
-    for draft in drafts:
-        draft_start_ts = draft['timestamp']
-        if (now - draft_start_ts).days > 0 or (now - draft_start_ts).seconds > DRAFT_TTL:
-            datastore_client.delete(draft.key)
-            # also delete all the history of edits to that draft
-            query2 = datastore_client.query(kind="draft_backup")
-            query2.add_filter(filter=PropertyFilter("draft_id", "=", draft.key.id))
-            draft_backups = query2.fetch()
-            for dbkup in draft_backups:
-                debug("found a backup, deleting it")
-                datastore_client.delete(dbkup.key)
-        else:
-            draft_last_change_ts = draft['last_edit']
-            drafts_local_timestamps[draft_start_ts] = (draft_start_ts.astimezone(JERUSALEM_TZ), draft_last_change_ts.astimezone(JERUSALEM_TZ))
-            drafts_to_return.append(draft)
             
-    return drafts_to_return, drafts_local_timestamps
-    
-
-def create_draft_history(draft):
-    key = datastore_client.key("draft_backup")
-    entity = datastore.Entity(key=key, exclude_from_indexes=["hebrew_text","translation_text"])
-    entity.update({"draft_id":draft.key.id, "hebrew_text": draft["hebrew_text"], "translation_text": draft["translation_text"], 
-                   "translation_lang": draft["translation_lang"], "draft_timestamp": draft["timestamp"], "last_edit": draft["last_edit"], 
-                   "is_finished": draft["is_finished"], "ok_to_translate": draft["ok_to_translate"], "created_by": draft["created_by"],
-                   "states": draft["states"],
-                   "backup_timestamp": datetime.now(tz=ZoneInfo('Asia/Jerusalem'))})
-    datastore_client.put(entity)
-    entity = datastore_client.get(entity.key)
-    return entity.key
-    
-def store_draft_backup(draft, force_backup=False):
-    debug("checking whether to save a draft backup...")
-    prev_backup_time = 0
-    query2 = datastore_client.query(kind="draft_backup")
-    query2.order = ["-backup_timestamp"]
-    #query2.add_filter("draft_id", "=", draft.key.id)
-    draft_backups = query2.fetch()
-    for dbkup in draft_backups:
-        if dbkup["draft_id"] != draft.key.id:
-            debug("Found a backup but not for this draft")
-            continue
-        else:
-            debug(f"found a relevant backup which was created on {dbkup['backup_timestamp']}")
-            prev_backup_time = dbkup['backup_timestamp']
-            break
-    if prev_backup_time == 0:
-        debug("No prev backup found")
-    else:
-        debug(f'draft last edit is {draft["last_edit"]} so the backup is {draft["last_edit"] - prev_backup_time} which is {(draft["last_edit"] - prev_backup_time).seconds} seconds old')
-    if force_backup or prev_backup_time == 0 or (draft["last_edit"] - prev_backup_time).seconds > 90:
-        debug("creating a draft backup")
-        create_draft_history(draft)
-
-
-def update_translation_draft(draft_key, translated_text, user_info, is_finished=False):   # can't change the original Hebrew
-    draft = datastore_client.get(draft_key)
-    draft.update({"translation_text": translated_text})
-    draft.update({"is_finished": is_finished})
-    edit_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
-    draft.update({"last_edit": edit_timestamp}) 
-    prev_states = draft["states"]
-    # this method is specific to translation and the only states the tool supports right now for translation
-    # are writing and publish_ready. Later it will be good to add additional states, at least edit_ready and published
-    if is_finished and DraftStates.PUBLISH_READY.name not in [states_entry["state"] for states_entry in prev_states]:
-        prev_states.append({"state":DraftStates.PUBLISH_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), 
-                            "by": user_info["name"], "by_heb": user_info["name_hebrew"]})
-
-    datastore_client.put(draft)
-
-    # also store history in case of dramatic failure
-    store_draft_backup(draft)
-
-    if is_finished:
-        update_archive(draft)
-
-
-@cachetools.func.ttl_cache(ttl=600)
-def cache_heb_draft_text_before_edits(draft_id):
-    query2 = datastore_client.query(kind="draft_backup")
-    query2.order = ["-backup_timestamp"]
-    #query2.add_filter("draft_id", "=", draft.key.id)
-    draft_backups = query2.fetch()
-    for dbkup in draft_backups:
-        # this query says: give me the last backup *before* the text went into Edit mode
-        if dbkup["draft_id"] == draft_id and DraftStates.EDIT_ONGOING.name not in [states_entry["state"] for states_entry in dbkup["states"]]: 
-            return dbkup
-    return None  # should not happen but could: admin user creates a draft and this method is called on the first attempt to save
-            
-
-def do_edits_reach_last_two_sections(draft):
-    # be careful - we can't actually check against the 20% end of the string because the changes prior to it change where the last 20% starts!
-    # so instead we have to find the 2nd to last section heading in the original text, find that same heading in the new text, and see if there 
-    # are changes from there onward. If that heading isn't found in the new text, the answer is yes.
-    # first challenge - get SHIRA'S original version of the Hebrew text currently being changed
-    current_text = draft["hebrew_text"]
-    last_backup_before_editing = cache_heb_draft_text_before_edits(draft.key.id)
-    if not last_backup_before_editing:
-        return False
-    text_at_ready_to_edit = last_backup_before_editing["hebrew_text"]
-
-    orig_last_heading = text_at_ready_to_edit.rfind("📌")
-    orig_second_last_heading = text_at_ready_to_edit.rfind("📌", 0, orig_last_heading)
-    orig_last_chunk = text_at_ready_to_edit[orig_second_last_heading:]
-    curr_last_heading = current_text.rfind("📌")
-    curr_second_last_heading = current_text.rfind("📌", 0, curr_last_heading)
-    curr_last_chunk = current_text[curr_second_last_heading:]
-    # debug("Checking whether edits have reached the last section. Originally it was:")
-    # debug(orig_last_chunk)
-    # debug("Now the last section is:")
-    # debug(curr_last_chunk)
-    return curr_last_chunk != orig_last_chunk
-
-
-def update_hebrew_draft(draft_key, hebrew_text, user_info, is_finished=False, ok_to_translate=False):
-    draft = datastore_client.get(draft_key)
-    draft.update({"hebrew_text": hebrew_text})
-    draft.update({"is_finished": is_finished})
-    if ok_to_translate:  
-        # we don't want to ever change it back (on this draft) once it's set to true
-        draft.update({"ok_to_translate": True})
-    edit_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
-    draft.update({"last_edit": edit_timestamp}) 
-    draft.update({"translation_lang": '--'})
-    prev_states = draft["states"]
-
-    if ok_to_translate and DraftStates.EDIT_READY.name not in [states_entry["state"] for states_entry in prev_states]:
-        prev_states.append({"state":DraftStates.EDIT_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), 
-                            "by": user_info["name"], "by_heb": user_info["name_hebrew"]})
-    
-    if "editor" in user_info["role"]:
-        if DraftStates.EDIT_ONGOING.name not in [states_entry["state"] for states_entry in prev_states]:
-            prev_states.append({"state":DraftStates.EDIT_ONGOING.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), 
-                                "by": user_info["name"], "by_heb": user_info["name_hebrew"]})
-
-        # has the bottom 20% of text changed from what it was originally?
-        bottom_20_percent_changed = do_edits_reach_last_two_sections(draft)
-
-        if bottom_20_percent_changed and DraftStates.EDIT_NEAR_DONE.name not in [states_entry["state"] for states_entry in prev_states]:
-            prev_states.append({"state":DraftStates.EDIT_NEAR_DONE.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), 
-                                "by": user_info["name"], "by_heb": user_info["name_hebrew"]})
-        
-    if is_finished and DraftStates.PUBLISH_READY.name not in [states_entry["state"] for states_entry in prev_states]:
-        prev_states.append({"state":DraftStates.PUBLISH_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), 
-                            "by": user_info["name"], "by_heb": user_info["name_hebrew"]})
-
-    datastore_client.put(draft)
-
-    # also store history in case of dramatic failure
-    # and for reasons related to applying deltas in translation, we need to force save this as a backup
-    store_draft_backup(draft, force_backup=ok_to_translate)
-
-    if is_finished:
-        update_archive(draft)
-
-
-def create_invitation(user):
-    key=datastore_client.key("invitation")
-    entity = datastore.Entity(key=key)
-    entity.update({"creation_timestamp": datetime.now(tz=ZoneInfo('Asia/Jerusalem')),
-                   "user_id": user.key.id,
-                   "link_id": str(uuid4())}) 
-    datastore_client.put(entity)
-    entity = datastore_client.get(entity.key)
-    return entity
-
-def consume_invitation(invitation):
-    debug(f"Seeking DB invitation [{invitation}]")
-    query = datastore_client.query(kind="invitation")
-    query.add_filter(filter=PropertyFilter("link_id", "=", invitation))
-    found_invs = query.fetch()
-    now = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
-    for inv in found_invs:
-        debug(f"found {inv['link_id']}")
-        if inv['link_id'] == invitation:
-            if 'used_at_timestamp' in inv and inv['used_at_timestamp']:
-                debug("It's already been used.")
-                return None
-            if (now - inv['creation_timestamp']).days > 0 or (now - inv['creation_timestamp']).seconds > (60 * 60):
-                debug("It's expired, deleting it.")
-                datastore_client.delete(inv.key)
-                return None
-            debug("Invitation is valid, marking it used...")
-            inv.update({"used_at_timestamp": now})
-            datastore_client.put(inv)
-            user_details = get_user(user_id=inv["user_id"])
-            return user_details
-    debug("consume_invitation: Returning None")
-    return None
-
-
-@dataclass
-class DateInfo():
-    part_of_day: str
-    day_of_week: str
-    hebrew_dom: int
-    hebrew_month: str
-    hebrew_year: int
-    secular_month: str
-    secular_dom: int
-    secular_year: int
-    day_of_war: int
-    hebrew_dom_he: str
-    hebrew_month_he: str
-    hebrew_year_he: str
-    motzei_shabbat_early: bool
-    erev_shabbat: bool
-
-    def __init__(self, dt, part_of_day, motzei_shabbat_early, erev_shabbat):
-        oct6 = datetime(2023,10,6,tzinfo=ZoneInfo('Asia/Jerusalem'))
-        heb_dt = dates.HebrewDate.from_pydate(dt)
-
-        self.part_of_day     = part_of_day
-        self.day_of_week     = dt.strftime('%A')
-        self.secular_month   = dt.strftime('%B') 
-        self.secular_dom     = dt.day
-        self.secular_year    = dt.year 
-        self.hebrew_dom      = heb_dt.day
-        self.hebrew_month    = heb_dt.month_name(transliteration=Transliteration.MODERN_ISRAELI)
-        self.hebrew_year     = heb_dt.year
-        self.day_of_war      = (dt - oct6).days
-        self.hebrew_dom_he   = heb_dt.hebrew_day()
-        self.hebrew_month_he = heb_dt.month_name(True)
-        self.hebrew_year_he  = heb_dt.hebrew_year()
-        self.erev_shabbat    = erev_shabbat
-        self.motzei_shabbat_early = motzei_shabbat_early
-
 tamtzit = Blueprint('tamtzit', __name__)
 
 def detect_mobile(request, page_name):
@@ -371,114 +67,6 @@ def detect_mobile(request, page_name):
     else:
         next_pg = page_name + ".html"
     return next_pg
-
-@cachetools.func.ttl_cache(ttl=600)
-def validate_weekly_birthcert(bcert):
-    query = datastore_client.query(kind="crypto_noise")
-    daily_noise_entries = query.fetch()
-    for daily_noise_entry in daily_noise_entries:
-        daily_noise = daily_noise_entry["daily_noise"]
-        if daily_noise in bcert:
-            return True
-    return False
-
-@cachetools.func.ttl_cache(ttl=300)
-def get_user(email=None, user_id=None):
-    debug("getting users from DB...")
-
-    if email:
-        query = datastore_client.query(kind="user")
-        debug(f"Based on email {email}")
-        query.add_filter(filter=PropertyFilter("email", "=", email))
-        users = query.fetch()
-        for user in users:
-            debug(f"Got back {user}")
-            return user
-    elif user_id:
-        debug(f"Based on user ID {user_id}")
-        user = datastore_client.get(datastore_client.key("user", int(user_id)))
-        debug(f"Got back {user}")
-        return user
-
-    debug("No matching user found.")
-    return None
-
-def send_invitation(user_details, invitation):
-    email_message = (f"To access the Tamtzit HaChadashot Admin Application, click the link below:\n\n "
-                    f"{invitation}")
-
-    data={"Messages":[{"From":{"Email":"moshe.sambol@gmail.com", "Name":"Moshe Sambol"},
-                        "To":[{"Email":user_details["email"], "Name":user_details["name"]}],
-                        "Subject":"Tamtzit HaChadashot Admin App Access",
-                        "TextPart":email_message}]}
-    
-    mailjet_resp = requests.post("https://api.mailjet.com/v3.1/send", auth=mailjet_basic_auth, 
-                                headers={"Content-Type":"application/json"}, data=json.dumps(data))
-
-    debug(f'Sending invitation email - status: {mailjet_resp.json()["Messages"][0]["Status"]}')     
-
-
-def require_login(func):
-    @functools.wraps(func)    # this is necessary so that Flask routing will work!!
-    def authentication_check_wrapper(*args, **kwargs):
-        debug("Checking authentication status...")
-        # check if there is a cookie with a valid session cert (session cookie - short expiration, but saves checking the DB frequently)
-        # - that is, today's date + some noise encrypted with our key
-        # if there is, let the method which called us continue. 
-        # if not, redirect to /auth while passing the URL the user was requesting
-        session_cookie = request.cookies.get(Cookies.ONE_DAY_SESSION)
-        if session_cookie:
-            today_session = get_cookie_dict(request, Cookies.ONE_DAY_SESSION)
-        else:
-            debug("No session cookie found (orig style)")
-            session_cookie = request.cookies.get("tz_autha")
-            if session_cookie:
-                today_session = get_cookie_dict(request, "tz_autha")
-
-        if 'today_session' not in locals():
-            debug("tried everything, can't find a cookie. redirecting to auth.")
-            return redirect("/auth?requested=" + request.full_path)
-
-        today_noise = get_today_noise()
-        if Cookies.COOKIE_CERT in today_session and today_noise in today_session[Cookies.COOKIE_CERT]:
-            debug("Decrypted cookie is valid!")
-            return func(*args, **kwargs)
-        
-        debug("daily cookie found but expired / invalid")
-        return redirect("/auth?requested=" + request.full_path)
-
-    return authentication_check_wrapper
-
-def confirm_user_has_role(request, roles_accepted):
-    debug(f"Checking role requirements, looking for {roles_accepted}")
-    db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
-    roles = db_user_info['role']
-    debug(f"user has roles {roles}")
-    has_role = False
-    if type(roles_accepted) == str:
-        has_role = roles_accepted in roles
-    elif type(roles_accepted) == list:
-        for role in roles_accepted:
-            if role in roles:
-                has_role = True
-    return has_role
-
-def require_role(roles_accepted):
-    # the roles_accepted parameter can be either a string or a list of strings. 
-    # If a list, they are treated as "OR" - access is granted if the user has any 
-    def decorator_require_role(func):
-        @functools.wraps(func)    # this is necessary so that Flask routing will work!!
-        def role_check_wrapper(*args, **kwargs):
-            if confirm_user_has_role(request, roles_accepted):
-                return func(*args, **kwargs)
-            else:
-                return render_template("error.html", msg="You don't have access to this section.",
-                                    heb_msg="חלק הזה של האתר מיועד למשתמשים אחרים")
-        
-        return role_check_wrapper
-    return decorator_require_role
-
-#        response.set_cookie('tamtzit_prefs', site_prefs, expires=datetime.now() + timedelta(days=100))
 
 
     # at /auth, check if there is a 7-day cookie with a signed user ID. Look up the user ID in our DB, if found,
@@ -993,61 +581,30 @@ def get_untranslated_additions():
     return response
 
 
-def make_new_archive_entry(soup, next_entry_tag, draft, anchor, lang_code):
-    new_entry = soup.new_tag("div")
-    new_entry.attrs['id'] = anchor
-    next_entry_tag.insert_after("\n\n", new_entry)
+@tamtzit.route('/start_daily_summary')
+@require_login
+def start_daily_summary():
+    next_page = "start_daily_summary.html" # not doing detect mobile - there's only one version of this page, suitable for both desktop and mobile
 
-    table_tag = soup.new_tag("table")
-    table_tag.attrs['border'] = '4'
-    table_tag.attrs['width'] = '750px'
-    table_tag.attrs['cellpadding'] = '20px'
-    new_entry.append(table_tag)
-
-    tr_tag = soup.new_tag("tr")
-    table_tag.append(tr_tag)
-
-    td_tag = soup.new_tag("td")
-    td_tag.attrs['id'] = anchor + "-td"
-    if lang_code == 'he':
-        td_tag.attrs['dir'] = 'rtl'
-        td_tag.attrs['align'] = 'right'
-    tr_tag.append(td_tag)
-
-    script_tag = soup.new_tag("script")
-    script_tag.string = f"document.getElementById('{anchor}-td').innerHTML = makeWhatsappPreview(`{draft['hebrew_text'] if lang_code == 'he' else draft['translation_text']}`);"
-    td_tag.append(script_tag)
-
-    other_langs_div = soup.new_tag("div")
-    other_langs_div.attrs['id'] = anchor + "-other-langs"
-    other_langs_div.attrs['style'] = "padding-top: 10px; font-weight: bold;"
-    other_langs_div.string = "Other Languages:"
-    new_entry.append("\n")
-    new_entry.append(other_langs_div)
-
-    section_divider_tag = soup.new_tag("hr")
-    new_entry.insert_after(section_divider_tag)
-
-    if lang_code != 'fr':
-        link_to_fr = soup.new_tag("a")
-        link_to_fr.attrs['href'] = f'{ARCHIVE_BASE}archive-fr.html#{anchor}'
-        link_to_fr.attrs['style'] = "padding-left: 20px;"
-        link_to_fr.string = 'French'
-        other_langs_div.append(link_to_fr)
-
-    if lang_code != 'en':
-        link_to_en = soup.new_tag("a")
-        link_to_en.attrs['href'] = f'{ARCHIVE_BASE}archive-en.html#{anchor}'
-        link_to_en.attrs['style'] = "padding-left: 20px;"
-        link_to_en.string = 'English'
-        other_langs_div.append(link_to_en)
-
-    if lang_code != 'he':
-        link_to_he = soup.new_tag("a")
-        link_to_he.attrs['href'] = f'{ARCHIVE_BASE}archive-he.html#{anchor}'
-        link_to_he.attrs['style'] = "padding-left: 20px;"
-        link_to_he.string = 'Hebrew'
-        other_langs_div.append(link_to_he)
+    lang = request.args.get("lang") or 'he'
+    if lang == 'he':
+        if not confirm_user_has_role(request, ["Hebrew", "editor", "admin"]):
+            return render_template("error.html", msg="You don't have access to this section.",
+                                heb_msg="חלק הזה של האתר מיועד למשתמשים אחרים")
+    else:
+        raise ValueError("Invalid lang parameter for start_daily_summary")
+    
+    # this is a map from edition name (morning, afternoon, eve) to a draft object
+    yesterdays_editions = get_latest_day_worth_of_editions()[lang]
+    organized_editions = {}
+    for edition_time_of_day in yesterdays_editions:
+        edition = yesterdays_editions[edition_time_of_day]
+        processed_text_info = process_translation_request(edition['hebrew_text' if lang == 'he' else 'translation_text'], lang)
+        # we get back:
+        #  {'heb_text': heb_text, 'date_info': date_info, 'organized': organized, 'sections': sections[target_language_code]}
+        organized_editions[edition_time_of_day] = processed_text_info['organized']
+    return render_template(next_page, organized_editions=organized_editions, times_of_day = editions, 
+                           sections_in_order = sections['keys_from_Hebrew'])
 
 
 @tamtzit.route('/nightly_archive_cleanup')
@@ -1064,16 +621,8 @@ def nightly_archive_cleanup():
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
 
     # make a map of each language's most mature editions from the last day
-    latest_drafts, _ = fetch_drafts()
-    yesterdays_editions = defaultdict(dict)
-    for draft in latest_drafts:
-        draft_lang = 'he' if draft['translation_lang'] == '--' else draft['translation_lang']
-        draft_time_of_day = get_edition_name_from_text(draft)
-        debug(f"Checking latest draft - is this one that was publish ready? {draft['states']}")
-        if ("PUBLISH_READY" in [st["state"] for st in draft['states']]) and (draft_time_of_day not in yesterdays_editions[draft_lang]):
-            yesterdays_editions[draft_lang][draft_time_of_day] = draft
-            debug(f"added {draft_time_of_day} to yesterdays_Editions for lang {draft_lang}")
-        
+    yesterdays_editions = get_latest_day_worth_of_editions()
+
     # For each language which is archived:
     for lang in ['he', 'en', 'fr']:
         debug(f"n_a_c cleaning up archive for {lang}")
@@ -1124,30 +673,9 @@ def nightly_archive_cleanup():
             datastore_client.put(entity)
 
         # step 4: push the updated page back to cloud storage
-        blob = archive_bucket.blob(f"archive-{lang}.html")
-        blob.upload_from_string(str(soup))
-        blob.content_type = "text/html; charset=utf-8"
-        blob.patch()
-        debug("DONE uploading new archive")
+        upload_to_cloud_storage(f"archive-{lang}.html", str(soup))
 
     return "OK"
-
-
-def get_edition_name_from_text(edition, as_english_always=True):
-    lang = edition['translation_lang']
-    text = edition['hebrew_text']
-    debug(f"g_e_n_f_t: lang={lang}")
-    m = re.search("^\*?מהדורת ([א-ת]+),", text, re.MULTILINE)
-    if m:
-        debug(f"g_e_n_f_t found {m.group(1)}, localizing...")
-        edition_index = editions['he'].index(m.group(1))
-        if as_english_always:
-            return editions['en'][edition_index]
-        if lang == '--':
-            return m.group(1)
-        return editions[lang][edition_index]
-    debug(f"g_e_n_f_t: lang={lang}, can't find edition name, returning UNKNOWN, text was: \n\n{text}\n\n")
-    return "UNKNOWN"
 
 
 def process_translation_request(heb_text, target_language_code):
@@ -1169,7 +697,7 @@ def process_translation_request(heb_text, target_language_code):
     #         heb_lines.pop(i)
     #         break
 
-    if target_language_code == "YY":
+    if target_language_code in ["YY", "he"]:
         translated = heb_text
     else:
         translated = translate_text(heb_text, target_language_code)
@@ -1199,6 +727,9 @@ def process_translation_request(heb_text, target_language_code):
                 # which should be ignored
                 break
             else:
+                # @TODO
+                # this is where we need to check if we've got a special header, e.g. motzei Shabbat, and need to ignore it
+                # rather than add it to UNKNOWN
                 debug("post three dots, switching to 'unknown'")
                 section = organized['UNKNOWN']
                 continue
@@ -1216,12 +747,12 @@ def process_translation_request(heb_text, target_language_code):
             elif kw["jands"] in line.lower() and 'YandS' not in organized:
                 debug("starting J&S section")
                 section = organized['YandS']
-            elif kw["policy"] in line.lower() and "politics" in line.lower() and 'PandP' not in organized:
-                debug("starting policy section")
-                section = organized['PandP']
-            elif kw["in the world"] in line.lower() and "Worldwide" not in organized:
-                debug("starting world section")
-                section = organized["Worldwide"]
+            # elif kw["policy"] in line.lower() and "politics" in line.lower() and 'PandP' not in organized:
+            #     debug("starting policy section")
+            #     section = organized['PandP']
+            # elif kw["in the world"] in line.lower() and "Worldwide" not in organized:
+            #     debug("starting world section")
+            #     section = organized["Worldwide"]
             elif section is not None:
                 debug("inside a section")
                 section.append(Markup(line))
@@ -1237,7 +768,7 @@ def process_translation_request(heb_text, target_language_code):
                 debug("starting inIsrael section")
                 section = organized['InIsrael']
             elif kw["world"] in line.lower():
-                debug("staerting world section")
+                debug("starting world section")
                 section = organized["Worldwide"]
             elif kw["policy"] in line.lower() and kw["politics"] in line.lower():
                 debug("starting policy section")
@@ -1266,8 +797,6 @@ def process_translation_request(heb_text, target_language_code):
                 debug("Adding to unknown (b): " + line)
 
             section.append(Markup(line))
-            if section == organized['UNKNOWN']:
-                debug("Adding to unknown (c):" + line)
    
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
     date_info = make_date_info(dt, target_language_code)
@@ -1280,21 +809,6 @@ def process_translation_request(heb_text, target_language_code):
     # as a contiguous block in the DB and going forward work from that
     result = {'heb_text': heb_text, 'date_info': date_info, 'organized': organized, 'sections': sections[target_language_code]}
     return result
-
-
-def make_date_info(dt, lang):
-    dt_edition = editions[lang][2]
-    if 0 <= dt.hour < 12:
-        dt_edition = editions[lang][0]
-    elif 12 <= dt.hour < 18:
-        dt_edition = editions[lang][1]
-
-    is_summer_daylight_savings_time = bool(datetime.now(tz=ZoneInfo("Asia/Jerusalem")).dst())
-
-    locale.setlocale(locale.LC_TIME, locales[lang])
-    return DateInfo(dt, part_of_day=dt_edition, 
-                    motzei_shabbat_early=((not is_summer_daylight_savings_time) and dt.isoweekday() == 6 and dt.hour < 19), 
-                    erev_shabbat=(dt.isoweekday() == 5 and dt.hour >= 12))
 
 
 if __name__ == '__main__':

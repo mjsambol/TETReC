@@ -23,7 +23,7 @@ sections['keys_from_Hebrew'] = {
     'חזית איו"ש': "YandS",
     "ביטחון": 'Security',
     "מהמתרחש בארץ": "InIsrael",
-    "מדיניות, ממשל ופוליטיקה": "PandP",  # an old version still sometimes in use
+#    "מדיניות, ממשל ופוליטיקה": "PandP",  # an old version still sometimes in use
     "מדיניות, משפט ופוליטיקה": "PandP",  
     "מסביב לעולם": "Worldwide",
     "כלכלה": "Economy",
@@ -62,7 +62,7 @@ sections['fr'] = {"SOUTH":Markup("Au sud"),
             "FinishWell":"Et on termine sur une bonne note 🎶",
             "UNKNOWN":"UNKNOWN"
             }
-sections['YY'] = {"SOUTH":"החזית הדרומית", 
+sections['he'] = {"SOUTH":"החזית הדרומית", 
             "NORTH":"החזית הצפונית", 
             "YandS":'חזית איו"ש',
             "Security":"ביטחון",
@@ -77,6 +77,8 @@ sections['YY'] = {"SOUTH":"החזית הדרומית",
             "FinishWell":"ונסיים בטוב",
             "UNKNOWN":"UNKNOWN"
             }
+sections['YY'] = sections["he"]
+
 keywords = {}
 keywords['en'] = {
     "edition": "edition",
@@ -112,7 +114,7 @@ keywords['fr'] = {
     "sport": "sport",
     "finish": "bien"
 }
-keywords['YY'] = {
+keywords['he'] = {
     "edition": "מהדורת",
     "intro_pin": "מלחמת חרבות ברזל",
     "northern":"הצפונית",
@@ -129,6 +131,8 @@ keywords['YY'] = {
     "sport": "ספורט",
     "finish": "ונסיים"
 }
+keywords['YY'] = keywords["he"]
+
 editions = {}
 editions['en'] = ['Morning', 'Afternoon', 'Evening']
 editions['fr'] = ['Matin', Markup("l'après-midi"), 'soir']

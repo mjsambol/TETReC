@@ -3,7 +3,7 @@ from google.cloud import datastore, storage
 from google.cloud.datastore.query import PropertyFilter
 import requests
 
-from .common import ARCHIVE_BASE, DateInfo, debug, DatastoreClientProxy, DraftStates, JERUSALEM_TZ
+from .common import ARCHIVE_BASE, compareDraftStateLists, DateInfo, debug, DatastoreClientProxy, DraftStates, JERUSALEM_TZ
 from .language_mappings import editions, locales
 
 import cachetools.func
@@ -83,12 +83,27 @@ def get_latest_day_worth_of_editions():
     for draft in latest_drafts:
         draft_lang = 'he' if draft['translation_lang'] == '--' else draft['translation_lang']
         draft_time_of_day = get_edition_name_from_text(draft)
-        debug(f"Checking latest draft - is this one that was publish ready? {draft['states']}")
-        if ("PUBLISH_READY" in [st["state"] for st in draft['states']]) and (draft_time_of_day not in yesterdays_editions[draft_lang]):
+        debug(f"Checking latest draft - is this most mature for this lang at this time of day? {draft['states']}")
+        if draft_time_of_day not in yesterdays_editions[draft_lang]:
             yesterdays_editions[draft_lang][draft_time_of_day] = draft
-            debug(f"added {draft_time_of_day} to yesterdays_Editions for lang {draft_lang}")
+            debug(f"added {draft_time_of_day} to yesterdays_Editions for lang {draft_lang}")            
+        else:
+            draft_maturity = compareDraftStateLists(draft, yesterdays_editions[draft_lang][draft_time_of_day])
+            if draft_maturity == -1:
+                yesterdays_editions[draft_lang][draft_time_of_day] = draft
+                debug(f"Yes, this is the most mature draft found so far.")
+            else:
+                debug("No, this edition is not newer.")
+                
     return yesterdays_editions
 
+
+def get_more_mature_draft(draft1, draft2):
+    draft_maturity = compareDraftStateLists(draft1['states'], draft2['states'])
+    if draft_maturity == 1:
+        return draft2
+    return draft1  # we have to return something when they're equal so arbitrarily going with the first one
+    
 
 def get_edition_name_from_text(edition, as_english_always=True):
     lang = edition['translation_lang']
@@ -226,7 +241,8 @@ def update_hebrew_draft(draft_key, hebrew_text, user_info, is_finished=False, ok
         draft.update({"ok_to_translate": True})
     edit_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     draft.update({"last_edit": edit_timestamp}) 
-    draft.update({"translation_lang": '--'})
+    # I don't know why the below line was here, whether it was ever necessary, but now it's problematic with the daily_summary flow
+    # draft.update({"translation_lang": '--'})
     prev_states = draft["states"]
 
     if ok_to_translate and DraftStates.EDIT_READY.name not in [states_entry["state"] for states_entry in prev_states]:

@@ -2,7 +2,7 @@
     <head>
         <meta charset="utf-8">
         <style>
-            .heb-text {font-size: 21px; text-align: right;}
+            .heb-text {font-size: 21px; text-align: right; color: #338}
             .heb-text-h1 {font-size: 23px; font-weight: bold;}
             .heb-text-h2 {font-size: 25px; font-weight: bold;}
 
@@ -33,12 +33,25 @@
                 font-size: 21px;
                 border:1px solid #000;                
             }
-            @media(max-width:990px) {textarea {width:100%; height:400px; border:5px solid #000;}}
+            @media(max-width:990px) {textarea {width:100%; height:750px; border:5px solid #000;}}
             @media(min-width:991px) {textarea {width:1000px; height:300px; font-size: 19px; border: 1px solid #000;}}
 
             button {
                 font-size: 20px; 
                 padding:8px 8px;
+            }
+            @media(max-width:990px) {button {font-size: 45px}}
+            @media(min-width:991px) {button {font-size: 20px}}
+
+            #containing-table {
+                border-color: #CCC;
+                border-width: 1px;
+                border-style: solid;
+                padding: 10px;
+            }
+
+            #char_count {
+                font-size: 20px;
             }
             @media(max-width:990px) {button {font-size: 45px}}
             @media(min-width:991px) {button {font-size: 20px}}
@@ -54,6 +67,17 @@
                     text = text.substring(0, two_blank_lines_pos) + "\n\n" + text.substring(two_blank_lines_pos + 3);
                     two_blank_lines_pos = text.indexOf("\n\n\n");
                 }
+                var double_space = text.indexOf("  ");
+                while (double_space != -1) {
+                    text = text.substring(0, double_space) + " " + text.substring(double_space + 2);
+                    double_space = text.indexOf("  ");
+                }
+                var space_line = text.indexOf("\n \n");
+                while (space_line != -1) {
+                    text = text.substring(0, space_line) + "\n" + text.substring(space_line + 3);
+                    space_line = text.indexOf("\n \n");
+                }
+
                 return text;
             }
 
@@ -78,13 +102,49 @@
                                                 target_textarea.value.substring(start_pos + item_content.innerText.length + 1));
                     }
                 }
+                update_char_count();
             }
+
+            var all_text_areas = [];
+
+            function update_char_count() {
+                // Approximately 250 characters will be added by the template - header, footer, and space between sections
+                var tot_length = 250;
+                var tot_body_text = "";
+
+                for (t of all_text_areas) {
+                    ta = document.getElementById(t);
+                    tot_body_text += ta.value + "\n";
+                }
+                tot_length = tot_length + tot_body_text.length;
+
+                document.getElementById("hebrew_body_text").value = tot_body_text;
+                document.getElementById("char_count").innerHTML="אורך: " + tot_length + " אותיות";
+
+                if (tot_length > 2700 && tot_length < 3200) {
+                    document.getElementById("containing-table").style="border-color:#FFFF66;border-width: 5px;";
+                    document.getElementById("char_count_td").style.backgroundColor="#FFFF66";
+                } else if (tot_length > 3200 && tot_length < 3700) {
+                    document.getElementById("containing-table").style="border-color:#FF9900;border-width: 7px;";
+                    document.getElementById("char_count_td").style.backgroundColor="#FF9900";
+                } else if (tot_length > 3700) {
+                    document.getElementById("containing-table").style="border-color:#FF0000;border-width: 10px;";
+                    document.getElementById("char_count_td").style.backgroundColor="#FF0000";
+                } else {
+                    document.getElementById("containing-table").style="border-color:#F6F6F6;;border-width: 1px;";
+                    document.getElementById("char_count_td").style.backgroundColor="#F6F6F6";
+                }
+            }
+            
         </script>
     </head>
-    <body style="align-content: center;">
-        
-        <table width="95%"><tr><td dir="rtl">
-            <form>
+    <body>
+      <center>
+        <div class="heb-text-h1">הכנת מהדורת סיכום היומי</div><br>
+        <table width="95%" id="containing-table"><tr><td dir="rtl">
+            <div class="heb-text" dir="rtl">תבחר\י מהכתבות של היום. אפשר להתחיל לערוך אותם כאן וגם יהיה אפשר בדף הבא.</div><br>
+            <form action="/heb_edit_daily_summary" method="POST">
+                <input type="hidden" id="hebrew_body_text" name="hebrew_body_text"/>
                 {% for section in sections_in_order %}
                     <div class="heb-text-h1"> > {{section}}: </div>
                     <br>
@@ -92,24 +152,34 @@
                         {% set part_of_day_in_he = times_of_day['he'][loop.index0] %}
                 
                         <div class="heb-text-h2">{{ part_of_day_in_he }}:</div>
-                        <table style="border: 0px;" width="100%" cellspacing="10px">
-                            {% for item in organized_editions[part_of_day][sections_in_order[section]] %}
-                                <tr>
-                                    <td><input onclick="checkboxChange(this);" type="checkbox" 
-                                        id="{{sections_in_order[section]}}-{{part_of_day}}-{{loop.index}}"></td>
-                                    <td class="heb-text" id="{{sections_in_order[section]}}-{{part_of_day}}-{{loop.index}}-content" width="99%">{{ item }}</td>
-                                </tr>
-                            {% endfor %}
-                        </table>
+                        {% if part_of_day in organized_editions %}
+                            <table style="border: 0px;" width="100%" cellspacing="10px">
+                                {% for item in organized_editions[part_of_day][sections_in_order[section]] %}
+                                    <tr>
+                                        <td><input onclick="checkboxChange(this);" type="checkbox" 
+                                            id="{{sections_in_order[section]}}-{{part_of_day}}-{{loop.index}}"></td>
+                                        <td class="heb-text" id="{{sections_in_order[section]}}-{{part_of_day}}-{{loop.index}}-content" width="99%">{{ item }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </table>
+                        {% endif %}
                         <br><br>
                     {% endfor %}
-
-                    <textarea rows="8" cols="80" id="{{ sections_in_order[section] }}-textarea"></textarea>
-                    <br><br><br><br>
+<!--  -->
+                    <textarea rows="8" cols="80" id="{{ sections_in_order[section] }}-textarea">{% if (loop.index <= 3) %}> *{{section}}*:{% else %}📌 *_{{section}}_*:{% endif %}
+                    </textarea>
+                    <script>all_text_areas.push("{{ sections_in_order[section] }}-textarea");</script>
+                    <br><br>
                 {% endfor %}
 
-                <button id="to_translation_button" onclick="to_translators();">מוכן לעריכה</button>  
+                <table cellspacing="50px">
+                    <tr>
+                        <td width="50%" align="center"><button id="submit_button" type="submit">להמשיך...</button></td>
+                        <td width="50%" align="right" id="char_count_td"><div id="char_count"></div></td>
+                    </tr>
+                </table>
             </form>
         </td></tr></table>
+      </center>          
     </body>
 </html>

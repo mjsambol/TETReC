@@ -28,7 +28,7 @@ def debug(stuff):
 
 def expand_lang_code(from_lang, to_lang='H'):
     if to_lang == 'H':
-        if from_lang == '--':
+        if from_lang in ['--', 'H1']:
             return 'עברית'
         if from_lang == 'en':
             return 'אנגלית'
@@ -37,7 +37,7 @@ def expand_lang_code(from_lang, to_lang='H'):
         if from_lang == 'YY':
             return 'נוער'
     if to_lang == 'E':
-        if from_lang == '--':
+        if from_lang in ['--', 'H1']:
             return 'Hebrew'
         if from_lang == 'en':
             return 'English'
@@ -57,6 +57,18 @@ class DraftStates(Enum):
     PUBLISHED = auto()
     ADMIN_CLOSED = auto()
 
+
+def compareDraftStateLists(dict_of_states1, dict_of_states2):
+    states_in_order = [DraftStates.PUBLISHED, DraftStates.PUBLISH_READY, DraftStates.EDIT_NEAR_DONE, DraftStates.EDIT_ONGOING, 
+                       DraftStates.EDIT_READY, DraftStates.WRITING]
+    for state in states_in_order:
+        if state in dict_of_states1:
+            if state in dict_of_states2:
+                return 0
+            return -1
+        if state in dict_of_states2:
+            return 1
+        
 
 class DatastoreClientProxy:
 

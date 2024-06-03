@@ -140,8 +140,10 @@ def route_create():
     debug(f"user is {db_user_info}")
     role = db_user_info['role']
 
+    daily_summary_in_progress = check_if_daily_summary_in_progress('H1')
+
     if request.method == "GET":
-        return render_template(detect_mobile(request, 'index'), user_role=role)
+        return render_template(detect_mobile(request, 'index'), user_role=role, daily_summary_in_progress=(daily_summary_in_progress is not None))
     elif request.method == "HEAD":
         debug("top-level: responding to head request with empty ...")
         return ''
@@ -186,6 +188,25 @@ def refresh_cookies(request, response):
     site_prefs = request.cookies.get('tamtzit_prefs')
     if site_prefs:
         response.set_cookie('tamtzit_prefs', site_prefs, expires=datetime.now() + timedelta(days=100), domain='.' + request.host)
+
+
+@cachetools.func.ttl_cache(ttl=15)  # note that this only works when the method has an input param!
+def check_if_daily_summary_in_progress(lang):
+    debug("checking existence of daily summary")
+    dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
+
+    # is there a daily summary draft from the last 3 hours [not a criteria: that's not yet "Done"]
+    drafts, local_tses = fetch_drafts()
+
+    for draft in drafts:
+        if draft['translation_lang'] != lang: 
+            continue
+
+        draft_last_mod = draft['last_edit']
+        debug(f"/check_if_daily_summary_in_progress: draft's last edit is {draft_last_mod}, it's now {dt}, delta is {dt - draft_last_mod}")
+        if (dt - draft_last_mod).seconds > (60 * 90):  # 1.5 hours 
+            return None
+        return draft
 
 
 @cachetools.func.ttl_cache(ttl=15)  # note that this only works when the method has an input param!
@@ -319,6 +340,46 @@ def route_hebrew_template():
                                      user_role=current_user_info['role']))
     refresh_cookies(request, response)
     return response
+
+
+@tamtzit.route('/heb_edit_daily_summary', methods=['POST', 'GET'])
+@require_login
+@require_role("Hebrew")
+def route_hebrew_edit_daily_summary():
+    next_page = detect_mobile(request, "hebrew")
+    current_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
+    debug(f"/heb_edit_daily_summary: user={current_user_info['name']}")
+    dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
+
+    if request.method == 'POST':
+        key = create_draft(heb_text='', user_info=current_user_info, translation_lang='H1')
+
+        debug(f'Creating a new H1 draft with key {key.to_legacy_urlsafe().decode("utf8")}')
+        date_info = make_date_info(dt, 'he')
+        response = make_response(render_template(next_page, date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"), 
+                                heb_text_body_only=Markup(request.form.get("hebrew_body_text")),
+                                ok_to_translate=False, is_finished=False, in_progress=False,
+                                heb_font_size=get_font_sz_prefs(request)['he'], author_user_name=current_user_info["name_hebrew"], 
+                                states=[{"state":DraftStates.WRITING.name, "at":dt.strftime('%Y%m%d-%H%M%S'), 
+                                        "by": current_user_info["name"], "by_heb": current_user_info["name_hebrew"]}],
+                                        user_role=current_user_info['role']))
+        return response
+    else:
+        draft = check_if_daily_summary_in_progress('H1')
+        if not draft:
+            return render_template("error.html", dont_show_home_link=True, msg="No recent daily summary draft found.",
+                    heb_msg="אין סיכום יומי לערוך")
+
+        draft_creator_user_info = get_user(user_id=draft["created_by"])
+        date_info = make_date_info(dt, 'he')
+
+        response = make_response(render_template(next_page, date_info=date_info, heb_text=Markup(draft['hebrew_text']), 
+                                draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
+                                ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
+                                is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
+                                heb_font_size=get_font_sz_prefs(request)['he'], author_user_name=draft_creator_user_info["name_hebrew"],
+                                states=draft['states'], user_role=current_user_info['role']))
+        return response
 
 
 @tamtzit.route('/admin')

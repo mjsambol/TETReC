@@ -323,7 +323,7 @@ def route_hebrew_template():
                                 ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
                                 is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
                                 heb_font_size=get_font_sz_prefs(request)['he'], author_user_name=draft_creator_user_info["name_hebrew"],
-                                states=draft['states'], user_role=current_user_info['role']))
+                                states=draft['states'], user_role=current_user_info['role'], req_rule=request.url_rule.rule))
         refresh_cookies(request, response)
         return response
             
@@ -337,7 +337,7 @@ def route_hebrew_template():
                             heb_font_size=get_font_sz_prefs(request)['he'], author_user_name=current_user_info["name_hebrew"], 
                             states=[{"state":DraftStates.WRITING.name, "at":dt.strftime('%Y%m%d-%H%M%S'), 
                                      "by": current_user_info["name"], "by_heb": current_user_info["name_hebrew"]}],
-                                     user_role=current_user_info['role']))
+                                     user_role=current_user_info['role'], req_rule=request.url_rule.rule))
     refresh_cookies(request, response)
     return response
 
@@ -362,7 +362,7 @@ def route_hebrew_edit_daily_summary():
                                 heb_font_size=get_font_sz_prefs(request)['he'], author_user_name=current_user_info["name_hebrew"], 
                                 states=[{"state":DraftStates.WRITING.name, "at":dt.strftime('%Y%m%d-%H%M%S'), 
                                         "by": current_user_info["name"], "by_heb": current_user_info["name_hebrew"]}],
-                                        user_role=current_user_info['role']))
+                                        user_role=current_user_info['role'], req_rule=request.url_rule.rule))
         return response
     else:
         draft = check_if_daily_summary_in_progress('H1')
@@ -378,7 +378,7 @@ def route_hebrew_edit_daily_summary():
                                 ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
                                 is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
                                 heb_font_size=get_font_sz_prefs(request)['he'], author_user_name=draft_creator_user_info["name_hebrew"],
-                                states=draft['states'], user_role=current_user_info['role']))
+                                states=draft['states'], user_role=current_user_info['role'], req_rule=request.url_rule.rule))
         return response
 
 

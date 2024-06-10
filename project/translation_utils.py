@@ -53,7 +53,7 @@ def tx_heb_prefix(word, lang):
     return result
 
 
-title_translations = {
+title_translations = {"en":{
     # This section of translations is based on an image shared by Yair, original source unknown
     'רב"ט': 'Corporal',
     'סמל': 'Sergeant',
@@ -62,10 +62,10 @@ title_translations = {
     'רב סמל': 'Sergeant First Class',
     'רס"ל': 'Sergeant First Class',
 
-    'רב סמל ראשון': 'Master Sergeant', # < switching to that based on other news sources and Ilana's friend. Originally had: 'Chief Sergeant First Class',
-    'רס"ר': 'Master Sergeant',       # < switching to that based on other news sources and Ilana's friend. Originally had: 'Chief Sergeant First Class',
-    'רס"מ': 'Sergeant Major',        # < switching to that based on other news sources and Ilana's friend. Originally had: 'Master Sergeant',
-    'רס"ם': 'Sergeant Major',        # < switching to that based on other news sources and Ilana's friend. Originally had: 'Master Sergeant',
+    'רב סמל ראשון': 'Master Sergeant', # < switching based on other sources and Ilana's friend. Originally had: 'Chief Sergeant First Class',
+    'רס"ר': 'Master Sergeant',       # < Originally had: 'Chief Sergeant First Class',
+    'רס"מ': 'Sergeant Major',        # < Originally had: 'Master Sergeant',
+    'רס"ם': 'Sergeant Major',        # < Originally had: 'Master Sergeant',
 
     'רס"ב': 'First Sergeant',
     'רנ"מ': 'Sergeant Major',        # "apparently doesn't exist anymore" per Ilana's friend
@@ -97,7 +97,6 @@ title_translations = {
 
     # This section of translations is based on https://www.almaany.com/en/dict/en-he/commander/
     # which is a surprising source but nothing here seems controversial
-    'מח"ט': 'Brigade Commander',
     'רמטכ"ל': 'Chief of General Staff',     # More accurate translation than this source's 'Commander in Chief',
     'מ"פ': 'Company Commander',
     'מג"ד': 'Battalon Commander',
@@ -119,6 +118,51 @@ title_translations = {
     'רבשצ': 'Military Security Coordinator',
     'רבש"צ': 'Military Security Coordinator',
     'כיתת הכוננות': 'First Response Squad'
+}, 
+"fr": {
+    'רב"ט': 'Première classe',
+    'סמל': 'Caporal',
+    'סמ"ר': 'Caporal-chef',
+    'סמל ראשון': 'Caporal-chef',
+
+    'רב סמל': 'Sergent',
+    'רס"ל': 'Sergent',
+
+    'רב סמל ראשון': 'Sergent-chef', 
+    'רס"ר': 'Sergent-chef',
+    'רס"מ': 'Adjudant',       
+    'רס"ם': 'Adjudant',       
+
+    'רס"ב': 'Adjudant-chef',
+    # 'רנ"מ': 'Sergeant Major',        # "apparently doesn't exist anymore" per Ilana's friend
+    # 'רנ"ם': 'Sergeant Major',        # "apparently doesn't exist anymore" per Ilana's friend
+    'רנ"ג': 'Major',
+    'רב נגד': 'Major',
+
+    'סג"מ': 'Sous-lieutenant',
+    'סג"ם': 'Sous-lieutenant',
+    'סגן משנה': 'Sous-lieutenant',
+    'סגן': 'Lieutenant',
+    'סרן': 'Capitaine',
+
+    'רב סרן': 'Commandant',
+    'רס"ן': 'Commandant',
+    'רס"נ': 'Commandant',
+
+    'סא"ל': 'Lieutenant-colonel',
+    'סגן אלוף': 'Lieutenant-colonel',
+
+    'אלוף משנה': 'Colonel',
+    'אל"מ': 'Colonel',
+    'אל"ם': 'Colonel',
+
+    'תת אלוף': 'Général de brigade',
+    'תא"ל': 'Général de brigade',
+
+    'אלוף': 'Général',
+    'רב אלוף': "Chef d'état-major",
+    'רא"ל': "Chef d'état-major",
+}
 }
 
 def pre_translation_swaps(text, target_language_code):
@@ -128,6 +172,9 @@ def pre_translation_swaps(text, target_language_code):
     # our Motzei Shabbat header is confused for regular content, this is an easy way to get rid of it
     text = re.sub(r'\*עדכון מוצאי שבת\*', '', text, flags=re.U)
     text = re.sub(r'קוראים יקרים, זהו עדכון מקוצר. מהדורה רגילה תישלח אחרי 21:00.', '', text, flags=re.U)
+    # and this is from the Friday afternoon edition
+    text = re.sub(r'\*קוראים יקרים,\*', '', text, flags=re.U)
+    text = re.sub(r'\*המהדורה הבאה תישלח במוצאי שבת, בשעה הרגילה של מהדורת הערב.\*', '', text, flags=re.U)
 
     text = re.sub(r'\bמשגב עם\b', 'Misgav Am', text, flags=re.U)
 
@@ -156,13 +203,21 @@ def pre_translation_swaps(text, target_language_code):
         text = re.sub(r'\b([למהבו]+)?מרגש\b', lambda m: tx_heb_prefix(m.group(1), "en") + "moving", text, flags=re.U)
 
     elif target_language_code == 'fr':
+        text = re.sub(r'\bבית משפט מחוזי\b', "Cour d'Appel", text, flags=re.U)
+        text = re.sub(r'\bהותר לפרסום\b', "Il a été autorisé à la publication", text, flags=re.U)
+        text = re.sub(r'\bיהי זכרו ברוך\b', "Que sa mémoire soit bénie", text, flags=re.U)
+        text = re.sub(r'\bיהי זכרם ברוך\b', "Que leur mémoire soit bénie", text, flags=re.U)
+        text = re.sub(r'\bיישוב\b', "localité", text, flags=re.U)
+        text = re.sub(r'\bיישובים\b', "localités", text, flags=re.U)
+        text = re.sub(r'\bכותל המערבי\b', "Kotel", text, flags=re.U)
         text = re.sub(r'\bהלילה\b', 'la nuit dernière', text, flags=re.U)
 
         text = re.sub(r'\b([למהבו]+)?עוטף עזה\b', lambda m: tx_heb_prefix(m.group(1), "fr") + 'La zone autour de Gaza', text, flags=re.U)
         text = re.sub(r'\b([למהבו]+)?עוטף\b', lambda m: tx_heb_prefix(m.group(1), "fr") + 'La zone autour de Gaza [?]', text, flags=re.U)
 
         text = re.sub(r'\bהסברה\b', 'diplomatie publique', text, flags=re.U)
-        text = re.sub(r'\b([למהבו]+)כטמ"[מם]\b', lambda m: tx_heb_prefix(m.group(1), "fr") + "drone", text, flags=re.U) 
+        text = re.sub(r'\b([למהבו]+)כטב"[מם]\b', lambda m: tx_heb_prefix(m.group(1), "fr") + "drone", text, flags=re.U) 
+        text = re.sub(r'\b([למהבו]+)כטמ"[מם]\b', lambda m: tx_heb_prefix(m.group(1), "fr") + "drone de combat", text, flags=re.U) 
 
     return text
 

@@ -12,12 +12,14 @@ from google.cloud.datastore.key import Key
 from markupsafe import Markup
 import requests
 
-from .auth_utils import confirm_user_has_role, consume_invitation, create_invitation, get_user, require_login, require_role 
+from .auth_utils import confirm_user_has_role, consume_invitation, create_invitation, get_user, require_login
+from .auth_utils import require_role
 from .auth_utils import send_invitation, validate_weekly_birthcert
 from .common import _set_debug, ARCHIVE_BASE, debug, DatastoreClientProxy, expand_lang_code, JERUSALEM_TZ
-from .cookies import Cookies, get_cookie_dict, get_today_noise, make_cookie_from_dict, make_daily_cookie, user_data_from_req
-from .draft_utils import create_draft, DraftStates, fetch_drafts, get_latest_day_worth_of_editions, make_date_info, make_new_archive_entry
-from .draft_utils import upload_to_cloud_storage, update_hebrew_draft, update_translation_draft
+from .cookies import Cookies, get_cookie_dict, get_today_noise, make_cookie_from_dict, make_daily_cookie
+from .cookies import user_data_from_req
+from .draft_utils import create_draft, DraftStates, fetch_drafts, get_latest_day_worth_of_editions, make_date_info
+from .draft_utils import make_new_archive_entry, upload_to_cloud_storage, update_hebrew_draft, update_translation_draft
 from .diff_draft_versions import get_translated_additions_since_ok_to_translate
 from .language_mappings import editions, keywords, sections, supported_langs_mapping
 from .translation_utils import translate_text
@@ -59,8 +61,9 @@ datastore_client = DatastoreClientProxy.get_instance()
             
 tamtzit = Blueprint('tamtzit', __name__)
 
-def detect_mobile(request, page_name):
-    ua = request.user_agent
+
+def detect_mobile(param_request, page_name):
+    ua = param_request.user_agent
     ua = str(ua).lower()
     if "mobile" in ua or "android" in ua or "iphone" in ua:
         next_pg = page_name + "_mobile.html"
@@ -69,17 +72,18 @@ def detect_mobile(request, page_name):
     return next_pg
 
 
-    # at /auth, check if there is a 7-day cookie with a signed user ID. Look up the user ID in our DB, if found,
-    # extend the 7 days, then create and set a daily session cookie, then redirect back to the requested URL. This is a week-long cookie and saves re-auth
-    #
-    # if at /auth no username found, prompt for email address, look it up in DB, create an invitation link for that user
-    # save it in the DB and send the link, then redir to page "check your email" or "email not found". 
-    # Together with the invitation link save the URL user wanted to go to.
-    #
-    # when user clicks invitation link look it up in DB, if found create a 7-day cookie and set it, redirect to requested URL from invitation table 
-    # with invitation link save created and used dates, don't let it be reused
-
-@tamtzit.route("/auth", methods=['GET','POST'])
+# at /auth, check if there is a 7-day cookie with a signed user ID. Look up the user ID in our DB, if found,
+# extend the 7 days, then create and set a daily session cookie, then redirect back to the requested URL.
+# This is a week-long cookie and saves re-auth
+#
+# if at /auth no username found, prompt for email address, look it up in DB, create an invitation link for that user
+# save it in the DB and send the link, then redir to page "check your email" or "email not found".
+# Together with the invitation link save the URL user wanted to go to.
+#
+# when user clicks invitation link look it up in DB, if found create a 7-day cookie and set it,
+# redirect to requested URL from invitation table with invitation link save created and used dates,
+# don't let it be reused
+@tamtzit.route("/auth", methods=['GET', 'POST'])
 def route_authenticate():
     debug("/auth called with method " + request.method)
 
@@ -90,8 +94,8 @@ def route_authenticate():
             return render_template("login.html")
             
         # how to create and manage the weekly cookie?
-        # one option: just keep a week's worth of entries of the daily noise, check each one of them for inclusion in the weekly cookie
-        # and delete any old ones as they're found
+        # one option: just keep a week's worth of entries of the daily noise, check each one of them for inclusion
+        # in the weekly cookie and delete any old ones as they're found
         # other option is yet another entity, but it doesn't seem any better, still have to keep it updated...
         debug("checking validity of weekly cookie which is present")
         weekly_session = get_cookie_dict(request, Cookies.ONE_WEEK_SESSION)
@@ -100,14 +104,17 @@ def route_authenticate():
             return render_template("login.html")
         bcert = weekly_session[Cookies.COOKIE_CERT]        
         if validate_weekly_birthcert(bcert):  
-            debug("weekly cookie is valid, refreshing it, setting daily cookie and redirecting to " + request.args.get('requested'))    
+            debug("weekly cookie is valid, refreshing it, setting daily cookie and redirecting to " +
+                  request.args.get('requested'))
             weekly_session[Cookies.COOKIE_CERT] = get_today_noise()
             response = redirect(request.args.get('requested'))
             new_cookie = make_cookie_from_dict(weekly_session)
             response.set_cookie(Cookies.ONE_DAY_SESSION, new_cookie, expires=datetime.now() + timedelta(days=1))
             response.set_cookie(Cookies.ONE_WEEK_SESSION, new_cookie, expires=datetime.now() + timedelta(days=7))
-            response.set_cookie("tz_autha", new_cookie, max_age=60*60*24, domain='.' + request.host, samesite="Lax", secure=True)
-            response.set_cookie("tz_authb", new_cookie, max_age=60*60*24*7, domain='.' + request.host, samesite="Lax", secure=True)
+            # response.set_cookie("tz_autha", new_cookie, max_age=60*60*24, domain='.' + request.host,
+            # samesite="Lax", secure=True)
+            # response.set_cookie("tz_authb", new_cookie, max_age=60*60*24*7, domain='.' + request.host,
+            # samesite="Lax", secure=True)
             return response
         else:
             debug("Weekly cookie is not valid")
@@ -118,7 +125,8 @@ def route_authenticate():
         debug("login attempt from user " + email)
         user_details = get_user(email.lower())
         if not user_details:
-            return render_template("error.html", dont_show_home_link=True, msg="The email address you provided is unknown. Contact the admin.",
+            return render_template("error.html", dont_show_home_link=True,
+                                   msg="The email address you provided is unknown. Contact the admin.",
                                    heb_msg="כתובת מייל זו לא מוכרת. צור קשר עם משה.")
     
         debug("Confirmed - it's a known user. Preparing an invitation link...")
@@ -128,7 +136,8 @@ def route_authenticate():
         # send the invitation via email to the user
         send_invitation(user_details, request.url_root + "use_invitation?inv=" + invitation["link_id"])
 
-        return render_template("error.html", dont_show_home_link=True, msg="Check your email for an authentication link.",
+        return render_template("error.html", dont_show_home_link=True,
+                               msg="Check your email for an authentication link.",
                                heb_msg="לינק לכניסה נשלח למייל שלך")
 
 
@@ -143,7 +152,8 @@ def route_create():
     daily_summary_in_progress = check_if_daily_summary_in_progress('H1')
 
     if request.method == "GET":
-        return render_template(detect_mobile(request, 'index'), user_role=role, daily_summary_in_progress=(daily_summary_in_progress is not None))
+        return render_template(detect_mobile(request, 'index'), user_role=role,
+                               daily_summary_in_progress=(daily_summary_in_progress is not None))
     elif request.method == "HEAD":
         debug("top-level: responding to head request with empty ...")
         return ''
@@ -152,11 +162,10 @@ def route_create():
         return "UH oh"
 
 
-
-def get_font_sz_prefs(request):
+def get_font_sz_prefs(param_request):
     heb_font_size = "30"
     en_font_size = "18"
-    site_prefs = request.cookies.get('tamtzit_prefs')
+    site_prefs = param_request.cookies.get('tamtzit_prefs')
     if site_prefs:
         spd = json.loads(site_prefs)
         if "heb-font-size" in spd:
@@ -165,7 +174,7 @@ def get_font_sz_prefs(request):
         if "en-font-size" in spd:
             en_font_size = spd["en-font-size"]
             debug("/debug: overriding English font size from cookie: " + en_font_size)
-    return {"he":heb_font_size, "en":en_font_size}
+    return {"he": heb_font_size, "en": en_font_size}
 
 
 @tamtzit.route('/debug')
@@ -181,13 +190,16 @@ def route_set_settings():
     debug(f"Changing settings: Hebrew font size is now {he_font_preference}, English is {en_font_preference}")
     response = make_response(redirect("/"))
     prefs = {"heb-font-size": he_font_preference, "en-font-size": en_font_preference}
-    response.set_cookie('tamtzit_prefs', json.dumps(prefs), expires=datetime.now() + timedelta(days=100), domain='.' + request.host)
+    response.set_cookie('tamtzit_prefs', json.dumps(prefs),
+                        expires=datetime.now() + timedelta(days=100), domain='.' + request.host)
     return response
 
-def refresh_cookies(request, response):
-    site_prefs = request.cookies.get('tamtzit_prefs')
+
+def refresh_cookies(param_request, response):
+    site_prefs = param_request.cookies.get('tamtzit_prefs')
     if site_prefs:
-        response.set_cookie('tamtzit_prefs', site_prefs, expires=datetime.now() + timedelta(days=100), domain='.' + request.host)
+        response.set_cookie('tamtzit_prefs', site_prefs,
+                            expires=datetime.now() + timedelta(days=100), domain='.' + param_request.host)
 
 
 @cachetools.func.ttl_cache(ttl=15)  # note that this only works when the method has an input param!
@@ -203,7 +215,8 @@ def check_if_daily_summary_in_progress(lang):
             continue
 
         draft_last_mod = draft['last_edit']
-        debug(f"/check_if_daily_summary_in_progress: draft's last edit is {draft_last_mod}, it's now {dt}, delta is {dt - draft_last_mod}")
+        debug(f"/check_if_daily_summary_in_progress: draft last edit: " +
+              f"{draft_last_mod}, now {dt}, delta: {dt - draft_last_mod}")
         if (dt - draft_last_mod).seconds > (60 * 90):  # 1.5 hours 
             return None
         return draft
@@ -253,7 +266,7 @@ def route_use_invitation_link():
     invitation = request.args.get("inv")
     debug(f"use_invitation: checking invitation {invitation}")
     if not invitation or len(invitation) < 36:
-        return ("Badly formatted request - missing invitation paramter")
+        return "Badly formatted request - missing invitation paramter"
     if len(invitation) > 36:
         invitation = invitation[0:36]
         debug(f"use_invitation: checking *trimmed* invitation {invitation}")
@@ -265,7 +278,7 @@ def route_use_invitation_link():
         return ''
     else:
         debug(f"use_invitation got unexpected request type {request.method}")
-        return ("UH oh")
+        return "UH oh"
 
     user_details = consume_invitation(invitation)
 
@@ -277,13 +290,16 @@ def route_use_invitation_link():
         response.set_cookie(Cookies.ONE_DAY_SESSION, new_cookie, expires=datetime.now() + timedelta(days=1))
         response.set_cookie(Cookies.ONE_WEEK_SESSION, new_cookie, expires=datetime.now() + timedelta(days=7))
 
-        response.set_cookie("tz_autha", new_cookie, max_age=60*60*24, domain='.' + request.host, samesite="Lax", secure=True)
-        response.set_cookie("tz_authb", new_cookie, max_age=60*60*24*7, domain='.' + request.host, samesite="Lax", secure=True)
+        # response.set_cookie("tz_autha", new_cookie, max_age=60*60*24,
+        # domain='.' + request.host, samesite="Lax", secure=True)
+        # response.set_cookie("tz_authb", new_cookie, max_age=60*60*24*7,
+        # domain='.' + request.host, samesite="Lax", secure=True)
 
         return response
     else:
         debug(f"use_invitation: returning an error - invitation seems invalid.")
-        return render_template("error.html", dont_show_home_link=True, msg="Invalid authentication link. Please contact an admin.",
+        return render_template("error.html", dont_show_home_link=True,
+                               msg="Invalid authentication link. Please contact an admin.",
                                heb_msg="הלינק לא תקין, צור קשר עם משה")
 
 
@@ -303,27 +319,33 @@ def route_hebrew_template():
         if draft['translation_lang'] != '--': 
             continue
 
-        debug(f"/heb: should we show draft w/ lang={draft['translation_lang']}, is_finished={'is_finished' in draft and draft['is_finished']}, ok_to_translate={'ok_to_translate' in draft and draft['ok_to_translate']}")
+        debug(f"/heb: should we show draft w/ lang={draft['translation_lang']}, " +
+              f"is_finished={'is_finished' in draft and draft['is_finished']}, " +
+              f"ok_to_translate={'ok_to_translate' in draft and draft['ok_to_translate']}")
         draft_last_mod = draft['last_edit']
         debug(f"/heb: draft's last edit is {draft_last_mod}, it's now {dt}, delta is {dt - draft_last_mod}")
         if (dt - draft_last_mod).seconds > (60 * 90):  # 1.5 hours per Yair's choice 
             break
 
         draft_creator_user_info = get_user(user_id=draft["created_by"])
-        # originally I didn't bother passing date_info based on the assumption that by the time we reach this point we're editing an existing draft,
-        # and the text will already have the date filled in, so there will be no templating left to resolve. But there is an edge case where that 
-        # might not play out: When we create the draft entry in the DB, the text is *blank*. If the user quickly refreshes the page, heb_text here is blank,
-        # so the logic in the hebrew.html page will use the template ... and will need this date info. One approach to fixing it would be to ensure that 
-        # _something_ is always saved to the DB, not blank; it seems not worse to ensure that the call to render_template is kept as close as possible between 
-        # here and the call below.
+        # originally I didn't bother passing date_info based on the assumption that by the time we reach this point
+        # we're editing an existing draft, and the text will already have the date filled in, so there will be no
+        # templating left to resolve. But there is an edge case where that might not play out: When we create the
+        # draft entry in the DB, the text is *blank*. If the user quickly refreshes the page, heb_text here is blank,
+        # so the logic in the hebrew.html page will use the template ... and will need this date info. One approach
+        # to fixing it would be to ensure that _something_ is always saved to the DB, not blank; it seems not worse
+        # to ensure that the call to render_template is kept as close as possible between here and the call below.
         date_info = make_date_info(dt, 'he')
 
-        response = make_response(render_template(next_page, date_info=date_info, heb_text=Markup(draft['hebrew_text']), 
-                                draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
-                                ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
-                                is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
-                                heb_font_size=get_font_sz_prefs(request)['he'], author_user_name=draft_creator_user_info["name_hebrew"],
-                                states=draft['states'], user_role=current_user_info['role'], req_rule=request.url_rule.rule))
+        response = make_response(
+            render_template(next_page, date_info=date_info, heb_text=Markup(draft['hebrew_text']),
+                            draft_key=draft.key.to_legacy_urlsafe().decode("utf8"),
+                            ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
+                            is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
+                            heb_font_size=get_font_sz_prefs(request)['he'],
+                            author_user_name=draft_creator_user_info["name_hebrew"],
+                            states=draft['states'], user_role=current_user_info['role'],
+                            req_rule=request.url_rule.rule))
         refresh_cookies(request, response)
         return response
             
@@ -332,12 +354,14 @@ def route_hebrew_template():
 
     debug(f'Creating a new Hebrew draft with key {key.to_legacy_urlsafe().decode("utf8")}')
     date_info = make_date_info(dt, 'he')
-    response = make_response(render_template(next_page, date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"), 
-                            ok_to_translate=False, is_finished=False, in_progress=False,
-                            heb_font_size=get_font_sz_prefs(request)['he'], author_user_name=current_user_info["name_hebrew"], 
-                            states=[{"state":DraftStates.WRITING.name, "at":dt.strftime('%Y%m%d-%H%M%S'), 
-                                     "by": current_user_info["name"], "by_heb": current_user_info["name_hebrew"]}],
-                                     user_role=current_user_info['role'], req_rule=request.url_rule.rule))
+    response = make_response(
+        render_template(next_page, date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"),
+                        ok_to_translate=False, is_finished=False, in_progress=False,
+                        heb_font_size=get_font_sz_prefs(request)['he'],
+                        author_user_name=current_user_info["name_hebrew"],
+                        states=[{"state": DraftStates.WRITING.name, "at": dt.strftime('%Y%m%d-%H%M%S'),
+                                 "by": current_user_info["name"], "by_heb": current_user_info["name_hebrew"]}],
+                        user_role=current_user_info['role'], req_rule=request.url_rule.rule))
     refresh_cookies(request, response)
     return response
 
@@ -356,29 +380,37 @@ def route_hebrew_edit_daily_summary():
 
         debug(f'Creating a new H1 draft with key {key.to_legacy_urlsafe().decode("utf8")}')
         date_info = make_date_info(dt, 'he')
-        response = make_response(render_template(next_page, date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"), 
-                                heb_text_body_only=Markup(request.form.get("hebrew_body_text")),
-                                ok_to_translate=False, is_finished=False, in_progress=False,
-                                heb_font_size=get_font_sz_prefs(request)['he'], author_user_name=current_user_info["name_hebrew"], 
-                                states=[{"state":DraftStates.WRITING.name, "at":dt.strftime('%Y%m%d-%H%M%S'), 
-                                        "by": current_user_info["name"], "by_heb": current_user_info["name_hebrew"]}],
-                                        user_role=current_user_info['role'], req_rule=request.url_rule.rule))
+        response = make_response(render_template(next_page, date_info=date_info,
+                                                 draft_key=key.to_legacy_urlsafe().decode("utf8"),
+                                                 heb_text_body_only=Markup(request.form.get("hebrew_body_text")),
+                                                 ok_to_translate=False, is_finished=False, in_progress=False,
+                                                 heb_font_size=get_font_sz_prefs(request)['he'],
+                                                 author_user_name=current_user_info["name_hebrew"],
+                                                 states=[{"state": DraftStates.WRITING.name,
+                                                          "at": dt.strftime('%Y%m%d-%H%M%S'),
+                                                          "by": current_user_info["name"],
+                                                          "by_heb": current_user_info["name_hebrew"]}],
+                                                 user_role=current_user_info['role'], req_rule=request.url_rule.rule))
         return response
     else:
         draft = check_if_daily_summary_in_progress('H1')
         if not draft:
-            return render_template("error.html", dont_show_home_link=True, msg="No recent daily summary draft found.",
-                    heb_msg="אין סיכום יומי לערוך")
+            return render_template("error.html", dont_show_home_link=True,
+                                   msg="No recent daily summary draft found.",
+                                   heb_msg="אין סיכום יומי לערוך")
 
         draft_creator_user_info = get_user(user_id=draft["created_by"])
         date_info = make_date_info(dt, 'he')
 
-        response = make_response(render_template(next_page, date_info=date_info, heb_text=Markup(draft['hebrew_text']), 
-                                draft_key=draft.key.to_legacy_urlsafe().decode("utf8"), 
-                                ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
-                                is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
-                                heb_font_size=get_font_sz_prefs(request)['he'], author_user_name=draft_creator_user_info["name_hebrew"],
-                                states=draft['states'], user_role=current_user_info['role'], req_rule=request.url_rule.rule))
+        response = make_response(
+            render_template(next_page, date_info=date_info, heb_text=Markup(draft['hebrew_text']),
+                            draft_key=draft.key.to_legacy_urlsafe().decode("utf8"),
+                            ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
+                            is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
+                            heb_font_size=get_font_sz_prefs(request)['he'],
+                            author_user_name=draft_creator_user_info["name_hebrew"],
+                            states=draft['states'], user_role=current_user_info['role'],
+                            req_rule=request.url_rule.rule))
         return response
 
 
@@ -393,7 +425,6 @@ def route_administration():
 @require_login
 @require_role("admin")
 def route_hebrew_restart():
-    next_page = detect_mobile(request, "hebrew")
     db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
 
     # is there a Hebrew draft from the last 3 hours [not a criteria: that's not yet "Done"]
@@ -415,7 +446,7 @@ def route_hebrew_restart():
             draft.update({"last_edit": edit_timestamp}) 
             draft.update({"is_finished": True})
             prev_states = draft["states"]
-            prev_states.append({"state":DraftStates.ADMIN_CLOSED.name, "at": dt.strftime('%Y%m%d-%H%M%S'), 
+            prev_states.append({"state": DraftStates.ADMIN_CLOSED.name, "at": dt.strftime('%Y%m%d-%H%M%S'),
                                 "by": db_user_info["name"], "by_heb": db_user_info["name_hebrew"]})
             draft.update({"states": prev_states})
             datastore_client.put(draft)
@@ -450,7 +481,8 @@ def route_mark_published():
 
         draft_last_mod = draft['last_edit']
         debug(f"/mark_published: draft's last edit is {draft_last_mod}, it's now {dt}, delta is {dt - draft_last_mod}")
-        if (dt - draft_last_mod).seconds > (60 * 90):  # 1.5 hours - if admin is going to publish by copying from the dash, it will certainly be within that time!
+        if (dt - draft_last_mod).seconds > (60 * 90):
+            # 1.5 hours - if admin is going to publish by copying from the dash, it will certainly be within that time!
             break
         else:
             prev_states = draft["states"]
@@ -459,7 +491,7 @@ def route_mark_published():
                 break
             if DraftStates.PUBLISH_READY.name in [st["state"] for st in prev_states]:
                 debug("/mark_published: marking most recent Hebrew draft as published")
-                prev_states.append({"state":DraftStates.PUBLISHED.name, "at": dt.strftime('%Y%m%d-%H%M%S'), 
+                prev_states.append({"state": DraftStates.PUBLISHED.name, "at": dt.strftime('%Y%m%d-%H%M%S'),
                                     "by": db_user_info["name"], "by_heb": db_user_info["name_hebrew"]})
             draft.update({"states": prev_states})
             datastore_client.put(draft)
@@ -475,13 +507,17 @@ def route_start_translation():
     drafts, local_tses = fetch_drafts()
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
     latest_heb = ''
+    latest_creator = ''
+    draft_id = None
+    draft = None
     for draft in drafts:
         # if we can't find an ok-to-translate Hebrew draft from the last 3 hours, let the user know it's not ready...
         draft_last_mod = draft['last_edit']
         if (dt - draft_last_mod).seconds > (60 * 60 * 3):
             return render_template("error.html", msg="There is no current edition ready for translation.")
 
-        if draft['translation_lang'] == '--' and DraftStates.EDIT_READY.name in [states_entry["state"] for states_entry in draft['states']]:
+        if draft['translation_lang'] == '--' and (DraftStates.EDIT_READY.name in
+                                                  [states_entry["state"] for states_entry in draft['states']]):
             # this is the most recent Hebrew text
             latest_heb = draft['hebrew_text']
             latest_creator = draft['created_by']
@@ -495,7 +531,9 @@ def route_start_translation():
     drafts, local_tses = fetch_drafts() 
     next_page = detect_mobile(request, "input")
     return render_template(next_page, heb_text=latest_heb, creator_id=latest_creator, draft_id=draft_id, 
-                           drafts=drafts, local_timestamps=local_tses, supported_langs=supported_langs_mapping, states=draft['states'])
+                           drafts=drafts, local_timestamps=local_tses, supported_langs=supported_langs_mapping,
+                           states=draft['states'])
+
 
 '''
 /translate and /draft are very similar:
@@ -520,20 +558,23 @@ def continue_draft():
             names = {
                 "heb_author_in_heb": draft_creator_user_info["name_hebrew"],
                 "heb_author_in_en": draft_creator_user_info["name"],
-                "translator_in_heb":user_info["name_hebrew"],
+                "translator_in_heb": user_info["name_hebrew"],
                 "translator_in_en": user_info["name"]
             }
             font_size_prefs = get_font_sz_prefs(request)
             key = draft.key
 
-            return render_template(next_page, heb_text=Markup(heb_text), translated=Markup(translated), draft_timestamp=draft_timestamp, 
+            return render_template(next_page, heb_text=Markup(heb_text), translated=Markup(translated),
+                                   draft_timestamp=draft_timestamp,
                                    lang=draft['translation_lang'], **names,  user_info=user_info,
                                    draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=draft['heb_draft_id'],
                                    heb_font_size=font_size_prefs['he'], en_font_size=font_size_prefs['en'], 
-                                   is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True, states=draft['states'])
+                                   is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
+                                   states=draft['states'])
 
     return "Draft not found, please start again."
-            
+
+
 '''
 /translate and /draft are very similar:
    /translate creates a new entry based on the submission of the form at /  (POST)
@@ -548,7 +589,7 @@ def process():
         return "Input field was missing."
 
     target_language_code = request.form.get('target-lang')
-    target_language = supported_langs_mapping[target_language_code]
+    target_lang = supported_langs_mapping[target_language_code]
     next_page = detect_mobile(request, "editing")
     basic_user_info = user_data_from_req(request)
     user_info = get_user(user_id=basic_user_info["user_id"])
@@ -556,24 +597,29 @@ def process():
     names = {
         "heb_author_in_heb": draft_creator_user_info["name_hebrew"],
         "heb_author_in_en": draft_creator_user_info["name"],
-        "translator_in_heb":user_info["name_hebrew"],
+        "translator_in_heb": user_info["name_hebrew"],
         "translator_in_en": user_info["name"]
     }
     font_size_prefs = get_font_sz_prefs(request)
     
     info = process_translation_request(heb_text, target_language_code)
     dt = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
-    draft_timestamp=dt.strftime('%Y%m%d-%H%M%S')
+    draft_timestamp = dt.strftime('%Y%m%d-%H%M%S')
 
-    translated = render_template(target_language.lower() + '.html', **info, draft_timestamp=draft_timestamp, **names)
-    translated = re.sub('\n{3,}', '\n\n', translated)  # this is necessary because the template can generate large gaps due to unused sections
+    translated = render_template(target_lang.lower() + '.html', **info, draft_timestamp=draft_timestamp, **names)
+    translated = re.sub('\n{3,}', '\n\n', translated)
+    # this is necessary because the template can generate large gaps due to unused sections
 
     # store the draft in DB so that someone else can continue the translation work
-    key = create_draft(heb_text, user_info, translation_text=translated, translation_lang=target_language_code, heb_draft_id=request.form.get('heb_draft_id'))
-    return render_template(next_page, heb_text=Markup(heb_text), translated=Markup(translated), lang=target_language_code, in_progress=False, user_info=user_info,
+    key = create_draft(heb_text, user_info, translation_text=translated, translation_lang=target_language_code,
+                       heb_draft_id=request.form.get('heb_draft_id'))
+    return render_template(next_page, heb_text=Markup(heb_text), translated=Markup(translated),
+                           lang=target_language_code, in_progress=False, user_info=user_info,
                            heb_font_size=font_size_prefs['he'], en_font_size=font_size_prefs['en'], 
-                           states=[{"state":DraftStates.WRITING.name, "at":draft_timestamp, "by":user_info["name"], "by_heb": user_info["name_hebrew"]}],
-                           draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=request.form.get('heb_draft_id'))
+                           states=[{"state": DraftStates.WRITING.name, "at": draft_timestamp,
+                                    "by": user_info["name"], "by_heb": user_info["name_hebrew"]}],
+                           draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'),
+                           heb_draft_id=request.form.get('heb_draft_id'))
 
 
 @tamtzit.route("/saveDraft", methods=['POST'])
@@ -587,18 +633,19 @@ def save_draft():
     finished = request.form.get('is_finished') and request.form.get('is_finished').lower() == 'true'
     send_to_translators = request.form.get('to_translators') and request.form.get('to_translators').lower() == 'true'
     # we're saving _either_ the Hebrew or the translation, not both at once
-    translated_text=request.form.get('translation')
+    translated_txt = request.form.get('translation')
     source_text = request.form.get('source_text')
-    if translated_text and len(translated_text) > 0:
+    if translated_txt and len(translated_txt) > 0:
         if confirm_user_has_role(request, "translator"):
             user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
-            update_translation_draft(draft_key, translated_text, user_info, is_finished=finished)
+            update_translation_draft(draft_key, translated_txt, user_info, is_finished=finished)
         else:
-            return "Error: saveDraft called with change to translated text, but user does not have the appropriate role."
+            return "Error: saveDraft called with change to translated text, but user does not have appropriate role."
     elif source_text and len(source_text) > 0:
         if confirm_user_has_role(request, "Hebrew"):
             user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
-            update_hebrew_draft(draft_key, source_text, user_info, is_finished=finished, ok_to_translate=send_to_translators)
+            update_hebrew_draft(draft_key, source_text, user_info, is_finished=finished,
+                                ok_to_translate=send_to_translators)
         else:
             return "Error: saveDraft called with change to Hebrew text, but user does not have the appropriate role."
     else:
@@ -614,7 +661,8 @@ def get_untranslated_additions():
     if heb_draft_id is None:
         debug("ERROR: /getUntranslatedAdditions got None heb_draft_id!")
         return None
-    # actually we want to compare with the draft as it was when the translation being worked on was created - which is saved in the hebrew_text field of the draft object!
+    # actually we want to compare with the draft as it was when the translation being worked on was created
+    # - which is saved in the hebrew_text field of the draft object!
     translation_draft_id = Key.from_legacy_urlsafe(request.args.get('translation_draft_id'))
     if translation_draft_id is None:
         debug("ERROR: /getUntranslatedAdditions got None translation_draft_id!")
@@ -632,12 +680,15 @@ def get_untranslated_additions():
 
     lang = request.args.get('lang')
     try:
-        additions_by_section, translated_additions_by_section = get_translated_additions_since_ok_to_translate(heb_draft['hebrew_text'], translated_draft['hebrew_text'], target_lang=lang)
+        additions_by_section, translated_additions_by_section = (
+            get_translated_additions_since_ok_to_translate(
+                            heb_draft['hebrew_text'], translated_draft['hebrew_text'], target_lang=lang))
     except:
         debug("There was an error trying to get deltas, returning no deltas.")
         additions_by_section = translated_additions_by_section = {}
 
-    response = Markup(json.dumps({"additions":additions_by_section, "translated_additions":translated_additions_by_section}))
+    response = Markup(json.dumps({"additions": additions_by_section,
+                                  "translated_additions": translated_additions_by_section}))
     print(response)
     return response
 
@@ -645,13 +696,14 @@ def get_untranslated_additions():
 @tamtzit.route('/start_daily_summary')
 @require_login
 def start_daily_summary():
-    next_page = "start_daily_summary.html" # not doing detect mobile - there's only one version of this page, suitable for both desktop and mobile
+    next_page = "start_daily_summary.html"
+    # not doing detect mobile - there's only one version of this page, suitable for both desktop and mobile
 
     lang = request.args.get("lang") or 'he'
     if lang == 'he':
         if not confirm_user_has_role(request, ["Hebrew", "editor", "admin"]):
             return render_template("error.html", msg="You don't have access to this section.",
-                                heb_msg="חלק הזה של האתר מיועד למשתמשים אחרים")
+                                   heb_msg="חלק הזה של האתר מיועד למשתמשים אחרים")
     else:
         raise ValueError("Invalid lang parameter for start_daily_summary")
     
@@ -660,12 +712,14 @@ def start_daily_summary():
     organized_editions = {}
     for edition_time_of_day in yesterdays_editions:
         edition = yesterdays_editions[edition_time_of_day]
-        processed_text_info = process_translation_request(edition['hebrew_text' if lang == 'he' else 'translation_text'], lang)
+        processed_text_info = (
+            process_translation_request(edition['hebrew_text' if lang == 'he' else 'translation_text'], lang))
         # we get back:
-        #  {'heb_text': heb_text, 'date_info': date_info, 'organized': organized, 'sections': sections[target_language_code]}
+        #  {'heb_text': heb_text, 'date_info': date_info, 'organized': organized,
+        #  'sections': sections[target_language_code]}
         organized_editions[edition_time_of_day] = processed_text_info['organized']
-    return render_template(next_page, organized_editions=organized_editions, times_of_day = editions, 
-                           sections_in_order = sections['keys_from_Hebrew'])
+    return render_template(next_page, organized_editions=organized_editions, times_of_day=editions,
+                           sections_in_order=sections['keys_from_Hebrew'])
 
 
 @tamtzit.route('/nightly_archive_cleanup')
@@ -728,9 +782,10 @@ def nightly_archive_cleanup():
             debug(f"n_a_c inserted entry for {edition_time_of_day}")
 
             # step 3b: save state change history to our audit table
-            key=datastore_client.key("audit")        
+            key = datastore_client.key("audit")
             entity = datastore.Entity(key=key)
-            entity.update({"date":yesterday, "edition":edition_time_of_day, "lang":lang, "states":edition['states']}) 
+            entity.update({"date": yesterday, "edition": edition_time_of_day, "lang": lang,
+                           "states": edition['states']})
             datastore_client.put(entity)
 
         # step 4: push the updated page back to cloud storage
@@ -744,7 +799,7 @@ def process_translation_request(heb_text, target_language_code):
 
     debug(f"RAW HEBREW:--------\n{heb_text}")
     debug(f"--------------------------")
-        # print(f"Split hebrew has {len(heb_lines)} lines")
+    # print(f"Split hebrew has {len(heb_lines)} lines")
 
     # strip the first few lines if necessary, they're causing some problem...
     # for i in range(5):
@@ -765,7 +820,7 @@ def process_translation_request(heb_text, target_language_code):
     debug(f"RAW TRANSLATION:--------\n{translated}")
     debug(f"--------------------------")
 
-    heb_text = Markup(heb_text) #.replace("\n", "<br>"))
+    heb_text = Markup(heb_text)  # .replace("\n", "<br>"))
     translated_lines = translated.split("\n")
 
     kw = keywords[target_language_code]
@@ -789,8 +844,8 @@ def process_translation_request(heb_text, target_language_code):
                 break
             else:
                 # @TODO
-                # this is where we need to check if we've got a special header, e.g. motzei Shabbat, and need to ignore it
-                # rather than add it to UNKNOWN
+                # this is where we need to check if we've got a special header, e.g. motzei Shabbat,
+                # and need to ignore it rather than add it to UNKNOWN
                 debug("post three dots, switching to 'unknown'")
                 section = organized['UNKNOWN']
                 continue
@@ -868,7 +923,8 @@ def process_translation_request(heb_text, target_language_code):
     # for the first pass the translation isn't sent as a block of text but rather 
     # as small blocks broken down by section. Later after the first human review pass we'll save it
     # as a contiguous block in the DB and going forward work from that
-    result = {'heb_text': heb_text, 'date_info': date_info, 'organized': organized, 'sections': sections[target_language_code]}
+    result = {'heb_text': heb_text, 'date_info': date_info, 'organized': organized,
+              'sections': sections[target_language_code]}
     return result
 
 

@@ -4,7 +4,12 @@ import json
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 from google.cloud import datastore
-from .common import debug, DatastoreClientProxy
+
+if __package__ is None or __package__ == '':
+    # uses current directory visibility
+    from common import DatastoreClientProxy, debug
+else:
+    from .common import debug, DatastoreClientProxy
 
 class Cookies:
 

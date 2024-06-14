@@ -1,0 +1,102 @@
+<html>
+    <head>
+        <style>
+            .edition_selected {
+                height: 100px;
+                border: 1px solid #A9A9A9;
+                background-color: #55CC55;
+            }
+            .edition_deselected {
+                height: 100px;
+                border: 1px solid #A9A9A9;
+                background-color: #FFFFFF;
+            }
+            .edition_disabled {
+                height: 100px;
+                border: 1px solid #A9A9A9;
+                background-color: #A9A9A9;
+            }
+        </style>
+        <script>
+            var availability = JSON.parse(`{{user_availability}}`);
+            var editions_to_skip = JSON.parse(`{{editions_to_skip}}`);
+            day_parts = ['Morning', 'Afternoon', 'Evening'];
+
+            function edition_clicked(edition_cell) {
+                if (edition_cell.className == "edition_disabled") {
+                    return;
+                }
+
+                edition_parts = edition_cell.id.split('.');
+                day_part_num = day_parts.indexOf(edition_parts[1]);
+
+                if (edition_cell.className == "edition_selected") {
+                    edition_cell.className = "edition_deselected";
+                    availability[edition_parts[0]][day_part_num] = 0;
+                } else {
+                    edition_cell.className = "edition_selected";
+                    availability[edition_parts[0]][day_part_num] = 1;
+                }    
+                fetch("/tx_schedule_update?" + new URLSearchParams({
+                    updated_availability: JSON.stringify(availability)
+                })
+                ).then(
+                    // as long as it returns success, don't do anything
+                    // (response) => {return response.json();}
+                ).then(
+                    // (obj) => {
+                    // }
+                ).catch(function(error) {
+                    console.log(error);
+                });                        
+            }
+
+            function update_table_with_availability() {
+                for (day_name in availability) {
+                    for (day_part_num in day_parts) {
+                        day_part = day_parts[day_part_num];
+                        is_avail = availability[day_name][day_part_num];
+                        to_skip = editions_to_skip[day_name][day_part_num];
+                        that_td = document.getElementById(day_name + "." + day_part);
+                        if (is_avail == 1) {
+                            that_td.className = "edition_selected";
+                        }
+                        if (to_skip == 1) {
+                            that_td.className = "edition_disabled";
+                        }
+                    }
+                }
+            }
+        </script>
+    </head>
+    <body onload="update_table_with_availability();">
+        <center>
+            <br>
+            <h3>Schedule for the week of {{week_being_scheduled}}</h3>
+            <table border="1">
+                <tr>
+                    {% for day_name in week %}
+                        <th style="padding-top:10px; padding-bottom:10px">{{day_name}}</th>
+                    {% endfor %}        
+                </tr>
+                <tr>
+                    {% for day_name in week %}
+                        <td align="center">
+                            <table border="0" cellspacing="10px" cellpadding="14px">
+                                {% for edition in [week[day_name].morning, week[day_name].afternoon, week[day_name].evening] %}
+                                    <tr>
+                                        <td id="{{day_name}}.{{edition.name}}" onclick="edition_clicked(this);" class="edition_deselected">
+                                            <div>{{ edition.name }}</div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </table>
+                        </td>
+                    {% endfor %}        
+                </tr>
+            </table>
+            <br><br><br>
+            The algorithm for scheduling translators and reviewers is <a target="_blank" href="https://w.splitc.com/en/tamtzit/translation-scheduling">documented here.</a>
+        </center>
+    </body>
+</html>

@@ -13,7 +13,7 @@ from markupsafe import Markup
 import requests
 
 from .auth_utils import confirm_user_has_role, consume_invitation, create_invitation, get_user, require_login
-from .auth_utils import require_role
+from .auth_utils import require_role, get_user_availability, update_user_availability
 from .auth_utils import send_invitation, validate_weekly_birthcert
 from .common import _set_debug, ARCHIVE_BASE, debug, DatastoreClientProxy, expand_lang_code, JERUSALEM_TZ
 from .cookies import Cookies, get_cookie_dict, get_today_noise, make_cookie_from_dict, make_daily_cookie
@@ -23,6 +23,7 @@ from .draft_utils import make_new_archive_entry, upload_to_cloud_storage, update
 from .diff_draft_versions import get_translated_additions_since_ok_to_translate
 from .language_mappings import editions, keywords, sections, supported_langs_mapping
 from .translation_utils import translate_text
+from .weekly_schedule import week
 
 translation_client = translate.TranslationServiceClient()
 
@@ -720,6 +721,56 @@ def start_daily_summary():
         organized_editions[edition_time_of_day] = processed_text_info['organized']
     return render_template(next_page, organized_editions=organized_editions, times_of_day=editions,
                            sections_in_order=sections['keys_from_Hebrew'])
+
+
+@tamtzit.route('/tx_schedule_curr')
+def route_translation_current_schedule():
+    return make_response(redirect("https://docs.google.com/spreadsheets/d/1ataLRPh19z_EKiFTM9CxuoVKYL8VvxhQL8h5hZqBtY4/edit?gid=0#gid=0"))
+
+
+class FakeKey:
+    def __init__(self) -> None:
+        self.id = 0
+class FakeUser:
+    def __init__(self) -> None:
+        self.key = FakeKey()
+
+zero_user = FakeUser()
+
+@tamtzit.route('/tx_schedule_signup')
+@require_login
+@require_role("translator")
+def route_translation_schedule_signup():
+    now = datetime.now()
+    dow = now.isoweekday()  # Monday = 1, Sunday = 7
+    read_only = (dow == 6 and now.hour == 23) or (dow == 7 and now.hour < 6)
+    db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
+
+    # you can schedule *next week* any time from Sunday morning 6 am until Sat night 11pm. 
+    # No scheduling allowed Sat night 11pm -> Sun morning so no one gets confused that they're affecting this week
+    week_from = now + timedelta(days=(7-dow))
+    week_to = week_from + timedelta(days=6)
+    week_being_scheduled = week_from.strftime("%B %d") + " to " + week_to.strftime("%B %d")
+    user_schedule_availability = get_user_availability(db_user_info, week_from.strftime("%B %d"))
+    usa_as_json = json.dumps(user_schedule_availability['available'])
+    editions_to_skip = get_user_availability(zero_user, week_from.strftime("%B %d"))
+
+    debug("tx_schedule_signup returning availability: " + Markup(usa_as_json))
+    return render_template("tx_signup.html", week=week, week_being_scheduled=week_being_scheduled, 
+                           user_availability=Markup(usa_as_json), read_only=read_only, 
+                           editions_to_skip=Markup(json.dumps(editions_to_skip['available'])))
+
+
+@tamtzit.route('/tx_schedule_update')
+@require_login
+@require_role("translator")
+def route_translation_schedule_change():
+    db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
+    now = datetime.now()
+    dow = now.isoweekday()  # Monday = 1, Sunday = 7
+    week_from = now + timedelta(days=(7-dow))
+    update_user_availability(db_user_info, week_from.strftime("%B %d"), json.loads(request.args.get('updated_availability')))
+    return "OK"
 
 
 @tamtzit.route('/nightly_archive_cleanup')

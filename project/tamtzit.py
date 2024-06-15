@@ -5,10 +5,10 @@ import json
 import re
 from zoneinfo import ZoneInfo
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from flask import Blueprint, render_template, request, redirect, make_response
-from google.cloud import translate, datastore
-from google.cloud.datastore.key import Key
+from google.cloud import translate, datastore  # noqa -- Intellij is incorrectly flagging the import
+from google.cloud.datastore.key import Key  # noqa -- Intellij is incorrectly flagging the import
 from markupsafe import Markup
 import requests
 
@@ -59,7 +59,7 @@ datastore_client = DatastoreClientProxy.get_instance()
 # to delete, use the key:
 # key.delete()
 
-            
+
 tamtzit = Blueprint('tamtzit', __name__)
 
 
@@ -93,7 +93,7 @@ def route_authenticate():
         if not weekly_cookie:
             debug("No weekly cookie found")
             return render_template("login.html")
-            
+
         # how to create and manage the weekly cookie?
         # one option: just keep a week's worth of entries of the daily noise, check each one of them for inclusion
         # in the weekly cookie and delete any old ones as they're found
@@ -103,8 +103,8 @@ def route_authenticate():
         if Cookies.COOKIE_CERT not in weekly_session:
             debug("Weekly cookie is not valid")
             return render_template("login.html")
-        bcert = weekly_session[Cookies.COOKIE_CERT]        
-        if validate_weekly_birthcert(bcert):  
+        bcert = weekly_session[Cookies.COOKIE_CERT]
+        if validate_weekly_birthcert(bcert):
             debug("weekly cookie is valid, refreshing it, setting daily cookie and redirecting to " +
                   request.args.get('requested'))
             weekly_session[Cookies.COOKIE_CERT] = get_today_noise()
@@ -120,7 +120,7 @@ def route_authenticate():
         else:
             debug("Weekly cookie is not valid")
             return render_template("login.html")
-    else: 
+    else:
         # handle login form submission    
         email = request.form.get("email")
         debug("login attempt from user " + email)
@@ -129,7 +129,7 @@ def route_authenticate():
             return render_template("error.html", dont_show_home_link=True,
                                    msg="The email address you provided is unknown. Contact the admin.",
                                    heb_msg="כתובת מייל זו לא מוכרת. צור קשר עם משה.")
-    
+
         debug("Confirmed - it's a known user. Preparing an invitation link...")
         # create an invitation link and store it in the DB
         invitation = create_invitation(user_details)
@@ -212,7 +212,7 @@ def check_if_daily_summary_in_progress(lang):
     drafts, local_tses = fetch_drafts()
 
     for draft in drafts:
-        if draft['translation_lang'] != lang: 
+        if draft['translation_lang'] != lang:
             continue
 
         draft_last_mod = draft['last_edit']
@@ -284,7 +284,7 @@ def route_use_invitation_link():
     user_details = consume_invitation(invitation)
 
     if user_details:
-        
+
         debug(f"/use_invitation: valid invitation for user {user_details['email']}")
 
         new_cookie = make_daily_cookie(user_details)
@@ -317,7 +317,7 @@ def route_hebrew_template():
 
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
     for draft in drafts:
-        if draft['translation_lang'] != '--': 
+        if draft['translation_lang'] != '--':
             continue
 
         debug(f"/heb: should we show draft w/ lang={draft['translation_lang']}, " +
@@ -349,7 +349,7 @@ def route_hebrew_template():
                             req_rule=request.url_rule.rule))
         refresh_cookies(request, response)
         return response
-            
+
     # if no current draft was found, create a new one so that we have a key to work with and save to while editing
     key = create_draft('', current_user_info, translation_lang='--')
 
@@ -434,7 +434,7 @@ def route_hebrew_restart():
 
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
     for draft in drafts:
-        if draft['translation_lang'] != '--': 
+        if draft['translation_lang'] != '--':
             continue
 
         draft_last_mod = draft['last_edit']
@@ -444,7 +444,7 @@ def route_hebrew_restart():
         else:
             debug("/heb-restart: Overriding last edit time of most recent Hebrew draft")
             edit_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem')) + timedelta(hours=-2)
-            draft.update({"last_edit": edit_timestamp}) 
+            draft.update({"last_edit": edit_timestamp})
             draft.update({"is_finished": True})
             prev_states = draft["states"]
             prev_states.append({"state": DraftStates.ADMIN_CLOSED.name, "at": dt.strftime('%Y%m%d-%H%M%S'),
@@ -454,7 +454,7 @@ def route_hebrew_restart():
             break
 
     return make_response(redirect("/"))
-        
+
 
 @tamtzit.route("/set-debug-mode")
 @require_login
@@ -477,7 +477,7 @@ def route_mark_published():
 
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
     for draft in drafts:
-        if draft['translation_lang'] != edition_lang: 
+        if draft['translation_lang'] != edition_lang:
             continue
 
         draft_last_mod = draft['last_edit']
@@ -527,24 +527,24 @@ def route_start_translation():
 
     if len(latest_heb) == 0:
         return render_template("error.html", msg="There is no current edition ready for translation.")
-    
+
     # we need to restart the iterator
-    drafts, local_tses = fetch_drafts() 
+    drafts, local_tses = fetch_drafts()
     next_page = detect_mobile(request, "input")
-    return render_template(next_page, heb_text=latest_heb, creator_id=latest_creator, draft_id=draft_id, 
+    return render_template(next_page, heb_text=latest_heb, creator_id=latest_creator, draft_id=draft_id,
                            drafts=drafts, local_timestamps=local_tses, supported_langs=supported_langs_mapping,
                            states=draft['states'])
 
 
-'''
-/translate and /draft are very similar:
-   /translate creates a new entry based on the submission of the form at /start_translate  (POST)
-   /draft     edits an existing entry based on a link       (GET)
-'''
 @tamtzit.route("/draft", methods=['GET'])
 @require_login
 @require_role("translator")
 def continue_draft():
+    """
+    /translate and /draft are very similar:
+       /translate creates a new entry based on the submission of the form at /start_translate  (POST)
+       /draft     edits an existing entry based on a link       (GET)
+    """
     next_page = detect_mobile(request, "editing")
     user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
 
@@ -567,24 +567,24 @@ def continue_draft():
 
             return render_template(next_page, heb_text=Markup(heb_text), translated=Markup(translated),
                                    draft_timestamp=draft_timestamp,
-                                   lang=draft['translation_lang'], **names,  user_info=user_info,
+                                   lang=draft['translation_lang'], **names, user_info=user_info,
                                    draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=draft['heb_draft_id'],
-                                   heb_font_size=font_size_prefs['he'], en_font_size=font_size_prefs['en'], 
+                                   heb_font_size=font_size_prefs['he'], en_font_size=font_size_prefs['en'],
                                    is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
                                    states=draft['states'])
 
     return "Draft not found, please start again."
 
 
-'''
-/translate and /draft are very similar:
-   /translate creates a new entry based on the submission of the form at /  (POST)
-   /draft     edits an existing entry based on a link on the main page      (GET)
-'''
 @tamtzit.route('/translate', methods=['POST'])
 @require_login
 @require_role("translator")
 def process():
+    """
+    /translate and /draft are very similar:
+       /translate creates a new entry based on the submission of the form at /  (POST)
+       /draft     edits an existing entry based on a link on the main page      (GET)
+    """
     heb_text = request.form.get('orig_text')
     if not heb_text:
         return "Input field was missing."
@@ -602,7 +602,7 @@ def process():
         "translator_in_en": user_info["name"]
     }
     font_size_prefs = get_font_sz_prefs(request)
-    
+
     info = process_translation_request(heb_text, target_language_code)
     dt = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     draft_timestamp = dt.strftime('%Y%m%d-%H%M%S')
@@ -616,7 +616,7 @@ def process():
                        heb_draft_id=request.form.get('heb_draft_id'))
     return render_template(next_page, heb_text=Markup(heb_text), translated=Markup(translated),
                            lang=target_language_code, in_progress=False, user_info=user_info,
-                           heb_font_size=font_size_prefs['he'], en_font_size=font_size_prefs['en'], 
+                           heb_font_size=font_size_prefs['he'], en_font_size=font_size_prefs['en'],
                            states=[{"state": DraftStates.WRITING.name, "at": draft_timestamp,
                                     "by": user_info["name"], "by_heb": user_info["name_hebrew"]}],
                            draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'),
@@ -683,8 +683,8 @@ def get_untranslated_additions():
     try:
         additions_by_section, translated_additions_by_section = (
             get_translated_additions_since_ok_to_translate(
-                            heb_draft['hebrew_text'], translated_draft['hebrew_text'], target_lang=lang))
-    except:
+                heb_draft['hebrew_text'], translated_draft['hebrew_text'], target_lang=lang))
+    except Exception:  # noqa eventually I should find the right exception classes
         debug("There was an error trying to get deltas, returning no deltas.")
         additions_by_section = translated_additions_by_section = {}
 
@@ -707,7 +707,7 @@ def start_daily_summary():
                                    heb_msg="חלק הזה של האתר מיועד למשתמשים אחרים")
     else:
         raise ValueError("Invalid lang parameter for start_daily_summary")
-    
+
     # this is a map from edition name (morning, afternoon, eve) to a draft object
     yesterdays_editions = get_latest_day_worth_of_editions()[lang]
     organized_editions = {}
@@ -725,17 +725,22 @@ def start_daily_summary():
 
 @tamtzit.route('/tx_schedule_curr')
 def route_translation_current_schedule():
-    return make_response(redirect("https://docs.google.com/spreadsheets/d/1ataLRPh19z_EKiFTM9CxuoVKYL8VvxhQL8h5hZqBtY4/edit?gid=0#gid=0"))
+    return make_response(redirect(
+        "https://docs.google.com/spreadsheets/d/1ataLRPh19z_EKiFTM9CxuoVKYL8VvxhQL8h5hZqBtY4/edit?gid=0#gid=0"))
 
 
 class FakeKey:
     def __init__(self) -> None:
         self.id = 0
+
+
 class FakeUser:
     def __init__(self) -> None:
         self.key = FakeKey()
 
+
 zero_user = FakeUser()
+
 
 @tamtzit.route('/tx_schedule_signup')
 @require_login
@@ -748,7 +753,7 @@ def route_translation_schedule_signup():
 
     # you can schedule *next week* any time from Sunday morning 6 am until Sat night 11pm. 
     # No scheduling allowed Sat night 11pm -> Sun morning so no one gets confused that they're affecting this week
-    week_from = now + timedelta(days=(7-dow))
+    week_from = now + timedelta(days=(7 - dow))
     week_to = week_from + timedelta(days=6)
     week_being_scheduled = week_from.strftime("%B %d") + " to " + week_to.strftime("%B %d")
     user_schedule_availability = get_user_availability(db_user_info, week_from.strftime("%B %d"))
@@ -756,8 +761,8 @@ def route_translation_schedule_signup():
     editions_to_skip = get_user_availability(zero_user, week_from.strftime("%B %d"))
 
     debug("tx_schedule_signup returning availability: " + Markup(usa_as_json))
-    return render_template("tx_signup.html", week=week, week_being_scheduled=week_being_scheduled, 
-                           user_availability=Markup(usa_as_json), read_only=read_only, 
+    return render_template("tx_signup.html", week=week, week_being_scheduled=week_being_scheduled,
+                           user_availability=Markup(usa_as_json), read_only=read_only,
                            editions_to_skip=Markup(json.dumps(editions_to_skip['available'])))
 
 
@@ -768,8 +773,9 @@ def route_translation_schedule_change():
     db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
     now = datetime.now()
     dow = now.isoweekday()  # Monday = 1, Sunday = 7
-    week_from = now + timedelta(days=(7-dow))
-    update_user_availability(db_user_info, week_from.strftime("%B %d"), json.loads(request.args.get('updated_availability')))
+    week_from = now + timedelta(days=(7 - dow))
+    update_user_availability(db_user_info, week_from.strftime("%B %d"),
+                             json.loads(request.args.get('updated_availability')))
     return "OK"
 
 
@@ -782,7 +788,7 @@ def nightly_archive_cleanup():
     if 'X-Appengine-Cron' not in request.headers or request.headers['X-Appengine-Cron'] != 'true':
         debug("This request does not come from AppEngine, so ignoring it.")
         # return
-    
+
     debug(f"n_a_c headers look good, progressing")
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
 
@@ -801,6 +807,7 @@ def nightly_archive_cleanup():
 
         # step 2: strip out all of yesterday's entries from the archives, if any
         for div in soup.find_all("div"):
+            div: Tag
             if div is None:
                 debug("Strange - got a None div, continuing...")
                 continue
@@ -812,7 +819,7 @@ def nightly_archive_cleanup():
                 continue
             if 'id' not in div.attrs:
                 debug(f"Deleting a div with no id: {div}")
-                div.decompose()  
+                div.decompose()
                 continue
             if div.attrs['id'] == 'next-entry':
                 debug("skipping next-entry div")
@@ -825,7 +832,6 @@ def nightly_archive_cleanup():
 
         # step 3: insert (in reverse chronological order) 1 entry for each of yestderday's editions        
         for edition_time_of_day in reversed(yesterdays_editions[lang]):
-
             edition = yesterdays_editions[lang][edition_time_of_day]
             anchor = edition['timestamp'].astimezone(JERUSALEM_TZ).strftime('%Y-%m-%d') + '-' + edition_time_of_day
 
@@ -927,7 +933,7 @@ def process_translation_request(heb_text, target_language_code):
             debug("pin line...")
             if kw['intro_pin'] in line.lower():
                 debug("skipping what looks like the intro pin line")
-                continue            
+                continue
             if kw["security"] in line.lower():
                 debug("starting Security section")
                 section = organized['Security']
@@ -949,14 +955,14 @@ def process_translation_request(heb_text, target_language_code):
             elif kw["sport"] in line.lower():
                 debug("Starting sports section")
                 section = organized["Sports"]
-            elif (kw["finish"] in line.lower() or "good note" in line.lower() or "end well" in line.lower() 
+            elif (kw["finish"] in line.lower() or "good note" in line.lower() or "end well" in line.lower()
                   or "bien finir" in line.lower() or "finit bien" in line.lower()):
                 debug("Starting good news section")
                 section = organized['FinishWell']
             else:
                 section = organized['UNKNOWN']
                 debug("Adding to unknown: " + line)
-                section.append(Markup(line))    
+                section.append(Markup(line))
         else:
             debug("regular text line")
             if section is None:
@@ -964,13 +970,13 @@ def process_translation_request(heb_text, target_language_code):
                 debug("Adding to unknown (b): " + line)
 
             section.append(Markup(line))
-   
+
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
     date_info = make_date_info(dt, target_language_code)
 
     if len(organized["UNKNOWN"]) == 0:
         del organized["UNKNOWN"]
-        
+
     # for the first pass the translation isn't sent as a block of text but rather 
     # as small blocks broken down by section. Later after the first human review pass we'll save it
     # as a contiguous block in the DB and going forward work from that

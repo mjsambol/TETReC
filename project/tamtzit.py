@@ -21,7 +21,7 @@ from .cookies import Cookies, get_cookie_dict, get_today_noise, make_cookie_from
 from .cookies import user_data_from_req
 from .draft_utils import create_draft, DraftStates, fetch_drafts, get_latest_day_worth_of_editions, make_date_info
 from .draft_utils import make_new_archive_entry, upload_to_cloud_storage, update_hebrew_draft, update_translation_draft
-from .diff_draft_versions import get_translated_additions_since_ok_to_translate
+from .diff_draft_versions import get_translated_additions_since_ok_to_tx
 from .language_mappings import editions, keywords, sections, supported_langs_mapping
 from .translation_utils import translate_text
 from .weekly_schedule import week
@@ -594,7 +594,6 @@ def process():
 
     target_language_code = request.form.get('target-lang')
     target_lang = supported_langs_mapping[target_language_code]
-    next_page = detect_mobile(request, "editing")
     basic_user_info = user_data_from_req(request)
     user_info = get_user(user_id=basic_user_info["user_id"])
     draft_creator_user_info = get_user(user_id=request.form.get('heb_author_id'))
@@ -604,7 +603,6 @@ def process():
         "translator_in_heb": user_info["name_hebrew"],
         "translator_in_en": user_info["name"]
     }
-    font_size_prefs = get_font_sz_prefs(request)
 
     info = process_translation_request(heb_text, target_language_code)
     dt = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
@@ -617,21 +615,11 @@ def process():
     # this is necessary because the template can generate large gaps due to unused sections
 
     # store the draft in DB so that someone else can continue the translation work
-    key = create_draft(heb_text, user_info, translation_text=translated, translation_lang=target_language_code,
-                       heb_draft_id=request.form.get('heb_draft_id'))
+    create_draft(heb_text, user_info, translation_text=translated, translation_lang=target_language_code,
+                 heb_draft_id=request.form.get('heb_draft_id'))
     
     # redirect to /draft so that we'll have the proper link in the URL bar for sharing
     return make_response(redirect(url_for("tamtzit.continue_draft", ts=utc_draft_timestamp_str, edit="true")))
-
-    # return render_template(next_page, heb_text=Markup(heb_text), translated=Markup(translated),
-    #                        draft_timestamp=draft_timestamp, 
-    #                        lang=target_language_code, user_info=user_info,
-    #                        draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=request.form.get('heb_draft_id'),
-    #                        heb_font_size=font_size_prefs['he'], en_font_size=font_size_prefs['en'],
-    #                        in_progress=False, 
-    #                        states=[{"state": DraftStates.WRITING.name, "at": draft_timestamp,
-    #                                 "by": user_info["name"], "by_heb": user_info["name_hebrew"]}]
-    #                        )
 
 
 @tamtzit.route("/saveDraft", methods=['POST'])
@@ -693,7 +681,7 @@ def get_untranslated_additions():
     lang = request.args.get('lang')
     try:
         additions_by_section, translated_additions_by_section = (
-            get_translated_additions_since_ok_to_translate(
+            get_translated_additions_since_ok_to_tx(
                 heb_draft['hebrew_text'], translated_draft['hebrew_text'], target_lang=lang))
     except Exception:  # noqa eventually I should find the right exception classes
         debug("There was an error trying to get deltas, returning no deltas.")

@@ -9,23 +9,28 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from enum import Enum, auto
 
+from .language_mappings import locales
+
 ARCHIVE_BASE = "https://storage.googleapis.com/tamtzit-archive/"
 JERUSALEM_TZ = ZoneInfo("Asia/Jerusalem")
 
 debug_state = os.getenv("FLASK_DEBUG") == "1"
 
+
 def _set_debug(new_state):
     global debug_state
-    if type(new_state) == bool:
+    if type(new_state) is bool:
         debug_state = new_state
     else:
-        debug_state = type(new_state) == str and new_state.lower() in ['on', 'true', 'debug', "1"]
+        debug_state = type(new_state) is str and new_state.lower() in ['on', 'true', 'debug', "1"]
     return debug_state
+
 
 def debug(stuff):
     if debug_state:
         now = datetime.now(tz=ZoneInfo("Asia/Jerusalem"))
         print(f"DEBUG: [{now.strftime('%d/%m/%Y %H:%M:%S')}] {stuff}")
+
 
 def expand_lang_code(from_lang, to_lang='H'):
     if to_lang == 'H':
@@ -59,9 +64,9 @@ class DraftStates(Enum):
     ADMIN_CLOSED = auto()
 
 
-def compareDraftStateLists(dict_of_states1, dict_of_states2):
-    states_in_order = [DraftStates.PUBLISHED, DraftStates.PUBLISH_READY, DraftStates.EDIT_NEAR_DONE, DraftStates.EDIT_ONGOING, 
-                       DraftStates.EDIT_READY, DraftStates.WRITING]
+def compare_draft_state_lists(dict_of_states1, dict_of_states2):
+    states_in_order = [DraftStates.PUBLISHED, DraftStates.PUBLISH_READY, DraftStates.EDIT_NEAR_DONE,
+                       DraftStates.EDIT_ONGOING, DraftStates.EDIT_READY, DraftStates.WRITING]
     for state in states_in_order:
         if state in dict_of_states1:
             if state in dict_of_states2:
@@ -101,11 +106,11 @@ class DatastoreClientProxy:
         return self.client.delete(key)
     
     def query(self, kind):
-        return self.client.query(kind =("debug_" if self.debug_mode else "") + kind)
+        return self.client.query(kind=("debug_" if self.debug_mode else "") + kind)
 
 
 @dataclass
-class DateInfo():
+class DateInfo:
     part_of_day: str
     day_of_week: str
     hebrew_dom: int
@@ -122,12 +127,12 @@ class DateInfo():
     erev_shabbat: bool
 
     def __init__(self, dt, lang, part_of_day, motzei_shabbat_early, erev_shabbat):
-        oct6 = datetime(2023,10,6,tzinfo=ZoneInfo('Asia/Jerusalem'))
+        oct6 = datetime(2023, 10, 6, tzinfo=ZoneInfo('Asia/Jerusalem'))
         heb_dt = dates.HebrewDate.from_pydate(dt)
 
         self.part_of_day     = part_of_day
-        self.day_of_week     = format_date(dt, "EEEE", locale=lang)  #dt.strftime('%A')
-        self.secular_month   = format_date(dt, "MMMM", locale=lang)
+        self.day_of_week     = format_date(dt, "EEEE", locale=locales[lang])  # dt.strftime('%A')
+        self.secular_month   = format_date(dt, "MMMM", locale=locales[lang])
         self.secular_dom     = dt.day
         self.secular_year    = dt.year 
         self.hebrew_dom      = heb_dt.day

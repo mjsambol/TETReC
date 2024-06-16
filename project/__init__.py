@@ -7,11 +7,12 @@ from flask import Flask
 #
 # To package it and transfer it to the server where it will run: from the parent directory:
 # tar --exclude="__pycache__" --exclude="venv" --exclude=".git" -cvzf training-admin.tgz lightrun-training-admin/
-# scp -i /home/moshe/cloud/AWS/moshes-aws-2.pem training-admin.tgz ubuntu@ec2-54-241-230-139.us-west-1.compute.amazonaws.com:~
+# scp -i /home/moshe/cloud/AWS/moshes-aws-2.pem training-admin.tgz ubuntu@ec2-54-241-230-139.us-west-1.compute.amazonaws.com:~    # noqa
 ##
 
 # init SQLAlchemy so we can use it later in our models
-#db = SQLAlchemy()
+# db = SQLAlchemy()
+
 
 def create_app():
     app = Flask(__name__)

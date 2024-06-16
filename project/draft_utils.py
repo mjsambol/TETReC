@@ -3,13 +3,13 @@ from google.cloud import datastore, storage
 from google.cloud.datastore.query import PropertyFilter
 import requests
 
-from .common import ARCHIVE_BASE, compareDraftStateLists, DateInfo, debug, DatastoreClientProxy, DraftStates, JERUSALEM_TZ
-from .language_mappings import editions, locales
+from .common import ARCHIVE_BASE, compare_draft_state_lists, DateInfo, debug, DatastoreClientProxy, DraftStates
+from .common import JERUSALEM_TZ
+from .language_mappings import editions
 
 import cachetools.func
 from collections import defaultdict
 from datetime import datetime
-import locale
 import re
 from zoneinfo import ZoneInfo
 
@@ -19,6 +19,7 @@ storage_client = storage.Client()
 archive_bucket = storage_client.bucket("tamtzit-archive")
 
 datastore_client = DatastoreClientProxy.get_instance()
+
 
 def make_new_archive_entry(soup, next_entry_tag, draft, anchor, lang_code):
     new_entry = soup.new_tag("div")
@@ -42,7 +43,8 @@ def make_new_archive_entry(soup, next_entry_tag, draft, anchor, lang_code):
     tr_tag.append(td_tag)
 
     script_tag = soup.new_tag("script")
-    script_tag.string = f"document.getElementById('{anchor}-td').innerHTML = makeWhatsappPreview(`{draft['hebrew_text'] if lang_code == 'he' else draft['translation_text']}`);"
+    script_tag.string = f"""document.getElementById('{anchor}-td').innerHTML = 
+                makeWhatsappPreview(`{draft['hebrew_text'] if lang_code == 'he' else draft['translation_text']}`);"""
     td_tag.append(script_tag)
 
     other_langs_div = soup.new_tag("div")
@@ -88,7 +90,7 @@ def get_latest_day_worth_of_editions():
             yesterdays_editions[draft_lang][draft_time_of_day] = draft
             debug(f"added {draft_time_of_day} to yesterdays_Editions for lang {draft_lang}")            
         else:
-            draft_maturity = compareDraftStateLists(draft, yesterdays_editions[draft_lang][draft_time_of_day])
+            draft_maturity = compare_draft_state_lists(draft, yesterdays_editions[draft_lang][draft_time_of_day])
             if draft_maturity == -1:
                 yesterdays_editions[draft_lang][draft_time_of_day] = draft
                 debug(f"Yes, this is the most mature draft found so far.")
@@ -99,7 +101,7 @@ def get_latest_day_worth_of_editions():
 
 
 def get_more_mature_draft(draft1, draft2):
-    draft_maturity = compareDraftStateLists(draft1['states'], draft2['states'])
+    draft_maturity = compare_draft_state_lists(draft1['states'], draft2['states'])
     if draft_maturity == 1:
         return draft2
     return draft1  # we have to return something when they're equal so arbitrarily going with the first one
@@ -109,7 +111,7 @@ def get_edition_name_from_text(edition, as_english_always=True):
     lang = edition['translation_lang']
     text = edition['hebrew_text']
     debug(f"g_e_n_f_t: lang={lang}")
-    m = re.search("^\*?מהדורת ([א-ת]+),", text, re.MULTILINE)
+    m = re.search("^\*?מהדורת ([א-ת]+),", text, re.MULTILINE)   # noqa - the pattern works
     if m:
         debug(f"g_e_n_f_t found {m.group(1)}, localizing...")
         edition_index = editions['he'].index(m.group(1))
@@ -120,6 +122,7 @@ def get_edition_name_from_text(edition, as_english_always=True):
         return editions[lang][edition_index]
     debug(f"g_e_n_f_t: lang={lang}, can't find edition name, returning UNKNOWN, text was: \n\n{text}\n\n")
     return "UNKNOWN"
+
 
 # this method is used to build a list of recent translations for the list which is shown on the 
 # input.html page, the main page where translators start a new draft
@@ -146,27 +149,29 @@ def fetch_drafts(query_order="-timestamp"):
                 datastore_client.delete(dbkup.key)
         else:
             draft_last_change_ts = draft['last_edit']
-            drafts_local_timestamps[draft_start_ts] = (draft_start_ts.astimezone(JERUSALEM_TZ), draft_last_change_ts.astimezone(JERUSALEM_TZ))
+            drafts_local_timestamps[draft_start_ts] = \
+                (draft_start_ts.astimezone(JERUSALEM_TZ), draft_last_change_ts.astimezone(JERUSALEM_TZ))
             drafts_to_return.append(draft)
             
     return drafts_to_return, drafts_local_timestamps
     
 
 def create_draft(heb_text, user_info, translation_text='', translation_lang='en', heb_draft_id=None):
-    '''Create a new entry in the Datastore, save the original text and, optionally, the translation, and return the new key and timestamp'''
+    """Create a new entry in the Datastore, save the original text and, optionally, the translation,
+    and return the new key and timestamp"""
 
     if len(heb_text) > 0 and heb_draft_id is None:
         debug("create_draft() ERROR: received heb_text but no heb_draft_id")
         raise ValueError("No draft ID though text is present")
 
-    key=datastore_client.key("draft")
+    key = datastore_client.key("draft")
     draft_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
-    entity = datastore.Entity(key=key, exclude_from_indexes=["hebrew_text","translation_text"])
+    entity = datastore.Entity(key=key, exclude_from_indexes=("hebrew_text", "translation_text"))
     entity.update({"hebrew_text": heb_text, "heb_draft_id": heb_draft_id, 
                    "translation_text": translation_text, "translation_lang": translation_lang, 
                    "timestamp": draft_timestamp, "last_edit": draft_timestamp, 
                    "is_finished": False, "ok_to_translate": False, "created_by": user_info.key.id,
-                   "states":[{"state": DraftStates.WRITING.name, "at": draft_timestamp.strftime('%Y%m%d-%H%M%S'), 
+                   "states": [{"state": DraftStates.WRITING.name, "at": draft_timestamp.strftime('%Y%m%d-%H%M%S'),
                               "by": user_info["name"], "by_heb": user_info["name_hebrew"]}]}) 
     datastore_client.put(entity)
     entity = datastore_client.get(entity.key)
@@ -175,10 +180,13 @@ def create_draft(heb_text, user_info, translation_text='', translation_lang='en'
 
 def create_draft_history(draft):
     key = datastore_client.key("draft_backup")
-    entity = datastore.Entity(key=key, exclude_from_indexes=["hebrew_text","translation_text"])
-    entity.update({"draft_id":draft.key.id, "hebrew_text": draft["hebrew_text"], "translation_text": draft["translation_text"], 
-                   "translation_lang": draft["translation_lang"], "draft_timestamp": draft["timestamp"], "last_edit": draft["last_edit"], 
-                   "is_finished": draft["is_finished"], "ok_to_translate": draft["ok_to_translate"], "created_by": draft["created_by"],
+    entity = datastore.Entity(key=key, exclude_from_indexes=("hebrew_text", "translation_text"))
+    entity.update({"draft_id": draft.key.id, "hebrew_text": draft["hebrew_text"],
+                   "translation_text": draft["translation_text"],
+                   "translation_lang": draft["translation_lang"], "draft_timestamp": draft["timestamp"],
+                   "last_edit": draft["last_edit"],
+                   "is_finished": draft["is_finished"], "ok_to_translate": draft["ok_to_translate"],
+                   "created_by": draft["created_by"],
                    "states": draft["states"],
                    "backup_timestamp": datetime.now(tz=ZoneInfo('Asia/Jerusalem'))})
     datastore_client.put(entity)
@@ -191,7 +199,7 @@ def store_draft_backup(draft, force_backup=False):
     prev_backup_time = 0
     query2 = datastore_client.query(kind="draft_backup")
     query2.order = ["-backup_timestamp"]
-    #query2.add_filter("draft_id", "=", draft.key.id)
+    # query2.add_filter("draft_id", "=", draft.key.id)
     draft_backups = query2.fetch()
     for dbkup in draft_backups:
         if dbkup["draft_id"] != draft.key.id:
@@ -204,13 +212,15 @@ def store_draft_backup(draft, force_backup=False):
     if prev_backup_time == 0:
         debug("No prev backup found")
     else:
-        debug(f'draft last edit is {draft["last_edit"]} so the backup is {draft["last_edit"] - prev_backup_time} which is {(draft["last_edit"] - prev_backup_time).seconds} seconds old')
+        debug(f'''draft last edit is {draft["last_edit"]} so the backup is 
+                {draft["last_edit"] - prev_backup_time} 
+                which is {(draft["last_edit"] - prev_backup_time).seconds} seconds old''')
     if force_backup or prev_backup_time == 0 or (draft["last_edit"] - prev_backup_time).seconds > 90:
         debug("creating a draft backup")
         create_draft_history(draft)
 
 
-def update_translation_draft(draft_key, translated_text, user_info, is_finished=False):   # can't change the original Hebrew
+def update_translation_draft(draft_key, translated_text, user_info, is_finished=False):
     draft = datastore_client.get(draft_key)
     draft.update({"translation_text": translated_text})
     draft.update({"is_finished": is_finished})
@@ -220,7 +230,7 @@ def update_translation_draft(draft_key, translated_text, user_info, is_finished=
     # this method is specific to translation and the only states the tool supports right now for translation
     # are writing and publish_ready. Later it will be good to add additional states, at least edit_ready and published
     if is_finished and DraftStates.PUBLISH_READY.name not in [states_entry["state"] for states_entry in prev_states]:
-        prev_states.append({"state":DraftStates.PUBLISH_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), 
+        prev_states.append({"state": DraftStates.PUBLISH_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'),
                             "by": user_info["name"], "by_heb": user_info["name_hebrew"]})
 
     datastore_client.put(draft)
@@ -241,28 +251,31 @@ def update_hebrew_draft(draft_key, hebrew_text, user_info, is_finished=False, ok
         draft.update({"ok_to_translate": True})
     edit_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     draft.update({"last_edit": edit_timestamp}) 
-    # I don't know why the below line was here, whether it was ever necessary, but now it's problematic with the daily_summary flow
+    # I don't know why the below line was here, whether it was ever necessary,
+    # but now it's problematic with the daily_summary flow
     # draft.update({"translation_lang": '--'})
     prev_states = draft["states"]
 
     if ok_to_translate and DraftStates.EDIT_READY.name not in [states_entry["state"] for states_entry in prev_states]:
-        prev_states.append({"state":DraftStates.EDIT_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), 
+        prev_states.append({"state": DraftStates.EDIT_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'),
                             "by": user_info["name"], "by_heb": user_info["name_hebrew"]})
     
     if "editor" in user_info["role"]:
         if DraftStates.EDIT_ONGOING.name not in [states_entry["state"] for states_entry in prev_states]:
-            prev_states.append({"state":DraftStates.EDIT_ONGOING.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), 
+            prev_states.append({"state": DraftStates.EDIT_ONGOING.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'),
                                 "by": user_info["name"], "by_heb": user_info["name_hebrew"]})
 
         # has the bottom 20% of text changed from what it was originally?
         bottom_20_percent_changed = do_edits_reach_last_two_sections(draft)
 
-        if bottom_20_percent_changed and DraftStates.EDIT_NEAR_DONE.name not in [states_entry["state"] for states_entry in prev_states]:
-            prev_states.append({"state":DraftStates.EDIT_NEAR_DONE.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), 
+        if (bottom_20_percent_changed and
+                DraftStates.EDIT_NEAR_DONE.name not in [states_entry["state"] for states_entry in prev_states]):
+            prev_states.append({"state": DraftStates.EDIT_NEAR_DONE.name,
+                                "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'),
                                 "by": user_info["name"], "by_heb": user_info["name_hebrew"]})
         
     if is_finished and DraftStates.PUBLISH_READY.name not in [states_entry["state"] for states_entry in prev_states]:
-        prev_states.append({"state":DraftStates.PUBLISH_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'), 
+        prev_states.append({"state": DraftStates.PUBLISH_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'),
                             "by": user_info["name"], "by_heb": user_info["name_hebrew"]})
 
     datastore_client.put(draft)
@@ -279,18 +292,22 @@ def update_hebrew_draft(draft_key, hebrew_text, user_info, is_finished=False, ok
 def cache_heb_draft_text_before_edits(draft_id):
     query2 = datastore_client.query(kind="draft_backup")
     query2.order = ["-backup_timestamp"]
-    #query2.add_filter("draft_id", "=", draft.key.id)
+    # query2.add_filter("draft_id", "=", draft.key.id)
     draft_backups = query2.fetch()
     for dbkup in draft_backups:
         # this query says: give me the last backup *before* the text went into Edit mode
-        if dbkup["draft_id"] == draft_id and DraftStates.EDIT_ONGOING.name not in [states_entry["state"] for states_entry in dbkup["states"]]: 
+        if (dbkup["draft_id"] == draft_id and
+                DraftStates.EDIT_ONGOING.name not in [states_entry["state"] for states_entry in dbkup["states"]]):
             return dbkup
-    return None  # should not happen but could: admin user creates a draft and this method is called on the first attempt to save
+    # should not happen but could: admin user creates a draft and this method is called on the first attempt to save
+    return None
 
 
 def do_edits_reach_last_two_sections(draft):
-    # be careful - we can't actually check against the 20% end of the string because the changes prior to it change where the last 20% starts!
-    # so instead we have to find the 2nd to last section heading in the original text, find that same heading in the new text, and see if there 
+    # be careful - we can't actually check against the 20% end of the string
+    # because the changes prior to it change where the last 20% starts!
+    # so instead we have to find the 2nd to last section heading in the original text,
+    # find that same heading in the new text, and see if there
     # are changes from there onward. If that heading isn't found in the new text, the answer is yes.
     # first challenge - get SHIRA'S original version of the Hebrew text currently being changed
     current_text = draft["hebrew_text"]
@@ -361,7 +378,9 @@ def make_date_info(dt, lang):
 
     is_summer_daylight_savings_time = bool(datetime.now(tz=ZoneInfo("Asia/Jerusalem")).dst())
 
-    locale.setlocale(locale.LC_TIME, locales[lang])
+    # locale.setlocale(locale.LC_TIME, locales[lang])
+
     return DateInfo(dt, lang, part_of_day=dt_edition, 
-                    motzei_shabbat_early=((not is_summer_daylight_savings_time) and dt.isoweekday() == 6 and dt.hour < 19), 
+                    motzei_shabbat_early=((not is_summer_daylight_savings_time) and
+                                          dt.isoweekday() == 6 and dt.hour < 19),
                     erev_shabbat=(dt.isoweekday() == 5 and dt.hour >= 12))

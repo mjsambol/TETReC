@@ -5,6 +5,7 @@ import json
 import re
 from zoneinfo import ZoneInfo
 
+from babel.dates import format_date
 from bs4 import BeautifulSoup, Tag
 from flask import Blueprint, render_template, request, redirect, make_response
 from google.cloud import translate, datastore  # noqa -- Intellij is incorrectly flagging the import
@@ -14,7 +15,7 @@ import requests
 
 from .auth_utils import confirm_user_has_role, consume_invitation, create_invitation, get_user, require_login
 from .auth_utils import require_role, get_user_availability, update_user_availability
-from .auth_utils import send_invitation, validate_weekly_birthcert
+from .auth_utils import send_invitation, validate_weekly_birthcert, zero_user
 from .common import _set_debug, ARCHIVE_BASE, debug, DatastoreClientProxy, expand_lang_code, JERUSALEM_TZ
 from .cookies import Cookies, get_cookie_dict, get_today_noise, make_cookie_from_dict, make_daily_cookie
 from .cookies import user_data_from_req
@@ -729,36 +730,26 @@ def route_translation_current_schedule():
         "https://docs.google.com/spreadsheets/d/1ataLRPh19z_EKiFTM9CxuoVKYL8VvxhQL8h5hZqBtY4/edit?gid=0#gid=0"))
 
 
-class FakeKey:
-    def __init__(self) -> None:
-        self.id = 0
-
-
-class FakeUser:
-    def __init__(self) -> None:
-        self.key = FakeKey()
-
-
-zero_user = FakeUser()
-
-
 @tamtzit.route('/tx_schedule_signup')
 @require_login
-@require_role("translator")
+@require_role("translator_en")
 def route_translation_schedule_signup():
-    now = datetime.now()
+    now = datetime.now(ZoneInfo('Asia/Jerusalem'))
     dow = now.isoweekday()  # Monday = 1, Sunday = 7
-    read_only = (dow == 6 and now.hour == 23) or (dow == 7 and now.hour < 6)
+    if dow == 7:
+        dow = 0   # make Sun-Sat 0-6
+    read_only = (dow == 6 and now.hour == 23) or (dow == 0 and now.hour < 6)
     db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
 
     # you can schedule *next week* any time from Sunday morning 6 am until Sat night 11pm. 
     # No scheduling allowed Sat night 11pm -> Sun morning so no one gets confused that they're affecting this week
     week_from = now + timedelta(days=(7 - dow))
+    week_from_str = format_date(week_from, "MMMM d", locale='en')
     week_to = week_from + timedelta(days=6)
-    week_being_scheduled = week_from.strftime("%B %d") + " to " + week_to.strftime("%B %d")
-    user_schedule_availability = get_user_availability(db_user_info, week_from.strftime("%B %d"))
+    week_being_scheduled = week_from_str + " to " + format_date(week_to, "MMMM d", locale='en')
+    user_schedule_availability = get_user_availability(db_user_info, week_from_str)
     usa_as_json = json.dumps(user_schedule_availability['available'])
-    editions_to_skip = get_user_availability(zero_user, week_from.strftime("%B %d"))
+    editions_to_skip = get_user_availability(zero_user, week_from_str)
 
     debug("tx_schedule_signup returning availability: " + Markup(usa_as_json))
     return render_template("tx_signup.html", week=week, week_being_scheduled=week_being_scheduled,
@@ -774,7 +765,7 @@ def route_translation_schedule_change():
     now = datetime.now()
     dow = now.isoweekday()  # Monday = 1, Sunday = 7
     week_from = now + timedelta(days=(7 - dow))
-    update_user_availability(db_user_info, week_from.strftime("%B %d"),
+    update_user_availability(db_user_info, format_date(week_from, "MMMM d", locale='en'),
                              json.loads(request.args.get('updated_availability')))
     return "OK"
 

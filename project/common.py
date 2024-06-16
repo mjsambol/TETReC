@@ -3,6 +3,7 @@ from pyluach import dates
 from pyluach.utils import Transliteration
 
 import os
+from babel.dates import format_date
 from dataclasses import dataclass
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -120,13 +121,13 @@ class DateInfo():
     motzei_shabbat_early: bool
     erev_shabbat: bool
 
-    def __init__(self, dt, part_of_day, motzei_shabbat_early, erev_shabbat):
+    def __init__(self, dt, lang, part_of_day, motzei_shabbat_early, erev_shabbat):
         oct6 = datetime(2023,10,6,tzinfo=ZoneInfo('Asia/Jerusalem'))
         heb_dt = dates.HebrewDate.from_pydate(dt)
 
         self.part_of_day     = part_of_day
-        self.day_of_week     = dt.strftime('%A')
-        self.secular_month   = dt.strftime('%B') 
+        self.day_of_week     = format_date(dt, "EEEE", locale=lang)  #dt.strftime('%A')
+        self.secular_month   = format_date(dt, "MMMM", locale=lang)
         self.secular_dom     = dt.day
         self.secular_year    = dt.year 
         self.hebrew_dom      = heb_dt.day

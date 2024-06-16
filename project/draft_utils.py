@@ -362,6 +362,6 @@ def make_date_info(dt, lang):
     is_summer_daylight_savings_time = bool(datetime.now(tz=ZoneInfo("Asia/Jerusalem")).dst())
 
     locale.setlocale(locale.LC_TIME, locales[lang])
-    return DateInfo(dt, part_of_day=dt_edition, 
+    return DateInfo(dt, lang, part_of_day=dt_edition, 
                     motzei_shabbat_early=((not is_summer_daylight_savings_time) and dt.isoweekday() == 6 and dt.hour < 19), 
                     erev_shabbat=(dt.isoweekday() == 5 and dt.hour >= 12))

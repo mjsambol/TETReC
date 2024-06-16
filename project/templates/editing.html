@@ -66,6 +66,13 @@
                 }
             }
 
+            function copy_review_link() {
+                var review_msg = "For review: " + document.location.href;
+                review_msg = review_msg.replace("&edit=true", '')
+                review_msg = review_msg.replace("edit=true", '')
+                copyToClipboardTrick(review_msg);  
+            }            
+
             function translation_changed() {
                 if (manual_saves_only) {
                     return;
@@ -331,6 +338,9 @@
             <table border="0" width="100%"><tr>
                 <td align="center">
                     <button id="edit_anyway_button" style="font-size: 20px; padding:8px 8px;visibility: hidden;" onclick="enable_edit();">Edit Again</button>
+                </td>
+                <td>
+                    <button id="copy_review_link" style="font-size: 20px; padding:8px 8px" onclick="copy_review_link();">Copy Review Link</button>
                 </td>
                 <td align="right">
                     <button id="finish_button" style="font-size: 20px; padding:8px 8px" onclick="publish();">Publish</button>

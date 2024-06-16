@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 from babel.dates import format_date
 from bs4 import BeautifulSoup, Tag
-from flask import Blueprint, render_template, request, redirect, make_response
+from flask import Blueprint, render_template, request, redirect, make_response, url_for
 from google.cloud import translate, datastore  # noqa -- Intellij is incorrectly flagging the import
 from google.cloud.datastore.key import Key  # noqa -- Intellij is incorrectly flagging the import
 from markupsafe import Markup
@@ -550,6 +550,7 @@ def continue_draft():
     user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
 
     draft_timestamp = request.args.get('ts')
+    edit_mode = request.args.get('edit')
     drafts, _ = fetch_drafts()
     for draft in drafts:
         ts = draft['timestamp']
@@ -571,7 +572,8 @@ def continue_draft():
                                    lang=draft['translation_lang'], **names, user_info=user_info,
                                    draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=draft['heb_draft_id'],
                                    heb_font_size=font_size_prefs['he'], en_font_size=font_size_prefs['en'],
-                                   is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
+                                   is_finished=('is_finished' in draft and draft['is_finished']),
+                                   in_progress=not edit_mode or edit_mode == "false",
                                    states=draft['states'])
 
     return "Draft not found, please start again."
@@ -607,6 +609,8 @@ def process():
     info = process_translation_request(heb_text, target_language_code)
     dt = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     draft_timestamp = dt.strftime('%Y%m%d-%H%M%S')
+    utc_draft_timestamp = dt.astimezone(tz=ZoneInfo("UTC"))
+    utc_draft_timestamp_str = utc_draft_timestamp.strftime('%Y%m%d-%H%M%S')
 
     translated = render_template(target_lang.lower() + '.html', **info, draft_timestamp=draft_timestamp, **names)
     translated = re.sub('\n{3,}', '\n\n', translated)
@@ -615,13 +619,19 @@ def process():
     # store the draft in DB so that someone else can continue the translation work
     key = create_draft(heb_text, user_info, translation_text=translated, translation_lang=target_language_code,
                        heb_draft_id=request.form.get('heb_draft_id'))
-    return render_template(next_page, heb_text=Markup(heb_text), translated=Markup(translated),
-                           lang=target_language_code, in_progress=False, user_info=user_info,
-                           heb_font_size=font_size_prefs['he'], en_font_size=font_size_prefs['en'],
-                           states=[{"state": DraftStates.WRITING.name, "at": draft_timestamp,
-                                    "by": user_info["name"], "by_heb": user_info["name_hebrew"]}],
-                           draft_timestamp=draft_timestamp, draft_key=key.to_legacy_urlsafe().decode('utf8'),
-                           heb_draft_id=request.form.get('heb_draft_id'))
+    
+    # redirect to /draft so that we'll have the proper link in the URL bar for sharing
+    return make_response(redirect(url_for("tamtzit.continue_draft", ts=utc_draft_timestamp_str, edit="true")))
+
+    # return render_template(next_page, heb_text=Markup(heb_text), translated=Markup(translated),
+    #                        draft_timestamp=draft_timestamp, 
+    #                        lang=target_language_code, user_info=user_info,
+    #                        draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=request.form.get('heb_draft_id'),
+    #                        heb_font_size=font_size_prefs['he'], en_font_size=font_size_prefs['en'],
+    #                        in_progress=False, 
+    #                        states=[{"state": DraftStates.WRITING.name, "at": draft_timestamp,
+    #                                 "by": user_info["name"], "by_heb": user_info["name_hebrew"]}]
+    #                        )
 
 
 @tamtzit.route("/saveDraft", methods=['POST'])
@@ -764,6 +774,8 @@ def route_translation_schedule_change():
     db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
     now = datetime.now()
     dow = now.isoweekday()  # Monday = 1, Sunday = 7
+    if dow == 7:
+        dow = 0   # make Sun-Sat 0-6
     week_from = now + timedelta(days=(7 - dow))
     update_user_availability(db_user_info, format_date(week_from, "MMMM d", locale='en'),
                              json.loads(request.args.get('updated_availability')))

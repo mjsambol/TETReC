@@ -116,10 +116,12 @@ class DatastoreClientProxy:
 class DateInfo:
     part_of_day: str
     day_of_week: str
+    day_of_week_digit: int
     hebrew_dom: int
     hebrew_month: str
     hebrew_year: int
     secular_month: str
+    secular_month_digit: int
     secular_dom: int
     secular_year: int
     day_of_war: int
@@ -129,13 +131,17 @@ class DateInfo:
     motzei_shabbat_early: bool
     erev_shabbat: bool
 
-    def __init__(self, dt, lang, part_of_day, motzei_shabbat_early, erev_shabbat):
+    def __init__(self, dt: datetime, lang, part_of_day, motzei_shabbat_early, erev_shabbat):
         oct6 = datetime(2023, 10, 6, tzinfo=ZoneInfo('Asia/Jerusalem'))
         heb_dt = dates.HebrewDate.from_pydate(dt)
 
         self.part_of_day     = part_of_day
         self.day_of_week     = format_date(dt, "EEEE", locale=locales[lang])  # dt.strftime('%A')
+        self.day_of_week_digit = dt.isoweekday()  # Monday = 1, Sunday = 7
+        if self.day_of_week_digit == 7:
+            self.day_of_week_digit = 0   # make Sun-Sat 0-6
         self.secular_month   = format_date(dt, "MMMM", locale=locales[lang])
+        self.secular_month_digit = dt.month
         self.secular_dom     = dt.day
         self.secular_year    = dt.year 
         self.hebrew_dom      = heb_dt.day

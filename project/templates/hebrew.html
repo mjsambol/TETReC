@@ -70,7 +70,9 @@
                 ok_to_translate = true;
                 saveDraft(force=true);
                 
-                if (("{{date_info.part_of_day}}" == "ערב") && ("{{req_rule}}".indexOf("daily_summary") == -1)) {
+                if ((("{{date_info.day_of_week_digit}}"=="5") && ("{{date_info.part_of_day}}" == "צוהריים")) || 
+                    (("{{date_info.day_of_week_digit}}"!="6") &&
+                     ("{{date_info.part_of_day}}" == "ערב") && ("{{req_rule}}".indexOf("daily_summary") == -1))) {
                     document.location = "/start_daily_summary";
                 } else {
                     document.location = "/";

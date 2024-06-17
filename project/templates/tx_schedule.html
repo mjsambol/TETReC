@@ -1,0 +1,84 @@
+<html>
+    <head>
+        <style>
+            .edition_selected {
+                height: 100px;
+                border: 1px solid #A9A9A9;
+                background-color: #55CC55;
+            }
+            .edition_deselected {
+                height: 100px;
+                border: 1px solid #A9A9A9;
+                background-color: #FFFFFF;
+            }
+            .edition_disabled {
+                height: 100px;
+                border: 1px solid #A9A9A9;
+                background-color: #A9A9A9;
+            }
+        </style>
+        <script>
+            var editions_to_skip = JSON.parse(`{{editions_to_skip}}`);
+            var schedule_data = JSON.parse(`{{schedule_data}}`);
+
+            day_parts = ['Morning', 'Afternoon', 'Evening'];
+            person_colors = {"Anne": "#76a5af", "Ayelet": "#ead1dc", "Gabriela":"#b4a7d6", "Karen":"#db8776",
+                            "Malke":"#f9cb9c", "Moshe": "#d9ead3", "Rebecca":"#a4c2f4", "Rochel":"#cfe2f3"}
+
+            function update_table_with_schedule() {
+                for (day_name in schedule_data) {
+                    for (day_part_num in day_parts) {
+                        day_part = day_parts[day_part_num];
+                        to_skip = editions_to_skip[day_name][day_part_num];
+                        that_td = document.getElementById(day_name + "." + day_part);
+                        if (to_skip == 1) {
+                            that_td.className = "edition_disabled";
+                            that_td.innerHTML = "";
+                        } else {
+                            tx_td = document.getElementById(day_name + "." + day_part + ".translator");
+                            tx_td.innerText = schedule_data[day_name][day_part]["translator"];
+                            if (schedule_data[day_name][day_part]["translator"] in person_colors) {
+                                tx_td.style.background=person_colors[schedule_data[day_name][day_part]["translator"]];
+                            }
+                            tx_td = document.getElementById(day_name + "." + day_part + ".reviewer");
+                            tx_td.innerText = schedule_data[day_name][day_part]["reviewer"];
+                        }
+                    }
+                }
+            }
+        </script>
+    </head>
+    <body onload="update_table_with_schedule();">
+        <center>
+            <br>
+            <h3>Schedule for the week of {{week_being_scheduled}}</h3>
+            <table border="1">
+                <tr>
+                    {% for day_name in week %}
+                        <th style="padding-top:10px; padding-bottom:10px">{{day_name}}</th>
+                    {% endfor %}        
+                </tr>
+                <tr>
+                    {% for day_name in week %}
+                        <td align="center">
+                            <table border="0" cellspacing="10px">
+                                {% for edition in [week[day_name].morning, week[day_name].afternoon, week[day_name].evening] %}
+                                    <tr>
+                                        <td id="{{day_name}}.{{edition.name}}" align="center">
+                                            <table border="1" width="100%" cellpadding="14px">
+                                                <tr><td width="70px" align="center" id="{{day_name}}.{{edition.name}}.translator"></td></tr>
+                                                <tr><td width="70px" align="center" id="{{day_name}}.{{edition.name}}.reviewer"></td></tr>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </table>
+                        </td>
+                    {% endfor %}        
+                </tr>
+            </table>
+            <br><br><br>
+            The algorithm for scheduling translators and reviewers is <a target="_blank" href="https://w.splitc.com/en/tamtzit/translation-scheduling">documented here.</a>
+        </center>
+    </body>
+</html>

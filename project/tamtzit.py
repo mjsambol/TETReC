@@ -5,7 +5,7 @@ import json
 import re
 from zoneinfo import ZoneInfo
 
-from babel.dates import format_date
+from babel.dates import format_date, format_datetime
 from bs4 import BeautifulSoup, Tag
 from flask import Blueprint, render_template, request, redirect, make_response, url_for
 from google.cloud import translate, datastore  # noqa -- Intellij is incorrectly flagging the import
@@ -366,6 +366,14 @@ def route_hebrew_template():
                         user_role=current_user_info['role'], req_rule=request.url_rule.rule))
     refresh_cookies(request, response)
     return response
+
+
+@tamtzit.route("/keep_alive")
+@require_login
+@require_role("Hebrew")
+def route_keep_alive():
+    dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
+    return format_datetime(dt, locale='en_US')
 
 
 @tamtzit.route('/heb_edit_daily_summary', methods=['POST', 'GET'])

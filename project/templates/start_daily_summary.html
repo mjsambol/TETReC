@@ -136,6 +136,27 @@
                 }
             }
             
+            function ping_server() {
+                fetch("/keep_alive?" + new URLSearchParams({
+                    at: Date.now()
+                })
+                ).then(
+                    // as long as it returns success, don't do anything
+                    // (response) => {return response.json();}
+                ).then(
+                    // (obj) => {
+                    // }
+                ).catch(function(error) {
+                    console.log(error);
+                });                                        
+
+                setTimeout(function(){ping_server()}, 10000);  // since user selections on this page aren't persisted until 
+                                                            // transition to next page, if the server goes away and we need
+                                                            // to re-authenticate, it can cause data loss. This is a hack to keep
+                                                            // the server available
+            }
+
+            setTimeout(function(){ping_server()}, 10000);
         </script>
     </head>
     <body>

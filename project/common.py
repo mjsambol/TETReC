@@ -9,7 +9,10 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from enum import Enum, auto
 
-from .language_mappings import locales
+if __package__ is None or __package__ == '':
+    from language_mappings import locales
+else:
+    from .language_mappings import locales
 
 ARCHIVE_BASE = "https://storage.googleapis.com/tamtzit-archive/"
 JERUSALEM_TZ = ZoneInfo("Asia/Jerusalem")

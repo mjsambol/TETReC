@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup, Tag
 from flask import Blueprint, render_template, request, redirect, make_response, url_for
 from google.cloud import translate, datastore  # noqa -- Intellij is incorrectly flagging the import
 from google.cloud.datastore.key import Key  # noqa -- Intellij is incorrectly flagging the import
+from google.cloud.datastore.query import PropertyFilter
 from markupsafe import Markup
 import requests
 
@@ -735,25 +736,47 @@ def get_scheduling_dates():
     dow = now.isoweekday()  # Monday = 1, Sunday = 7
     if dow == 7:
         dow = 0   # make Sun-Sat 0-6
+    this_week_from = now - timedelta(days=dow)
+    this_week_from_str = format_date(this_week_from, "MMMM d", locale='en')
+    this_week_to = this_week_from + timedelta(days=6)
+    this_week_to_str = format_date(this_week_to, "MMMM d", locale='en')
     read_only = (dow == 6 and now.hour == 23) or (dow == 0 and now.hour < 6)
-    week_from = now + timedelta(days=(7 - dow))
-    week_to = week_from + timedelta(days=6)
-    week_from_str = format_date(week_from, "MMMM d", locale='en')
-    week_being_scheduled = week_from_str + " to " + format_date(week_to, "MMMM d", locale='en')
+    next_week_from = now + timedelta(days=(7 - dow))
+    next_week_to = next_week_from + timedelta(days=6)
+    next_week_from_str = format_date(next_week_from, "MMMM d", locale='en')
+    next_week_to_str = format_date(next_week_to, "MMMM d", locale='en')
+    week_being_scheduled = next_week_from_str + " to " + next_week_to_str
+    week_already_scheduled = this_week_from_str + " to "  + this_week_to_str
 
-    return {"week_from": week_from, "week_from_str": week_from_str, 
-            "week_to": week_to, "week_being_scheduled": week_being_scheduled, 
+    return {"this_week_from": this_week_from, "this_week_from_str": this_week_from_str,
+            "next_week_from": next_week_from, "next_week_from_str": next_week_from_str, 
+            "this_week_to": this_week_to, "this_week_to_str": this_week_to_str,
+            "next_week_to": next_week_to, "next_week_to_str": next_week_to_str,
+            "week_being_scheduled": week_being_scheduled, "week_already_scheduled": week_already_scheduled,
             "read_only": read_only}
 
 
 @tamtzit.route('/tx_schedule_curr')
 def route_translation_current_schedule():
     sched_dates = get_scheduling_dates()
-    editions_to_skip = get_user_availability(zero_user, sched_dates['week_from_str'])
+    editions_to_skip = get_user_availability(zero_user, sched_dates['this_week_from_str'])
+
+    query = datastore_client.query(kind="translation_schedule")
+    dates = get_scheduling_dates()
+    debug(f"tx_schedule_curr: fetching schedule for week of {dates['this_week_from_str']}")
+    query.add_filter(filter=PropertyFilter("week_from", "=", dates['this_week_from_str']))
+    schedule_info = query.fetch()
+    schedule = None
+    for s in schedule_info:
+        debug("got a schedule from the db...")
+        schedule = s['schedule']
+
+    debug(f"tx_schedule_curr: passing data: {schedule}")
 
     return render_template("tx_schedule.html", week=week, 
                            editions_to_skip=Markup(json.dumps(editions_to_skip['available'])),
-                           week_being_scheduled=sched_dates['week_being_scheduled']) 
+                           week_being_scheduled=sched_dates['week_already_scheduled'],
+                           schedule_data=Markup(json.dumps(schedule))) 
     # make_response(redirect(
     # "https://docs.google.com/spreadsheets/d/1ataLRPh19z_EKiFTM9CxuoVKYL8VvxhQL8h5hZqBtY4/edit?gid=0#gid=0"))
 
@@ -768,9 +791,9 @@ def route_translation_schedule_signup():
     # No scheduling allowed Sat night 11pm -> Sun morning so no one gets confused that they're affecting this week
 
     db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
-    user_schedule_availability = get_user_availability(db_user_info, sched_dates['week_from_str'])
+    user_schedule_availability = get_user_availability(db_user_info, sched_dates['next_week_from_str'])
     usa_as_json = json.dumps(user_schedule_availability['available'])
-    editions_to_skip = get_user_availability(zero_user, sched_dates['week_from_str'])
+    editions_to_skip = get_user_availability(zero_user, sched_dates['next_week_from_str'])
 
     debug("tx_schedule_signup returning availability: " + Markup(usa_as_json))
     return render_template("tx_signup.html", week=week, 
@@ -785,7 +808,7 @@ def route_translation_schedule_signup():
 def route_translation_schedule_change():
     db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
     sched_dates = get_scheduling_dates()
-    update_user_availability(db_user_info, format_date(sched_dates['week_from'], "MMMM d", locale='en'),
+    update_user_availability(db_user_info, sched_dates['next_week_from_str'],
                              json.loads(request.args.get('updated_availability')))
     return "OK"
 

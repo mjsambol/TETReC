@@ -19,7 +19,7 @@
                             You can select it below.
                             <br><br><br>
                         {% for draft in drafts %}
-                           {% if draft['translation_lang'] != '--' %}                               
+                           {% if draft['translation_lang'] not in ['--', 'H1'] %}                               
                            <b>{{ local_timestamps[draft['timestamp']][0].strftime('%Y.%m.%d') }}:</b> 
                              <a href="/draft?ts={{ draft['timestamp'].strftime('%Y%m%d-%H%M%S') }}">
                                 {{ local_timestamps[draft['timestamp']][0].strftime('%H:%M') }}

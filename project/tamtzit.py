@@ -25,7 +25,7 @@ from .draft_utils import make_new_archive_entry, upload_to_cloud_storage, update
 from .diff_draft_versions import get_translated_additions_since_ok_to_tx
 from .language_mappings import editions, keywords, sections, supported_langs_mapping
 from .translation_utils import translate_text
-from .weekly_schedule import week
+from .weekly_schedule import Schedule
 
 translation_client = translate.TranslationServiceClient()
 
@@ -746,7 +746,7 @@ def get_scheduling_dates():
     next_week_from_str = format_date(next_week_from, "MMMM d", locale='en')
     next_week_to_str = format_date(next_week_to, "MMMM d", locale='en')
     week_being_scheduled = next_week_from_str + " to " + next_week_to_str
-    week_already_scheduled = this_week_from_str + " to "  + this_week_to_str
+    week_already_scheduled = this_week_from_str + " to " + this_week_to_str
 
     return {"this_week_from": this_week_from, "this_week_from_str": this_week_from_str,
             "next_week_from": next_week_from, "next_week_from_str": next_week_from_str, 
@@ -759,6 +759,7 @@ def get_scheduling_dates():
 @tamtzit.route('/tx_schedule_curr')
 def route_translation_current_schedule():
     sched_dates = get_scheduling_dates()
+    sched_obj = Schedule()
     editions_to_skip = get_user_availability(zero_user, sched_dates['this_week_from_str'])
 
     query = datastore_client.query(kind="translation_schedule")
@@ -773,7 +774,7 @@ def route_translation_current_schedule():
 
     debug(f"tx_schedule_curr: passing data: {schedule}")
 
-    return render_template("tx_schedule.html", week=week, 
+    return render_template("tx_schedule.html", week=sched_obj.week,
                            editions_to_skip=Markup(json.dumps(editions_to_skip['available'])),
                            week_being_scheduled=sched_dates['week_already_scheduled'],
                            schedule_data=Markup(json.dumps(schedule))) 
@@ -785,7 +786,7 @@ def route_translation_current_schedule():
 @require_login
 @require_role("translator_en")
 def route_translation_schedule_signup():
-
+    sched_obj = Schedule()
     sched_dates = get_scheduling_dates()
     # you can schedule *next week* any time from Sunday morning 6 am until Sat night 11pm. 
     # No scheduling allowed Sat night 11pm -> Sun morning so no one gets confused that they're affecting this week
@@ -796,7 +797,7 @@ def route_translation_schedule_signup():
     editions_to_skip = get_user_availability(zero_user, sched_dates['next_week_from_str'])
 
     debug("tx_schedule_signup returning availability: " + Markup(usa_as_json))
-    return render_template("tx_signup.html", week=week, 
+    return render_template("tx_signup.html", week=sched_obj.week,
                            week_being_scheduled=sched_dates['week_being_scheduled'],
                            user_availability=Markup(usa_as_json), read_only=sched_dates['read_only'],
                            editions_to_skip=Markup(json.dumps(editions_to_skip['available'])))
@@ -813,15 +814,33 @@ def route_translation_schedule_change():
     return "OK"
 
 
+@tamtzit.route('/tx_build_sched_for_next_week')
+def route_translation_build_next_schedule():
+    # as this is meant to be called only by the App Engine scheduler, we check an expected header
+    # and if it's not there, reject the request
+    debug("Building next week's translation schedule...")
+    if 'X-Appengine-Cron' not in request.headers or request.headers['X-Appengine-Cron'] != 'true':
+        debug("This request does not come from AppEngine, so ignoring it.")
+        # return
+
+    sched_dates = get_scheduling_dates()
+    sched = Schedule()
+    sched.cache_user_info()
+    sched.get_input_from_datastore(sched_dates['next_week_from_str'])
+    sched.make_translation_schedule()
+    # sched.print_schedule()
+    sched.persist_schedule(sched_dates['next_week_from_str'])
+    sched.set_up_next_week(sched_dates['next_week_from_str'], non_interactive_mode_p=True)
+
+
 @tamtzit.route('/nightly_archive_cleanup')
 def nightly_archive_cleanup():
     # as this is meant to be called only by the App Engine scheduler, we check an expected header
     # and if it's not there, reject the request
-    # X-Appengine-Cron: true
     debug("Cleaning the day's archive entries...")
     if 'X-Appengine-Cron' not in request.headers or request.headers['X-Appengine-Cron'] != 'true':
         debug("This request does not come from AppEngine, so ignoring it.")
-        # return
+        return
 
     debug(f"n_a_c headers look good, progressing")
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')

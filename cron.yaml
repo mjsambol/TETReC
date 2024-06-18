@@ -3,3 +3,7 @@ cron:
   url: /nightly_archive_cleanup
   schedule: every day 01:00
   timezone: Asia/Jerusalem
+- description: "weekly translation schedule creation"
+  url: /tx_build_sched_for_next_week
+  schedule: every saturday 23:00
+  timezone: Asia/Jerusalem

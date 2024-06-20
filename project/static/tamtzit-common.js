@@ -52,7 +52,7 @@ async function notifyServerOfPublish(button_id) {
 
 // var focused = true;
 var latest_status = null;
-const lang_order = ['--', 'en', 'fr', 'YY'];
+const lang_order = ['--', 'en', 'fr', 'YY', 'H1'];
 
 async function updateStatus() {
     var stuff_happening = false;
@@ -78,7 +78,7 @@ async function updateStatus() {
                             status_msg = status_msg.substring(0, status_msg.length - 4);
                             if (edition_state["state"] == "WRITING" || edition_state["state"] == "EDIT_READY") {
                                 status_msg = status_msg + " עד ל " + obj['by_lang'][lang]['last_edit'];
-                                if (lang == '--') {
+                                if (lang in ['--', 'H1']) {
                                     if (edition_state["state"] == "EDIT_READY") {
                                         status_msg = status_msg + ' -- <b><font color="#1a9c3b">';
                                     } else {

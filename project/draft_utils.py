@@ -80,6 +80,11 @@ def make_new_archive_entry(soup, next_entry_tag, draft, anchor, lang_code):
 
 
 def get_latest_day_worth_of_editions():
+    """This methos is used from two locations:
+    nightly_archive_cleanup() - which is invoked only by a cron job
+    and 
+    start_daily_summary() which is a route method, called by the hebrew.html page on submission
+    """
     latest_drafts, _ = fetch_drafts()
     yesterdays_editions = defaultdict(dict)
     for draft in latest_drafts:
@@ -112,6 +117,7 @@ def get_edition_name_from_text(edition, as_english_always=True):
     text = edition['hebrew_text']
     debug(f"g_e_n_f_t: lang={lang}")
     m = re.search("^\*?מהדורת ([א-ת]+),", text, re.MULTILINE)   # noqa - the pattern works
+    # The pattern WON'T match on the daily summary!
     if m:
         debug(f"g_e_n_f_t found {m.group(1)}, localizing...")
         edition_index = editions['he'].index(m.group(1))
@@ -120,6 +126,14 @@ def get_edition_name_from_text(edition, as_english_always=True):
         if lang == '--':
             return m.group(1)
         return editions[lang][edition_index]
+    else:
+        m = re.search("^\*?מהדורה יומית", text, re.MULTILINE)   # noqa
+        if m:
+            debug("g_e_n_f_t found daily summary edition, localizing...")
+            if as_english_always:
+                return "Heb Daily Summary"
+            else:
+                return "מהדורה יומית"
     debug(f"g_e_n_f_t: lang={lang}, can't find edition name, returning UNKNOWN, text was: \n\n{text}\n\n")
     return "UNKNOWN"
 

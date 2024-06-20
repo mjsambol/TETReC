@@ -244,10 +244,15 @@ def get_cachable_status(role):
             "done": draft['is_finished'],
             "states": draft['states']
         }
-        if draft['translation_lang'] == '--':
-            status_per_lang['--']['text'] = draft['hebrew_text']
-        if draft['is_finished'] and "admin" in role and draft['translation_lang'] != '--':
-            status_per_lang[draft['translation_lang']]['text'] = draft['translation_text']
+        if draft['translation_lang'] in ['--']:  # not including H1 here - we don't need its text unless it's finished
+            # we're keeping the Hebrew in the status even when it's not yet done as we're using it on the translation
+            # page (edit.html) to let translators flip back and forth between the Hebrew they started with and the 'latest'
+            status_per_lang[draft['translation_lang']]['text'] = draft['hebrew_text']
+        elif draft['is_finished'] and "admin" in role:
+            if draft['translation_lang'] in ['H1']:
+                status_per_lang[draft['translation_lang']]['text'] = draft['hebrew_text']
+            else:
+                status_per_lang[draft['translation_lang']]['text'] = draft['translation_text']
     response = {
         'as_of': now.strftime("%H:%M"),
         'by_lang': status_per_lang

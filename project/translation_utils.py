@@ -166,8 +166,9 @@ title_translations = {"en":{
 }
 
 def pre_translation_swaps(text, target_language_code):
-    for title in title_translations:
-        text = re.sub(fr'\b(ו?)(ה?){title}\b', vav_hey(title_translations[title]), text, flags=re.U)
+    if target_language_code in title_translations:
+        for title in title_translations[target_language_code]:
+            text = re.sub(fr'\b(ו?)(ה?){title}\b', vav_hey(title_translations[target_language_code][title]), text, flags=re.U)
 
     # our Motzei Shabbat header is confused for regular content, this is an easy way to get rid of it
     text = re.sub(r'\*עדכון מוצאי שבת\*', '', text, flags=re.U)

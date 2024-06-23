@@ -146,17 +146,19 @@ def route_authenticate():
 
 @tamtzit.route('/')
 @require_login
-def route_create():
+def route_home_page():
     debug("top-level: do we know this user?")
     db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
     debug(f"user is {db_user_info}")
     role = db_user_info['role']
 
     daily_summary_in_progress = check_if_daily_summary_in_progress('H1')
+    next_translators = get_next_translators()
 
     if request.method == "GET":
         return render_template(detect_mobile(request, 'index'), user_role=role,
-                               daily_summary_in_progress=(daily_summary_in_progress is not None))
+                               daily_summary_in_progress=(daily_summary_in_progress is not None),
+                               next_translators=next_translators)
     elif request.method == "HEAD":
         debug("top-level: responding to head request with empty ...")
         return ''
@@ -246,7 +248,8 @@ def get_cachable_status(role):
         }
         if draft['translation_lang'] in ['--']:  # not including H1 here - we don't need its text unless it's finished
             # we're keeping the Hebrew in the status even when it's not yet done as we're using it on the translation
-            # page (edit.html) to let translators flip back and forth between the Hebrew they started with and the 'latest'
+            # page (edit.html) to let translators flip back and forth
+            # between the Hebrew they started with and the 'latest'
             status_per_lang[draft['translation_lang']]['text'] = draft['hebrew_text']
         elif draft['is_finished'] and "admin" in role:
             if draft['translation_lang'] in ['H1']:
@@ -758,7 +761,26 @@ def get_scheduling_dates():
             "this_week_to": this_week_to, "this_week_to_str": this_week_to_str,
             "next_week_to": next_week_to, "next_week_to_str": next_week_to_str,
             "week_being_scheduled": week_being_scheduled, "week_already_scheduled": week_already_scheduled,
-            "read_only": read_only}
+            "read_only": read_only, "day_of_week": dow, "day_of_week_str": now.strftime('%A'), "date_obj": now}
+
+
+def get_next_translators():
+    sched_dates = get_scheduling_dates()
+    date_info = make_date_info(sched_dates['date_obj'], 'en')   # always English as page uses En tag names
+
+    result = {"English": None}
+
+    query = datastore_client.query(kind="translation_schedule")
+    query.add_filter(filter=PropertyFilter("week_from", "=", sched_dates['this_week_from_str']))
+    schedule_info = query.fetch()
+    schedule = None
+    for s in schedule_info:
+        schedule = s['schedule']
+
+    if schedule:
+        result["English"] = schedule[sched_dates['day_of_week_str']][date_info.part_of_day]
+
+    return result
 
 
 @tamtzit.route('/tx_schedule_curr')
@@ -768,9 +790,8 @@ def route_translation_current_schedule():
     editions_to_skip = get_user_availability(zero_user, sched_dates['this_week_from_str'])
 
     query = datastore_client.query(kind="translation_schedule")
-    dates = get_scheduling_dates()
-    debug(f"tx_schedule_curr: fetching schedule for week of {dates['this_week_from_str']}")
-    query.add_filter(filter=PropertyFilter("week_from", "=", dates['this_week_from_str']))
+    debug(f"tx_schedule_curr: fetching schedule for week of {sched_dates['this_week_from_str']}")
+    query.add_filter(filter=PropertyFilter("week_from", "=", sched_dates['this_week_from_str']))
     schedule_info = query.fetch()
     schedule = None
     for s in schedule_info:
@@ -808,10 +829,10 @@ def route_translation_schedule_signup():
                            editions_to_skip=Markup(json.dumps(editions_to_skip['available'])))
 
 
-@tamtzit.route('/tx_schedule_update')
+@tamtzit.route('/tx_schedule_nextweek_volunteer')
 @require_login
 @require_role("translator")
-def route_translation_schedule_change():
+def route_translation_schedule_nextweek_volunteer():
     db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
     sched_dates = get_scheduling_dates()
     update_user_availability(db_user_info, sched_dates['next_week_from_str'],
@@ -835,7 +856,10 @@ def route_translation_build_next_schedule():
     sched.make_translation_schedule()
     # sched.print_schedule()
     sched.persist_schedule(sched_dates['next_week_from_str'])
-    sched.set_up_next_week(sched_dates['next_week_from_str'], non_interactive_mode_p=True)
+    the_following_week = sched_dates['next_week_from'] + timedelta(days=7)
+    the_following_week_str = format_date(the_following_week, "MMMM d", locale='en')
+    sched.set_up_next_week(the_following_week_str, non_interactive_mode_p=True)
+    return "Done"
 
 
 @tamtzit.route('/nightly_archive_cleanup')

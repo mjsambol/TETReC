@@ -37,8 +37,10 @@ def debug(stuff):
 
 def expand_lang_code(from_lang, to_lang='H'):
     if to_lang == 'H':
-        if from_lang in ['--', 'H1']:
+        if from_lang == '--':
             return 'עברית'
+        if from_lang == 'H1':
+            return 'עברית יומי'
         if from_lang == 'en':
             return 'אנגלית'
         if from_lang == 'fr':

@@ -42,7 +42,7 @@
                     edition_cell.className = "edition_selected";
                     availability[edition_parts[0]][day_part_num] = 1;
                 }    
-                fetch("/tx_schedule_update?" + new URLSearchParams({
+                fetch("/tx_schedule_nextweek_volunteer?" + new URLSearchParams({
                     updated_availability: JSON.stringify(availability)
                 })
                 ).then(

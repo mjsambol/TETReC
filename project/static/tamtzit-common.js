@@ -78,7 +78,7 @@ async function updateStatus() {
                             status_msg = status_msg.substring(0, status_msg.length - 4);
                             if (edition_state["state"] == "WRITING" || edition_state["state"] == "EDIT_READY") {
                                 status_msg = status_msg + " עד ל " + obj['by_lang'][lang]['last_edit'];
-                                if (lang in ['--', 'H1']) {
+                                if (lang == '--' || lang == 'H1') {
                                     if (edition_state["state"] == "EDIT_READY") {
                                         status_msg = status_msg + ' -- <b><font color="#1a9c3b">';
                                     } else {

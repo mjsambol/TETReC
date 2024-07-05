@@ -1,0 +1,23 @@
+<html>
+    <head>
+        <title>Tamtzit - Admin Portal</title>
+        <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240621b')}}"></script>
+    </head>
+    <body>
+        {% for team in team_availability %}
+            <table border="1" cellpadding="5px">
+                <tr>
+                    <th colspan="2">{{ team }}</th>
+                </tr>
+                {% for team_member in team_availability[team] %}
+                    <tr>
+                        <td>{{ team_member }}</td>
+                        <td>{{ team_availability[team][team_member] }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+            <br><br>
+        {% endfor %}
+    </body>
+</html>

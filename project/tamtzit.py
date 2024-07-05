@@ -158,7 +158,7 @@ def route_home_page():
     if request.method == "GET":
         return render_template(detect_mobile(request, 'index'), user_role=role,
                                daily_summary_in_progress=(daily_summary_in_progress is not None),
-                               next_translators=next_translators)
+                               next_translators=Markup(json.dumps(next_translators)))
     elif request.method == "HEAD":
         debug("top-level: responding to head request with empty ...")
         return ''
@@ -779,6 +779,9 @@ def get_next_translators():
 
     if schedule:
         result["English"] = schedule[sched_dates['day_of_week_str']][date_info.part_of_day]
+    else:
+        # should happen only when debugging
+        result["English"] = "None"
 
     return result
 
@@ -834,9 +837,69 @@ def route_translation_schedule_signup():
 @require_role("translator")
 def route_translation_schedule_nextweek_volunteer():
     db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
+    # I should really audit this somewhere ... 
     sched_dates = get_scheduling_dates()
     update_user_availability(db_user_info, sched_dates['next_week_from_str'],
                              json.loads(request.args.get('updated_availability')))
+    return "OK"
+
+
+@tamtzit.route('/team_avail_next_week')
+@require_login
+@require_role("admin")
+def route_team_availability_next_week():
+    sched_dates = get_scheduling_dates()
+    team_availability = {}
+    # map of team_name -> team_member_name -> int # slots avail next week
+    # I'm not caching as assuming this page will be rarely used, but if false or if this code is reused elsewhere, cache!
+    query = datastore_client.query(kind="user")
+    users = query.fetch()
+    for user in users:
+        user_availability = get_user_availability(user, sched_dates['next_week_from_str'])["available"]
+        if "translator_" in user["role"]:
+            start_pos = user["role"].index("translator_") + len("translator_")
+            team = user["role"][start_pos:start_pos+3]
+        elif "Hebrew" in user["role"]:
+            team = "he"
+        else:
+            continue # this person is an editor or admin
+            # print(f"ERROR: route_team_availability_next_week: can't determine team from {user['role']}")
+
+        if team not in team_availability:
+            team_availability[team] = {}
+
+        team_availability[team][user['name']] = sum([sum(user_availability[key]) for key in user_availability])
+
+    return render_template("team_avail_next_week.html", team_availability=team_availability)
+        
+
+
+@tamtzit.route('/tx_schedule_thisweek_change')
+@require_login
+@require_role(["translator", "admin"])
+def route_translation_schedule_thisweek_change():
+    # db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
+
+    sched_dates = get_scheduling_dates()
+    sched_obj = Schedule()
+    # day_name=edition_parts[0], edition_name=edition_parts[1], new_translator=new_val to the server
+    day_name = request.args.get('day_name')
+    edition_name = request.args.get('edition_name')
+    tx_or_rv = request.args.get("which_role")
+    new_volunteer = request.args.get('new_volunteer') or "---"
+
+    print(f"fetching schedule for {sched_dates['this_week_from_str']}")
+    schedule = sched_obj.fetch_from_db(sched_dates['this_week_from_str'])
+    if not day_name or not day_name in schedule['schedule']:
+        return "ERROR bad param day_name: " + day_name
+    if not edition_name or not edition_name in schedule['schedule'][day_name]:
+        return "ERROR bad param edition_name: " + edition_name
+    if not tx_or_rv or not tx_or_rv in ["tx", "rv"]:
+        return "ERROR bad param tx_or_rv " + tx_or_rv
+    schedule['schedule'][day_name][edition_name]['translator' if tx_or_rv == 'tx' else 'reviewer'] = new_volunteer 
+
+    datastore_client.put(schedule)
+
     return "OK"
 
 

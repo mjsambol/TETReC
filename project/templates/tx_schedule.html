@@ -46,6 +46,57 @@
                     }
                 }
             }
+
+            var change_mode = false;
+
+            function select_edition_to_change() {
+                if (!confirm("You are about to change the schedule. \n" +
+                "This should *only* be done after communicating the change on the Whatsapp group!\n\n" +
+                "Have you informed the group of this change?\n\n")) {
+                    return;
+                }
+                if (!confirm("After dismissing this dialog box, click on the edition which you wish to change.")) {
+                    return;
+                }
+                change_mode = true;
+            }
+
+            function edition_clicked(edition_cell) {
+                if (!change_mode) {
+                    return;
+                }
+
+                edition_parts = edition_cell.id.split('.');
+
+                change_type = prompt("Do you want to change the *translator* (enter T or t) or *reviewer* (enter R or r) for " 
+                                + edition_parts[0] + " " + edition_parts[1]);
+                if (['T','t','R','r'].includes(change_type)) {
+                    var spelled_out = change_type.toLowerCase() == "t" ? "translator" : "reviewer";
+                    new_val = prompt("Enter the name of the new " + spelled_out + 
+                    ".\nYou can leave the field blank to make the " + spelled_out + " unassigned.");
+
+                    fetch("/tx_schedule_thisweek_change?" + new URLSearchParams({
+                        day_name: edition_parts[0],
+                        edition_name: edition_parts[1],
+                        which_role: change_type.toLowerCase() == 't' ? "tx" : "rv",
+                        new_volunteer: new_val
+                    })
+                    ).then(
+                        // as long as it returns success, don't do anything
+                       // (response) => {alert(response);}
+                    ).then(
+                        (obj) => {document.location = "/tx_schedule_curr";}
+                    ).catch(function(error) {
+                        alert("There was a problem making the change: " + error);
+                    });       
+
+
+                } else {
+                    alert("Invalid entry, ignoring.");
+                }
+
+            }
+
         </script>
     </head>
     <body onload="update_table_with_schedule();">
@@ -64,7 +115,7 @@
                             <table border="0" cellspacing="10px">
                                 {% for edition in [week[day_name].morning, week[day_name].afternoon, week[day_name].evening] %}
                                     <tr>
-                                        <td id="{{day_name}}.{{edition.name}}" align="center">
+                                        <td id="{{day_name}}.{{edition.name}}" align="center" onclick="edition_clicked(this);">
                                             <table border="1" width="100%" cellpadding="14px">
                                                 <tr><td width="70px" align="center" id="{{day_name}}.{{edition.name}}.translator"></td></tr>
                                                 <tr><td width="70px" align="center" id="{{day_name}}.{{edition.name}}.reviewer"></td></tr>
@@ -79,6 +130,10 @@
             </table>
             <br><br><br>
             The algorithm for scheduling translators and reviewers is <a target="_blank" href="https://w.splitc.com/en/tamtzit/translation-scheduling">documented here.</a>
+            <br><br>
+            If necessary, you can change one of the assignments. <br>
+            <b>Please only do this after communicating the change on the appropriate Whatsapp group!</b><br>
+            <a onclick="select_edition_to_change();" style="color: #3333FF; font-weight: bold;">Click to  begin.</a>
         </center>
     </body>
 </html>

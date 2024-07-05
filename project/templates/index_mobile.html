@@ -2,7 +2,7 @@
     <head>
         <title>Tamtzit - Admin Portal (Mobile)</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
-        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240521')}}"></script>
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240621b')}}"></script>
         <script>
             var user_role = "{{user_role}}"; // required for the status box
         </script>
@@ -19,7 +19,9 @@
     <tr>
         <td width="35%" align="center"><a href="start_translation">לתרגם</a></td>
         <Td> </Td>
-        <Td width="65%" align="center"><a href="heb">ליצור מהדורה חדשה<br>או לערוך את הנוכחית</a></Td>
+        <Td width="65%" align="center"><a href="heb">ליצור מהדורה חדשה<br>או לערוך את הנוכחית</a>
+            {% if daily_summary_in_progress %}<br><br><br><a href="/heb_edit_daily_summary">לערוך את הסיכום היומי</a>{% endif %}
+	</Td>
     </tr>
 </table>
 <br><br><br><br>

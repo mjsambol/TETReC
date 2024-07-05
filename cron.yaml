@@ -5,5 +5,5 @@ cron:
   timezone: Asia/Jerusalem
 - description: "weekly translation schedule creation"
   url: /tx_build_sched_for_next_week
-  schedule: every saturday 23:00
+  schedule: every saturday 22:00
   timezone: Asia/Jerusalem

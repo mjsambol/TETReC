@@ -557,7 +557,7 @@ def route_start_translation():
 @tamtzit.route("/draft", methods=['GET'])
 @require_login
 @require_role("translator")
-def continue_draft():
+def route_continue_draft():
     """
     /translate and /draft are very similar:
        /translate creates a new entry based on the submission of the form at /start_translate  (POST)
@@ -599,7 +599,7 @@ def continue_draft():
 @tamtzit.route('/translate', methods=['POST'])
 @require_login
 @require_role("translator")
-def process():
+def route_translate():
     """
     /translate and /draft are very similar:
        /translate creates a new entry based on the submission of the form at /  (POST)
@@ -636,7 +636,7 @@ def process():
                  heb_draft_id=request.form.get('heb_draft_id'))
     
     # redirect to /draft so that we'll have the proper link in the URL bar for sharing
-    return make_response(redirect(url_for("tamtzit.continue_draft", ts=utc_draft_timestamp_str, edit="true")))
+    return make_response(redirect(url_for("tamtzit.route_continue_draft", ts=utc_draft_timestamp_str, edit="true")))
 
 
 @tamtzit.route("/saveDraft", methods=['POST'])
@@ -748,7 +748,7 @@ def get_scheduling_dates():
     this_week_from_str = format_date(this_week_from, "MMMM d", locale='en')
     this_week_to = this_week_from + timedelta(days=6)
     this_week_to_str = format_date(this_week_to, "MMMM d", locale='en')
-    read_only = (dow == 6 and now.hour == 23) or (dow == 0 and now.hour < 6)
+    read_only = (dow == 6 and now.hour >= 22) #or (dow == 0 and now.hour < 6)
     next_week_from = now + timedelta(days=(7 - dow))
     next_week_to = next_week_from + timedelta(days=6)
     next_week_from_str = format_date(next_week_from, "MMMM d", locale='en')
@@ -789,12 +789,13 @@ def get_next_translators():
 @tamtzit.route('/tx_schedule_curr')
 def route_translation_current_schedule():
     sched_dates = get_scheduling_dates()
-    sched_obj = Schedule()
-    editions_to_skip = get_user_availability(zero_user, sched_dates['this_week_from_str'])
+    sched_obj = Schedule("en")
+    sched_week = sched_dates['next_week_from_str'] if sched_dates['read_only'] else sched_dates['this_week_from_str']
+    editions_to_skip = get_user_availability(zero_user, sched_week)
 
     query = datastore_client.query(kind="translation_schedule")
-    debug(f"tx_schedule_curr: fetching schedule for week of {sched_dates['this_week_from_str']}")
-    query.add_filter(filter=PropertyFilter("week_from", "=", sched_dates['this_week_from_str']))
+    debug(f"tx_schedule_curr: fetching schedule for week of {sched_week}")
+    query.add_filter(filter=PropertyFilter("week_from", "=", sched_week))
     schedule_info = query.fetch()
     schedule = None
     for s in schedule_info:
@@ -805,7 +806,7 @@ def route_translation_current_schedule():
 
     return render_template("tx_schedule.html", week=sched_obj.week,
                            editions_to_skip=Markup(json.dumps(editions_to_skip['available'])),
-                           week_being_scheduled=sched_dates['week_already_scheduled'],
+                           week_being_scheduled=(sched_dates['week_being_scheduled'] if sched_dates['read_only'] else sched_dates['week_already_scheduled']),
                            schedule_data=Markup(json.dumps(schedule))) 
     # make_response(redirect(
     # "https://docs.google.com/spreadsheets/d/1ataLRPh19z_EKiFTM9CxuoVKYL8VvxhQL8h5hZqBtY4/edit?gid=0#gid=0"))
@@ -815,7 +816,7 @@ def route_translation_current_schedule():
 @require_login
 @require_role("translator_en")
 def route_translation_schedule_signup():
-    sched_obj = Schedule()
+    sched_obj = Schedule("en")
     sched_dates = get_scheduling_dates()
     # you can schedule *next week* any time from Sunday morning 6 am until Sat night 11pm. 
     # No scheduling allowed Sat night 11pm -> Sun morning so no one gets confused that they're affecting this week
@@ -881,7 +882,7 @@ def route_translation_schedule_thisweek_change():
     # db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
 
     sched_dates = get_scheduling_dates()
-    sched_obj = Schedule()
+    sched_obj = Schedule("en")
     # day_name=edition_parts[0], edition_name=edition_parts[1], new_translator=new_val to the server
     day_name = request.args.get('day_name')
     edition_name = request.args.get('edition_name')
@@ -889,7 +890,7 @@ def route_translation_schedule_thisweek_change():
     new_volunteer = request.args.get('new_volunteer') or "---"
 
     print(f"fetching schedule for {sched_dates['this_week_from_str']}")
-    schedule = sched_obj.fetch_from_db(sched_dates['this_week_from_str'])
+    schedule = sched_obj.fetch_from_db(sched_dates['this_week_from_str'])   # @TODO change to support scheds beyond English
     if not day_name or not day_name in schedule['schedule']:
         return "ERROR bad param day_name: " + day_name
     if not edition_name or not edition_name in schedule['schedule'][day_name]:
@@ -910,18 +911,19 @@ def route_translation_build_next_schedule():
     debug("Building next week's translation schedule...")
     if 'X-Appengine-Cron' not in request.headers or request.headers['X-Appengine-Cron'] != 'true':
         debug("This request does not come from AppEngine, so ignoring it.")
-        # return
+        return
 
     sched_dates = get_scheduling_dates()
-    sched = Schedule()
-    sched.cache_user_info()
-    sched.get_input_from_datastore(sched_dates['next_week_from_str'])
-    sched.make_translation_schedule()
-    # sched.print_schedule()
-    sched.persist_schedule(sched_dates['next_week_from_str'])
-    the_following_week = sched_dates['next_week_from'] + timedelta(days=7)
-    the_following_week_str = format_date(the_following_week, "MMMM d", locale='en')
-    sched.set_up_next_week(the_following_week_str, non_interactive_mode_p=True)
+    for lang in ["en"]:   # @TODO support other langs
+        sched = Schedule(lang) 
+        sched.cache_user_info()
+        sched.get_input_from_datastore(sched_dates['next_week_from_str'])
+        sched.make_translation_schedule()
+        # sched.print_schedule()
+        sched.persist_schedule(sched_dates['next_week_from_str'])
+        the_following_week = sched_dates['next_week_from'] + timedelta(days=7)
+        the_following_week_str = format_date(the_following_week, "MMMM d", locale='en')
+        sched.set_up_next_week(the_following_week_str, non_interactive_mode_p=True)
     return "Done"
 
 

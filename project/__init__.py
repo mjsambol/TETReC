@@ -1,4 +1,5 @@
 from flask import Flask
+from google.appengine.api import wrap_wsgi_app
 
 ##
 # This code is taken from
@@ -16,7 +17,7 @@ from flask import Flask
 
 def create_app():
     app = Flask(__name__)
-
+    app.wsgi_app = wrap_wsgi_app(app.wsgi_app)
     app.config['SECRET_KEY'] = 'uiHvrty90p3'
     # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
 

@@ -147,9 +147,15 @@ function update_char_count() {
     translated_text = document.getElementById(TEXT_BEING_EDITED).value;
     entry_len = translated_text.length;
     document.getElementById("char_count").innerHTML=LENGTH_LABEL + " " + entry_len + " " + CHARACTERS_LABEL;
+    //
+    // I never noticed it before, but suddenly this code is making the cursor jump to the end of the section,
+    // which is intolerable if it happens while a user is editing the text
+    //
+    var curr_cursor_pos = document.getElementById(TEXT_BEING_EDITED).selectionStart;
     section_divider = "•   •   •\n\n";
     strip_from = translated_text.lastIndexOf(section_divider) + section_divider.length;
     last_chunk = translated_text.substring(strip_from);
+    var changed = false;
     if (entry_len > 4000) {
         document.getElementById("char_count").style.color="#FF0000";
         // remove the link to subscribe, it's not going to be rendered correctly anyway
@@ -157,6 +163,7 @@ function update_char_count() {
             link_to_subscribe = last_chunk.substring(0, last_chunk.indexOf("\n\n") + 2);            
             translated_text = translated_text.substring(0, strip_from) + last_chunk.substring(last_chunk.indexOf("\n\n") + 2);
             document.getElementById(TEXT_BEING_EDITED).value = translated_text;
+            changed = true;
         }
     } else {
         document.getElementById("char_count").style.color="#000000";
@@ -164,7 +171,11 @@ function update_char_count() {
             // include the link to subscribe
             translated_text = translated_text.substring(0, strip_from) + link_to_subscribe + last_chunk;
             document.getElementById(TEXT_BEING_EDITED).value = translated_text;
+            changed = true;
         }
+    }
+    if (changed) {
+        document.getElementById(TEXT_BEING_EDITED).setSelectionRange(curr_cursor_pos,curr_cursor_pos);
     }
 }
 

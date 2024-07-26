@@ -339,6 +339,11 @@ def route_hebrew_template():
             break
 
         draft_creator_user_info = get_user(user_id=draft["created_by"])
+        editor_name = "עוד לא ידוע"
+        if ("editor" in current_user_info["role"] and 
+            DraftStates.EDIT_ONGOING.name not in [states_entry["state"] for states_entry in draft["states"]]):
+            editor_name = current_user_info["name_hebrew"]
+
         # originally I didn't bother passing date_info based on the assumption that by the time we reach this point
         # we're editing an existing draft, and the text will already have the date filled in, so there will be no
         # templating left to resolve. But there is an edge case where that might not play out: When we create the
@@ -355,6 +360,7 @@ def route_hebrew_template():
                             is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
                             heb_font_size=get_font_sz_prefs(request)['he'],
                             author_user_name=draft_creator_user_info["name_hebrew"],
+                            editor_user_name=editor_name,
                             states=draft['states'], user_role=current_user_info['role'],
                             req_rule=request.url_rule.rule))
         refresh_cookies(request, response)
@@ -362,14 +368,19 @@ def route_hebrew_template():
 
     # if no current draft was found, create a new one so that we have a key to work with and save to while editing
     key = create_draft('', current_user_info, translation_lang='--')
-
     debug(f'Creating a new Hebrew draft with key {key.to_legacy_urlsafe().decode("utf8")}')
     date_info = make_date_info(dt, 'he')
+
+    editor_name = "עוד לא ידוע"
+    if "editor" in current_user_info["role"]:
+        editor_name = current_user_info["name_hebrew"]
+
     response = make_response(
         render_template(next_page, date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"),
                         ok_to_translate=False, is_finished=False, in_progress=False,
                         heb_font_size=get_font_sz_prefs(request)['he'],
                         author_user_name=current_user_info["name_hebrew"],
+                        editor_user_name=editor_name,
                         states=[{"state": DraftStates.WRITING.name, "at": dt.strftime('%Y%m%d-%H%M%S'),
                                  "by": current_user_info["name"], "by_heb": current_user_info["name_hebrew"]}],
                         user_role=current_user_info['role'], req_rule=request.url_rule.rule))
@@ -405,6 +416,7 @@ def route_hebrew_edit_daily_summary():
                                                  ok_to_translate=False, is_finished=False, in_progress=False,
                                                  heb_font_size=get_font_sz_prefs(request)['he'],
                                                  author_user_name=current_user_info["name_hebrew"],
+                                                 editor_user_name="עוד לא ידוע",
                                                  states=[{"state": DraftStates.WRITING.name,
                                                           "at": dt.strftime('%Y%m%d-%H%M%S'),
                                                           "by": current_user_info["name"],
@@ -428,6 +440,7 @@ def route_hebrew_edit_daily_summary():
                             is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
                             heb_font_size=get_font_sz_prefs(request)['he'],
                             author_user_name=draft_creator_user_info["name_hebrew"],
+                            editor_user_name="עוד לא ידוע",
                             states=draft['states'], user_role=current_user_info['role'],
                             req_rule=request.url_rule.rule))
         return response

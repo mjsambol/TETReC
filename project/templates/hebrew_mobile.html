@@ -1,7 +1,7 @@
 <html>
     <head>
         <title>Tamtzit - Hebrew Editing (mobile)</title>
-        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240522')}}"></script>
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240721')}}"></script>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 
@@ -41,7 +41,6 @@
                 document.getElementById("done_button").style.backgroundColor="#66BB66";
                 document.getElementById("done_button").disabled = true;
                 document.getElementById("heb_text").disabled = true;
-//                document.getElementById("back_home").style.display = "initial";
                 document.getElementById("edit_anyway_button").style.visibility = "visible";
             }
 
@@ -55,7 +54,6 @@
                 document.getElementById("to_translation_button").disabled = true;
                 document.getElementById("done_button").disabled = true;
                 document.getElementById("heb_text").disabled = true;
-//                document.getElementById("back_home").style.display = "initial";
                 document.getElementById("edit_anyway_button").style.visibility = "visible";
             }
 
@@ -71,7 +69,6 @@
                     document.getElementById("to_translation_button").disabled = false;
                     document.getElementById("to_translation_button").style.backgroundColor="#DDDDDD";
                 }
-//                document.getElementById("back_home").style.display = "none";
             }
 
             function to_translators() {

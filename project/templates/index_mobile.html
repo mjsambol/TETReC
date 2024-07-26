@@ -2,22 +2,41 @@
     <head>
         <title>Tamtzit - Admin Portal (Mobile)</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
-        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240621b')}}"></script>
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240721')}}"></script>
         <script>
             var user_role = "{{user_role}}"; // required for the status box
+            const today = new Date();
+
+            function fill_in_data() {
+                var next_translators = JSON.parse(`{{next_translators}}`);
+                var en_translator_div = document.getElementById("next-translator-en");
+                en_translator_div.innerText = next_translators["English"]["translator"];
+                if (today.getDay() > 4 && user_role.indexOf("admin") >= 0) {
+                    var tx_sign_up_status_div = document.getElementById("translators_registered_for_next_week");
+                    tx_sign_up_status_div.innerHTML = "<br><a href='/team_avail_next_week'>זמינות הצוות לשבוע הבא</a><br>";
+                }
+            }
         </script>
         <style>
             #settings-icon {position: fixed; bottom: 4px; right: 4px;}
             td {font-size: 45px;  font-family: Arial, Helvetica, sans-serif;}
         </style>   
     </head>
-    <body>
+    <body onload="fill_in_data();">
         <center><br><br><br><br>
        <div style="font-size: 55px; font-family: Arial, Helvetica, sans-serif;">ניהול תמצית החדשות</div>
        <br><br><br><br>
+<table cellpadding="20" border="2">
+    <tr><td id="translation_status" dir="rtl">
+
+    </td></tr>
+</table>
+<br><br><br><br>
 <table width="90%" border="0">
     <tr>
-        <td width="35%" align="center"><a href="start_translation">לתרגם</a></td>
+        <td width="35%" valign="top" align="center">
+		<a href="start_translation">לתרגם</a>
+	</td>
         <Td> </Td>
         <Td width="65%" align="center"><a href="heb">ליצור מהדורה חדשה<br>או לערוך את הנוכחית</a>
             {% if daily_summary_in_progress %}<br><br><br><a href="/heb_edit_daily_summary">לערוך את הסיכום היומי</a>{% endif %}
@@ -25,10 +44,25 @@
     </tr>
 </table>
 <br><br><br><br>
-<table cellpadding="20" border="2">
-    <tr><td id="translation_status" dir="rtl">
-
-    </td></tr>
+<table border="1" cellpadding="10px">
+<tr><td align="center" dir="rtl">לוח משימות</td></tr>
+<tr><td align="center" dir="rtl">
+    מתרגמ\ת הבא\ה:
+    <table border="0" width="100%">
+        <tr>
+            <td dir="rtl">אנגלית: </td>
+            <td id="next-translator-en"></td>
+        </tr>
+    </table>
+    <br>
+    <a href="/tx_schedule_curr">לו"ז לשבוע זה</a>
+    {% if "translator" in user_role %}
+    <br><br>
+        <a href="/tx_schedule_signup">הזמינות שלי</a>
+    {% endif %}
+    <div id="translators_registered_for_next_week"></div>
+</td>
+</tr>
 </table>
 <br><br><br><br>
 <table width="90%" border="0" cellpadding="20px">
@@ -37,6 +71,9 @@
     </tr>
     <tr>
         <td colspan="3" align="center"><a target="_blank" href="https://tamtzit-reader.oa.r.appspot.com/">תמצית החדשות במגוון שפות</a></td>
+    </tr>
+    <tr>
+           <td colspan="3" align="center"><br><br><a href="admin">פעולות למנהלים בלבד</a></td>            
     </tr>
 </table>
 

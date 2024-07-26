@@ -213,12 +213,13 @@
 
 {% endif %}•   •   •
 
-כתיבה: {{author_user_name}}. עריכה לשונית: שירה עבאדי.
+כתיבה: {{author_user_name}}. עריכה לשונית: {{editor_user_name}}.
 
 •   •   •
 
-✓ *להצטרפות לתמצית החדשות:*
-     https://link.mmb.org.il/news
+✓ *להצטרפות לתמצית החדשות:*{% if heb_text_body_only | length > 0 %}
+     https://link.mmb.org.il/1news{% else %}
+     https://link.mmb.org.il/news{% endif %}
 
 ✓ *בדף הפייסבוק שלנו כבר ביקרת?*
      https://link.mmb.org.il/news_facebook

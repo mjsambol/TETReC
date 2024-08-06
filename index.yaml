@@ -1,0 +1,11 @@
+indexes:
+
+- kind: debug_audit
+  properties:
+  - name: lang
+  - name: date
+
+- kind: audit
+  properties:
+  - name: lang
+  - name: date

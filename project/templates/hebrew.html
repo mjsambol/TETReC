@@ -57,6 +57,10 @@
                         document.getElementById("done_button").style.backgroundColor="#DDDDDD";
                         document.getElementById("done_button").disabled = false;
                     }
+                    if (user_role.includes("editor") && document.getElementById("heb_text").value.includes("עריכה לשונית: עוד לא ידוע")) {
+                        document.getElementById("heb_text").value = 
+                            document.getElementById("heb_text").value.replace("עריכה לשונית: עוד לא ידוע", "עריכה לשונית: {{editor_user_name}}");
+                    }
                 } else {
                     document.getElementById("to_translation_button").disabled = false;
                     document.getElementById("to_translation_button").style.backgroundColor="#DDDDDD";

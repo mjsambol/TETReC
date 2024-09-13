@@ -233,6 +233,9 @@ def post_translation_swaps(text, target_language_code):
         text = re.sub("Judea and Samaria", "Yehuda and Shomron", text, flags=re.IGNORECASE)
         text = re.sub("Beer Sheva", "Be'er Sheva", text, flags=re.IGNORECASE)
         text = re.sub("slightly injured", "lightly injured", text, flags=re.IGNORECASE)
+        text = re.sub(r"ultra[ -]?orthodox", "Haredi", text, flags=re.IGNORECASE)
+        text = re.sub(r"red alert (siren)?", "siren", text, flags=re.IGNORECASE)
+        text = re.sub(r"Ben Gabir", "Ben Gvir", text)
 
     elif target_language_code == 'fr':
         text = re.sub(r'\balarm(s?)\b', lambda m: "alert" + ('s' if m.group(1).startswith("s") else ''), text, flags=re.IGNORECASE)

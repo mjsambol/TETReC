@@ -2,16 +2,7 @@
     <head>
         <title>Tamtzit - Editing {{lang}} (Mobile)</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
-        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240510')}}"></script>
-        <!-- Google tag (gtag.js) -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-7WJQ95B6KX"></script>
-        <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-
-        gtag('config', 'G-7WJQ95B6KX');
-        </script>        
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240516')}}"></script>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
         <script>
             const TEXT_BEING_EDITED = "translated_text";
@@ -85,6 +76,20 @@
                 }
             }
 
+            function swap_hebrew_view() {
+                button_text = document.getElementById("swap_hebrew_view").innerText;
+                if (button_text == "Show latest") {
+                    document.getElementById("heb_text_area").value = latest_status["by_lang"]["--"]["text"];
+                    document.getElementById("swap_hebrew_view").innerText = "Show my start";
+                    document.getElementById("pull_additions_button").style.visibility = "hidden";
+                } else {
+                    document.getElementById("heb_text_area").value = starting_hebrew_text;
+                    document.getElementById("swap_hebrew_view").innerText = "Show latest";
+                    document.getElementById("pull_additions_button").style.visibility = "visible";
+                }
+            }
+
+            var starting_hebrew_text = `{{heb_text}}`;
             var last_saved_translation = `{{translated}}`;
 
             function done() {
@@ -125,12 +130,29 @@
 
             setInterval(function(){saveDraft()}, 10000);  // automatically save a draft every 30 seconds, if the text has changed
 
+            function edit_page_updates(latest_status) {
+                if (document.getElementById("swap_hebrew_view").disabled) {
+                    if (starting_hebrew_text.localeCompare(latest_status["by_lang"]["--"]["text"]) != 0) {
+                        document.getElementById("swap_hebrew_view").disabled = false;
+                    }
+                }
+            }
+            setInterval(function(){getLatestStatus(edit_page_updates)}, 20000);
+
         </script>        
     </head>
 
     <body>
                 <div id="orig_heb_panel" style="display: none; font-size:17px;">
-                    <textarea rows="25" style="width:100%; font-size: inherit;" dir="rtl">{{heb_text}}</textarea>
+                    <textarea rows="25" id="heb_text_area" style="width:100%; font-size: inherit;" dir="rtl">{{heb_text}}</textarea>
+                    <table width="100%">
+                        <tr><br><br>
+                            <td align="center"><button id="swap_hebrew_view" style="font-size: 16px; padding:6px 6px" onclick="swap_hebrew_view();" disabled>Show latest</button></td>                            
+                            <td align="center"><span id="heb_status_label"></span></td>
+                            <!-- button to pull latest changes, active only once per minute, not nec b/c there are changes to pull -->
+                            <td align="center"><button id="pull_additions_button" style="font-size: 16px; padding:6px 6px" onclick="pullAdditions();">Get Additions</button></td>
+                        </tr>
+                    </table>
                 </div>
 
                 <div id="translation_panel">

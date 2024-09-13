@@ -368,6 +368,10 @@ def update_archive(draft):
     soup = BeautifulSoup(prev_archive, "html.parser")
     next_entry_tag = soup.find(id='next-entry')
 
+    if not next_entry_tag:
+        print(f"ERROR: update_archive can't find the next-entry tag for language {lang_code}, returning.")
+        return
+        
     anchor = draft['timestamp'].astimezone(JERUSALEM_TZ).strftime('%Y-%m-%d') + '-' + date_info.part_of_day
 
     make_new_archive_entry(soup, next_entry_tag, draft, anchor, lang_code)

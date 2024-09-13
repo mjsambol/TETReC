@@ -1,3 +1,25 @@
+/*
+    Editing and Translation Coordination tool
+    Copyright (C) 2023-2024, Moshe Sambol, https://github.com/mjsambol
+
+    Originally created for the Tamtzit Hachadashot project
+    of the Lokhim Ahrayut non-profit organization
+    Published in English as "Israel News Highlights"
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 function makeWhatsappPreview(input) {
     result = input.replaceAll(/\*(\S[^\n]+?)\*/g,"<b>$1</b>");
     result = result.replaceAll(/_(\S[^\n]+?)_/g,"<i>$1</i>");
@@ -147,6 +169,10 @@ function update_char_count() {
     translated_text = document.getElementById(TEXT_BEING_EDITED).value;
     entry_len = translated_text.length;
     document.getElementById("char_count").innerHTML=LENGTH_LABEL + " " + entry_len + " " + CHARACTERS_LABEL;
+
+    if (typeof dont_remove_footer !== 'undefined' && dont_remove_footer) {  // an override that is defined in hebrew.html and hebrew_mobile.html
+        return;
+    }
     //
     // I never noticed it before, but suddenly this code is making the cursor jump to the end of the section,
     // which is intolerable if it happens while a user is editing the text

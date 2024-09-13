@@ -1,3 +1,27 @@
+#####################################################################################################
+#
+# Editing and Translation Coordination tool
+# Copyright (C) 2023-2024, Moshe Sambol, https://github.com/mjsambol
+#
+# Originally created for the Tamtzit Hachadashot project 
+# of the Lokhim Ahrayut non-profit organization
+# Published in English as "Israel News Highlights"
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+######################################################################################################
+
 import cachetools.func
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -362,6 +386,7 @@ def route_hebrew_template():
                             author_user_name=draft_creator_user_info["name_hebrew"],
                             editor_user_name=editor_name,
                             states=draft['states'], user_role=current_user_info['role'],
+                            user_info=current_user_info,
                             req_rule=request.url_rule.rule))
         refresh_cookies(request, response)
         return response
@@ -381,6 +406,7 @@ def route_hebrew_template():
                         heb_font_size=get_font_sz_prefs(request)['he'],
                         author_user_name=current_user_info["name_hebrew"],
                         editor_user_name=editor_name,
+                        user_info=current_user_info,
                         states=[{"state": DraftStates.WRITING.name, "at": dt.strftime('%Y%m%d-%H%M%S'),
                                  "by": current_user_info["name"], "by_heb": current_user_info["name_hebrew"]}],
                         user_role=current_user_info['role'], req_rule=request.url_rule.rule))
@@ -417,6 +443,7 @@ def route_hebrew_edit_daily_summary():
                                                  heb_font_size=get_font_sz_prefs(request)['he'],
                                                  author_user_name=current_user_info["name_hebrew"],
                                                  editor_user_name="עוד לא ידוע",
+                                                 user_info=current_user_info,
                                                  states=[{"state": DraftStates.WRITING.name,
                                                           "at": dt.strftime('%Y%m%d-%H%M%S'),
                                                           "by": current_user_info["name"],
@@ -442,6 +469,7 @@ def route_hebrew_edit_daily_summary():
                             author_user_name=draft_creator_user_info["name_hebrew"],
                             editor_user_name="עוד לא ידוע",
                             states=draft['states'], user_role=current_user_info['role'],
+                            user_info=current_user_info,
                             req_rule=request.url_rule.rule))
         return response
 

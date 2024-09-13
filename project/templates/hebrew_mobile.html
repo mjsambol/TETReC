@@ -1,7 +1,29 @@
+<!--
+    Editing and Translation Coordination tool
+    Copyright (C) 2023-2024, Moshe Sambol, https://github.com/mjsambol
+
+    Originally created for the Tamtzit Hachadashot project
+    of the Lokhim Ahrayut non-profit organization
+    Published in English as "Israel News Highlights"
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
+
 <html>
     <head>
         <title>Tamtzit - Hebrew Editing (mobile)</title>
-        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240721')}}"></script>
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240808')}}"></script>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 
@@ -11,6 +33,7 @@
             const CHARACTERS_LABEL = "אותיות";
 
             var user_role = "{{user_role}}"; // required for the status box
+            var dont_remove_footer = "True" === "{{user_info['overrides'] is defined and 'dont_remove_footer' in user_info['overrides']}}";
 
             function showPrev() {
                 document.getElementById("orig_heb_panel").style.display="none";

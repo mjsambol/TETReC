@@ -28,15 +28,15 @@
 {{line}}
 {% endfor %}{% endif %}
 
-{% if 'SOUTH' in organized and organized['SOUTH'] | length > 0 %}
-⬇️ *החזית הדרומית:*
-{% for line in organized['SOUTH'] %}
-{{line}}
-{% endfor %}{% endif %}
-
 {% if 'NORTH' in organized and organized['NORTH'] | length > 0 %}
 ⬆️ *החזית הצפונית:*
 {% for line in organized['NORTH'] %}
+{{line}}
+{% endfor %}{% endif %}
+
+{% if 'SOUTH' in organized and organized['SOUTH'] | length > 0 %}
+⬇️ *החזית הדרומית:*
+{% for line in organized['SOUTH'] %}
 {{line}}
 {% endfor %}{% endif %}
 

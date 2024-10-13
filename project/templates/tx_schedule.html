@@ -23,7 +23,7 @@
 
             day_parts = ['Morning', 'Afternoon', 'Evening'];
             person_colors = {"Anne": "#76a5af", "Ayelet": "#ead1dc", "Gabriela":"#b4a7d6", "Karen":"#db8776",
-                            "Malke":"#f9cb9c", "Moshe": "#d9ead3", "Rebecca":"#a4c2f4", "Rochel":"#cfe2f3"}
+                            "Malke":"#f9cb9c", "Moshe": "#d9ead3", "Rebecca":"#a4c2f4", "Rochel":"#cfe2f3", "Judy":"#ffcc66"}
 
             function update_table_with_schedule() {
                 for (day_name in schedule_data) {
@@ -112,7 +112,7 @@
                 <tr>
                     {% for day_name in week %}
                         <td align="center">
-                            <table border="0" cellspacing="10px">
+                            <table border="0" cellspacing="10px" width="128px">
                                 {% for edition in [week[day_name].morning, week[day_name].afternoon, week[day_name].evening] %}
                                     <tr>
                                         <td id="{{day_name}}.{{edition.name}}" align="center" onclick="edition_clicked(this);">

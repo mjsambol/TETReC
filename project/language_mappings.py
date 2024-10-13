@@ -18,8 +18,8 @@ locales['he'] = 'he_IL.UTF-8'
 locales['YY'] = 'he_IL.UTF-8'
 sections = {} # noqa
 sections['keys_from_Hebrew'] = {
-    "החזית הדרומית": "SOUTH",
     "החזית הצפונית": "NORTH",
+    "החזית הדרומית": "SOUTH",
     'חזית איו"ש': "YandS",
     "ביטחון": 'Security',
     "מהמתרחש בארץ": "InIsrael",
@@ -32,8 +32,8 @@ sections['keys_from_Hebrew'] = {
 }
 
 sections['en'] = {
-    "SOUTH": "Southern Front",
     "NORTH": "Northern Front",
+    "SOUTH": "Southern Front",
     "YandS": "Yehuda and Shomron",
     "Security": "Security",
     "InIsrael": "Israel Local News",
@@ -46,8 +46,8 @@ sections['en'] = {
     "UNKNOWN": "UNKNOWN"
 }
 sections['fr'] = {
-    "SOUTH": Markup("Au sud"),
     "NORTH": Markup("Au nord"),
+    "SOUTH": Markup("Au sud"),
     "YandS": "Yehouda et Shomron",
     "Security": "Sécurité",
     "InIsrael": Markup("En Israël"),
@@ -60,8 +60,8 @@ sections['fr'] = {
     "UNKNOWN": "UNKNOWN"
 }
 sections['he'] = {
-    "SOUTH": "החזית הדרומית",
     "NORTH": "החזית הצפונית",
+    "SOUTH": "החזית הדרומית",
     "YandS": 'חזית איו"ש',
     "Security": "ביטחון",
     "InIsrael": "מהמתרחש בארץ",

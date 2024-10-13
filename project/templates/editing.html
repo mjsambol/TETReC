@@ -95,6 +95,9 @@
                 saveDraft(true);
                 document.getElementById("finish_button").style.backgroundColor="#66BB66";
                 observe_only();
+                document.getElementById("finish_button").disabled = false; // this is because it seems sometimes the publish signal isn't
+                                                                          // being received or acked, and editors think changes not yet saved
+                                                                          // so I'm making it possible to "publish" repeatedly.
             }
 
             function saveDraft(force=false) {

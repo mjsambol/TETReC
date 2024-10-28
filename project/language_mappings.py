@@ -18,6 +18,7 @@ locales['he'] = 'he_IL.UTF-8'
 locales['YY'] = 'he_IL.UTF-8'
 sections = {} # noqa
 sections['keys_from_Hebrew'] = {
+    "מלחמת חרבות ברזל": "SwordsOfIron",
     "החזית הצפונית": "NORTH",
     "החזית הדרומית": "SOUTH",
     'חזית איו"ש': "YandS",
@@ -32,6 +33,7 @@ sections['keys_from_Hebrew'] = {
 }
 
 sections['en'] = {
+    "SwordsOfIron": "Swords of Iron",
     "NORTH": "Northern Front",
     "SOUTH": "Southern Front",
     "YandS": "Yehuda and Shomron",
@@ -46,6 +48,7 @@ sections['en'] = {
     "UNKNOWN": "UNKNOWN"
 }
 sections['fr'] = {
+    "SwordsOfIron": "Guerre des Épées de Fer",
     "NORTH": Markup("Au nord"),
     "SOUTH": Markup("Au sud"),
     "YandS": "Yehouda et Shomron",
@@ -60,6 +63,7 @@ sections['fr'] = {
     "UNKNOWN": "UNKNOWN"
 }
 sections['he'] = {
+    "SwordsOfIron": "מלחמת חרבות ברזל",
     "NORTH": "החזית הצפונית",
     "SOUTH": "החזית הדרומית",
     "YandS": 'חזית איו"ש',
@@ -74,6 +78,16 @@ sections['he'] = {
     "UNKNOWN": "UNKNOWN"
 }
 sections['YY'] = sections["he"]
+
+translated_section_names = {}
+for target_lang in ['en', 'fr']:
+    translated_section_names[target_lang] = {
+        section_name_in_he: sections[target_lang][sections['keys_from_Hebrew'][section_name_in_he]]
+        for section_name_in_he in sections['keys_from_Hebrew'].keys()}
+for target_lang in ['he', 'YY']:  # necessary for daily summary
+    translated_section_names[target_lang] = {
+        section_name_in_he: section_name_in_he for section_name_in_he in sections['keys_from_Hebrew'].keys()}
+
 
 keywords = {}  # noqa
 keywords['en'] = {
@@ -96,15 +110,15 @@ keywords['en'] = {
 keywords['fr'] = {
     "edition": "édition",
     "intro_pin": "guerre des épées de fer",
-    "northern": "nord ",
-    "southern": "sud ",
+    "northern": " nord",
+    "southern": " sud",
     "security": "sécurité",
     "jands": "iosh",
     "policy": "politique",
     "politics": "politique",
     "in the world": "UNKNOWN",
     "in israel": "en israël",
-    "world": "le monde",
+    "world": " monde",
     "weather": "météo",
     "economy": "économie",
     "sport": "sport",

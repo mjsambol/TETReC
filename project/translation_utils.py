@@ -1,6 +1,10 @@
+import json
 import re
 from google.cloud import translate
+from openai import OpenAI
+
 from .common import debug
+from .language_mappings import supported_langs_mapping
 
 PROJECT_ID = "tamtzit-hadashot"
 PARENT = f"projects/{PROJECT_ID}"
@@ -186,14 +190,16 @@ def pre_translation_swaps(text, target_language_code):
                     text, flags=re.U)
         text = re.sub(r'\b(אחר )?ה?צו?הריים\b', 'the afternoon', text, flags=re.U)
 
-        text = re.sub(r'\bהלילה\b', 'last night', text, flags=re.U)
+        # text = re.sub(r'\bהלילה\b', 'last night', text, flags=re.U)  # removing, it's wrong half the time
+        text = re.sub(r'\bיישוב\b', "community", text, flags=re.U)
+        text = re.sub(r'\bיישובים\b', "communities", text, flags=re.U)
 
         text = re.sub(r'\b([למהבו]+)?עוטף עזה\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'the Gaza envelope', text, flags=re.U)
         text = re.sub(r'\b([למהבו]+)?עוטף\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'the Gaza envelope [?]', text, flags=re.U)
 
         text = re.sub(r'\bהסברה\b', 'hasbara (public diplomacy)', text, flags=re.U)
         text = re.sub(r'\b([למהבו]+)?חלל(י)?\b', lambda m: tx_heb_prefix(m.group(1), "en") + 'fallen', text, flags=re.U)
-        text = re.sub(r'\b([למהבו]+)?כטמ"[מם]\b', lambda m: tx_heb_prefix(m.group(1), "en") + "remotely operated UAV", text, flags=re.U) 
+        text = re.sub(r'\b([למהבו]+)?כטמ"[מם]\b', lambda m: tx_heb_prefix(m.group(1), "en") + "UAV", text, flags=re.U)
         text = re.sub(r'\b([למהבו]+)?אמל"ח\b', lambda m: tx_heb_prefix(m.group(1), "en") + "weapons", text, flags=re.U)
         text = re.sub(r'\b([למהבו]+)?חטוף\b', lambda m: tx_heb_prefix(m.group(1), "en") + "hostage", text, flags=re.U)
         text = re.sub(r'\b([למהבו]+)?חטופים\b', lambda m: tx_heb_prefix(m.group(1), "en") + "hostages", text, flags=re.U)
@@ -236,6 +242,7 @@ def post_translation_swaps(text, target_language_code):
         text = re.sub(r"ultra[ -]?orthodox", "Haredi", text, flags=re.IGNORECASE)
         text = re.sub(r"red alert (siren)?", "siren", text, flags=re.IGNORECASE)
         text = re.sub(r"Ben Gabir", "Ben Gvir", text)
+        text = re.sub("spokesman", "spokesperson", text, flags=re.IGNORECASE)
 
     elif target_language_code == 'fr':
         text = re.sub(r'\balarm(s?)\b', lambda m: "alert" + ('s' if m.group(1).startswith("s") else ''), text, flags=re.IGNORECASE)
@@ -245,8 +252,76 @@ def post_translation_swaps(text, target_language_code):
     return text
 
 
-def translate_text(text: str, target_language_code: str, source_language='he') -> translate.Translation:
+def translate_text(text: str, target_language_code: str, source_language='he', engine="Google") -> str:
+    if engine == "Google":
+        return google_translate(text, target_language_code, source_language)
+    else:
+        return openai_translate(text, target_language_code, source_language)
 
+openai_force_translations = {
+    "en": {
+        'אזעקה': 'siren',
+        'אזעקות': 'sirens',
+        'אצבע הגליל': 'the Galilee Panhandle',
+        'מחבל': 'terrorist',
+        'מחבלים': 'terrorists'
+    },
+    "fr": {
+        'אזעקות': 'sirènes'
+    }
+}
+
+def openai_translate(text: str, target_language_code: str, source_language: str) -> str:
+        debug(f"translate_text: using OpenAI as engine... ")  # Hebrew is ======\n{text}\n======")
+        debug("Forcing these terms: \n " +
+              json.dumps(openai_force_translations[target_language_code] | title_translations[target_language_code],
+                                                    ensure_ascii=False, indent=4))
+        target_language_name = supported_langs_mapping[target_language_code]
+        openai_client = OpenAI()
+
+        messages = [
+            {"role": "system",
+             "content": f"You are translating news updates from Hebrew to {target_language_name}. " +
+                        "The translation may restructure sentences to make them more natural for readers of {target_language_name}."},
+            {"role": "system",
+             "content": "Each item begins with a hyphen or other special character at the start of the line; " +
+                        "the translation should maintain separation between items, " +
+                        "and each should begin with the same hyphen or special character with which the Hebrew began."},
+            {"role": "system",
+             "content": "The following python dictionary must be used to enforce translation of the terms which appear as its keys. " +
+                        f"For example, the Hebrew word אזעקות must always be translated as {openai_force_translations[target_language_code]['אזעקות']}."},
+            {"role": "system",
+             "content": json.dumps(openai_force_translations[target_language_code] | title_translations[target_language_code], ensure_ascii=False)},
+        ]
+        if target_language_code == 'en':
+            messages.extend([
+                {"role": "system",
+                 "content": "In addition, the following python dictionary indicates English words which " +
+                            "sometimes appear in the translation results, and alternatives which should be used instead."},
+                {"role": "user", "content": [{"type": "text", "text": "{'fighter':'soldier'}"}]}
+            ])
+        elif target_language_code == 'fr':
+            messages.extend([
+                {"role": "system",
+                 "content": """Traduire en français style journaliste, sachant que je suis un journaliste israélien sioniste, 
+                 et de ce fait ne parle pas de "Judée et Samarie" mais de "la région de Yehouda et Shomron", 
+                 pas de colonies mais de localités, pas de colons mais d'habitants. 
+                 Enfin, כטב"ם est un drone explosif alors que כטמ"ם un drone."""}
+            ])
+
+        messages.extend([
+            {"role": "user",
+             "content": f"Translate the following Hebrew text to {target_language_name}: \n" + text
+             }])
+
+        completion = openai_client.chat.completions.create(model="gpt-4o-mini", messages=messages)
+            # {"role": "system", "content": "Do not abbreviate anything which is not abbreviated in the Hebrew."""},
+            # {"role": "system", "content": "Text which indicates when the news item happened, such as 'last night' or 'this morning', should be minimized in the translation."},
+
+        return completion.choices[0].message.content
+
+
+def google_translate(text: str, target_language_code: str, source_language: str) -> str:
     text = pre_translation_swaps(text, target_language_code)
 
     break_point = text.find("📌", text.find("📌") + 1)

@@ -47,7 +47,7 @@ from .cookies import user_data_from_req
 from .draft_utils import create_draft, DraftStates, fetch_drafts, get_latest_day_worth_of_editions, make_date_info
 from .draft_utils import make_new_archive_entry, upload_to_cloud_storage, update_hebrew_draft, update_translation_draft
 from .diff_draft_versions import get_translated_additions_since_ok_to_tx
-from .language_mappings import editions, keywords, sections, supported_langs_mapping
+from .language_mappings import editions, keywords, sections, supported_langs_mapping, translated_section_names
 from .translation_utils import translate_text
 from .weekly_schedule import Schedule
 
@@ -87,6 +87,7 @@ datastore_client = DatastoreClientProxy.get_instance()
 
 
 tamtzit = Blueprint('tamtzit', __name__)
+section_header_pat = re.compile("[📌>] \*?_?([^_:*]+):_?\*?")
 
 
 def detect_mobile(param_request, page_name):
@@ -662,7 +663,8 @@ def route_translate():
         "translator_in_en": user_info["name"]
     }
 
-    info = process_translation_request(heb_text, target_language_code)
+    translation_engine = request.form.get("tx-engine")
+    info = process_translation_request(heb_text, target_language_code, translation_engine)
     dt = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     draft_timestamp = dt.strftime('%Y%m%d-%H%M%S')
     utc_draft_timestamp = dt.astimezone(tz=ZoneInfo("UTC"))
@@ -674,7 +676,7 @@ def route_translate():
 
     # store the draft in DB so that someone else can continue the translation work
     create_draft(heb_text, user_info, translation_text=translated, translation_lang=target_language_code,
-                 heb_draft_id=request.form.get('heb_draft_id'))
+                 translation_engine=translation_engine, heb_draft_id=request.form.get('heb_draft_id'))
     
     # redirect to /draft so that we'll have the proper link in the URL bar for sharing
     return make_response(redirect(url_for("tamtzit.route_continue_draft", ts=utc_draft_timestamp_str, edit="true")))
@@ -1039,29 +1041,46 @@ def nightly_archive_cleanup():
     return "OK"
 
 
-def process_translation_request(heb_text, target_language_code):
+def process_translation_request(heb_text, target_language_code, translation_engine="Google"):
     # heb_lines = heb_text.split("\n")
 
     debug(f"RAW HEBREW:--------\n{heb_text}")
     debug(f"--------------------------")
-    # print(f"Split hebrew has {len(heb_lines)} lines")
 
-    # strip the first few lines if necessary, they're causing some problem...
-    # for i in range(5):
-    #     if "תמצית החדשות" in heb_lines[i]:
-    #         print("popping a tamtzit" + heb_lines[i])
-    #         heb_lines.pop(i)
-    #         break
-    # for i in range(5):
-    #     if "מהדורת " in heb_lines[i]:
-    #         print("popping a mehadura: " + heb_lines[i])
-    #         heb_lines.pop(i)
-    #         break
+    debug(f"translated section names is {translated_section_names[target_language_code]}")
+
+    # strip off the header and footer, there is no point translating them and they are complicated to ignore later
+    stripped_heb_text = ""
+    header_stripped = False
+    for line in heb_text.split("\n"):
+        if not header_stripped:
+            if "• • •" in line or "•   •   •" in line:
+                header_stripped = True
+            continue
+        else:
+            if "• • •" in line or "•   •   •" in line:
+                break
+        # while we're going through the text, replace Hebrew section headings with those of the target language
+        # it's too messy to translate and then try to figure it out
+        header_match = section_header_pat.match(line)
+        if header_match:
+            debug(f"replacing header\n'{line}'\ngroup1 is '{header_match.group(1)}'")
+            if header_match.group(1) not in translated_section_names[target_language_code]:
+                debug(f"We have no mapping for that, so leaving it alone.")
+            else:
+                line = line.replace(header_match.group(1), translated_section_names[target_language_code][header_match.group(1)])
+            debug(f"now it's {line}")
+
+        stripped_heb_text = stripped_heb_text + line + "\n"
+
+    heb_text = stripped_heb_text
+    debug(f"STRIPPED OF HEADER & FOOTER:--------\n{heb_text}")
+    debug(f"--------------------------")
 
     if target_language_code in ["YY", "he"]:
         translated = heb_text
     else:
-        translated = translate_text(heb_text, target_language_code)
+        translated = translate_text(heb_text, target_language_code=target_language_code, engine=translation_engine)
     debug(f"RAW TRANSLATION:--------\n{translated}")
     debug(f"--------------------------")
 
@@ -1069,6 +1088,8 @@ def process_translation_request(heb_text, target_language_code):
     translated_lines = translated.split("\n")
 
     kw = keywords[target_language_code]
+    section_titles = sections[target_language_code]
+
     section = None
     organized = defaultdict(list)
     for line in translated_lines:
@@ -1115,17 +1136,17 @@ def process_translation_request(heb_text, target_language_code):
             #     debug("starting world section")
             #     section = organized["Worldwide"]
             elif section is not None:
-                debug("inside a section")
+                debug(f"inside section {section}")
                 section.append(Markup(line))
         elif line.startswith("📌"):
             debug("pin line...")
-            if kw['intro_pin'] in line.lower():
+            if kw['intro_pin'] in line.lower() or "iron swords war" in line.lower() or "swords of iron" in line.lower():
                 debug("skipping what looks like the intro pin line")
                 continue
             if kw["security"] in line.lower():
                 debug("starting Security section")
                 section = organized['Security']
-            elif kw["in israel"] in line.lower():
+            elif kw["in israel"] in line.lower() or section_titles["InIsrael"] in line:
                 debug("starting inIsrael section")
                 section = organized['InIsrael']
             elif kw["world"] in line.lower():
@@ -1144,7 +1165,7 @@ def process_translation_request(heb_text, target_language_code):
                 debug("Starting sports section")
                 section = organized["Sports"]
             elif (kw["finish"] in line.lower() or "good note" in line.lower() or "end well" in line.lower()
-                  or "bien finir" in line.lower() or "finit bien" in line.lower()):
+                  or "positive note" in line.lower() or section_titles["FinishWell"] in line):
                 debug("Starting good news section")
                 section = organized['FinishWell']
             else:

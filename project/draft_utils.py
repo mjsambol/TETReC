@@ -170,7 +170,7 @@ def fetch_drafts(query_order="-timestamp"):
     return drafts_to_return, drafts_local_timestamps
     
 
-def create_draft(heb_text, user_info, translation_text='', translation_lang='en', heb_draft_id=None):
+def create_draft(heb_text, user_info, translation_text='', translation_lang='en', translation_engine='Google', heb_draft_id=None):
     """Create a new entry in the Datastore, save the original text and, optionally, the translation,
     and return the new key and timestamp"""
 
@@ -182,7 +182,8 @@ def create_draft(heb_text, user_info, translation_text='', translation_lang='en'
     draft_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     entity = datastore.Entity(key=key, exclude_from_indexes=("hebrew_text", "translation_text"))
     entity.update({"hebrew_text": heb_text, "heb_draft_id": heb_draft_id, 
-                   "translation_text": translation_text, "translation_lang": translation_lang, 
+                   "translation_text": translation_text, "translation_lang": translation_lang,
+                   "translation_engine": translation_engine,
                    "timestamp": draft_timestamp, "last_edit": draft_timestamp, 
                    "is_finished": False, "ok_to_translate": False, "created_by": user_info.key.id,
                    "states": [{"state": DraftStates.WRITING.name, "at": draft_timestamp.strftime('%Y%m%d-%H%M%S'),

@@ -461,6 +461,12 @@ def route_hebrew_edit_daily_summary():
         draft_creator_user_info = get_user(user_id=draft["created_by"])
         date_info = make_date_info(dt, 'he')
 
+        editor_name = "עוד לא ידוע"
+        debug("checking what name to use for the editor...")
+        if "editor" in current_user_info["role"]:
+            editor_name = current_user_info["name_hebrew"]
+        debug(f"set editor name to {editor_name}")
+
         response = make_response(
             render_template(next_page, date_info=date_info, heb_text=Markup(draft['hebrew_text']),
                             draft_key=draft.key.to_legacy_urlsafe().decode("utf8"),
@@ -468,7 +474,7 @@ def route_hebrew_edit_daily_summary():
                             is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
                             heb_font_size=get_font_sz_prefs(request)['he'],
                             author_user_name=draft_creator_user_info["name_hebrew"],
-                            editor_user_name="עוד לא ידוע",
+                            editor_user_name=editor_name,
                             states=draft['states'], user_role=current_user_info['role'],
                             user_info=current_user_info,
                             req_rule=request.url_rule.rule))

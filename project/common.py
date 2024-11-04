@@ -132,8 +132,9 @@ class DateInfo:
     hebrew_year_he: str
     motzei_shabbat_early: bool
     erev_shabbat: bool
+    is_dst: bool   # indication of summer time when there is only one motzei Shabbat edition
 
-    def __init__(self, dt: datetime, lang, part_of_day, motzei_shabbat_early, erev_shabbat):
+    def __init__(self, dt: datetime, lang, part_of_day, motzei_shabbat_early, erev_shabbat, is_dst):
         oct6 = datetime(2023, 10, 6, tzinfo=ZoneInfo('Asia/Jerusalem'))
         heb_dt = dates.HebrewDate.from_pydate(dt)
 
@@ -155,3 +156,4 @@ class DateInfo:
         self.hebrew_year_he  = heb_dt.hebrew_year()
         self.erev_shabbat    = erev_shabbat
         self.motzei_shabbat_early = motzei_shabbat_early
+        self.is_dst          = is_dst

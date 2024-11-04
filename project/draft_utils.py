@@ -404,4 +404,5 @@ def make_date_info(dt, lang):
     return DateInfo(dt, lang, part_of_day=dt_edition, 
                     motzei_shabbat_early=((not is_summer_daylight_savings_time) and
                                           dt.isoweekday() == 6 and dt.hour < 19),
-                    erev_shabbat=(dt.isoweekday() == 5 and dt.hour >= 12))
+                    erev_shabbat=(dt.isoweekday() == 5 and dt.hour >= 12),
+                    is_dst=is_summer_daylight_savings_time)

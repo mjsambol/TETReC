@@ -1057,15 +1057,22 @@ def process_translation_request(heb_text, target_language_code, translation_engi
 
     # strip off the header and footer, there is no point translating them and they are complicated to ignore later
     stripped_heb_text = ""
-    header_stripped = False
+    found_a_pin = False
+    in_footer = False
+
     for line in heb_text.split("\n"):
-        if not header_stripped:
-            if "• • •" in line or "•   •   •" in line:
-                header_stripped = True
-            continue
+        if not found_a_pin:
+            if "📌" in line:
+                found_a_pin = True
+            else:
+                continue   # strip this line, it's header
         else:
-            if "• • •" in line or "•   •   •" in line:
-                break
+            if not in_footer and ("• • •" in line or "•   •   •" in line):
+                in_footer = True
+
+            if in_footer:
+                continue   # strip this line, it's footer
+
         # while we're going through the text, replace Hebrew section headings with those of the target language
         # it's too messy to translate and then try to figure it out
         header_match = section_header_pat.match(line)

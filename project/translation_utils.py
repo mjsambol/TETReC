@@ -264,7 +264,9 @@ openai_force_translations = {
         'אזעקות': 'sirens',
         'אצבע הגליל': 'the Galilee Panhandle',
         'מחבל': 'terrorist',
-        'מחבלים': 'terrorists'
+        'מחבלים': 'terrorists',
+        'הותר לפרסום': 'released for publication',
+        'חרדי': 'Ultra-Orthodox'
     },
     "fr": {
         'אזעקות': 'sirènes'

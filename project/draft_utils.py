@@ -80,7 +80,7 @@ def make_new_archive_entry(soup, next_entry_tag, draft, anchor, lang_code):
 
 
 def get_latest_day_worth_of_editions():
-    """This methos is used from two locations:
+    """This method is used from two locations:
     nightly_archive_cleanup() - which is invoked only by a cron job
     and 
     start_daily_summary() which is a route method, called by the hebrew.html page on submission
@@ -90,17 +90,17 @@ def get_latest_day_worth_of_editions():
     for draft in latest_drafts:
         draft_lang = 'he' if draft['translation_lang'] == '--' else draft['translation_lang']
         draft_time_of_day = get_edition_name_from_text(draft)
-        debug(f"Checking latest draft - is this most mature for this lang at this time of day? {draft['states']}")
+        debug(f"GLDWOE: Checking latest {draft_lang} draft ({draft_time_of_day}) - is this most mature for this lang at this time of day? {draft['states']}")
         if draft_time_of_day not in yesterdays_editions[draft_lang]:
             yesterdays_editions[draft_lang][draft_time_of_day] = draft
-            debug(f"added {draft_time_of_day} to yesterdays_Editions for lang {draft_lang}")            
+            debug(f"GLDWOE: added {draft_time_of_day} to yesterdays_Editions for lang {draft_lang}")            
         else:
             draft_maturity = compare_draft_state_lists(draft, yesterdays_editions[draft_lang][draft_time_of_day])
             if draft_maturity == -1:
                 yesterdays_editions[draft_lang][draft_time_of_day] = draft
-                debug(f"Yes, this is the most mature draft found so far.")
+                debug(f"GLDWOE: Yes, this is the most mature draft found so far.")
             else:
-                debug("No, this edition is not newer.")
+                debug("GLDWOE: No, this edition is not newer.")
                 
     return yesterdays_editions
 

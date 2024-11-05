@@ -60,7 +60,7 @@ pycparser==2.21
 pydantic==2.7.3
 pydantic_core==2.18.4
 Pygments==2.16.1
-pyluach @ git+https://github.com/mjsambol/pyluach.git@33713d95bde1341811549089d98c2e865015c572
+pyluach @ git+https://github.com/mjsambol/pyluach.git@1e03988b59a7717bea98644cd1ff7557ce00db9b
 pytz==2023.3.post1
 requests==2.31.0
 rsa==4.9

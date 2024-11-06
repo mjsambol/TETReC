@@ -260,17 +260,45 @@ def translate_text(text: str, target_language_code: str, source_language='he', e
 
 openai_force_translations = {
     "en": {
+        'אגורה': 'agora',
+        'אגורות': 'agorot',
         'אזעקה': 'siren',
         'אזעקות': 'sirens',
+        'אמל"ח': 'weapons',
         'אצבע הגליל': 'the Galilee Panhandle',
+        'הותר לפרסום': 'released for publication',
+        'הי"ד': 'HYD',
+        'הסברה': 'hasbara (public diplomacy)',
+        'חטוף': 'hostage',
+        'חטופים': 'hostages',
+        'חטיבת האש': 'artillery brigade',
+        'חלל': 'fallen',
+        'חרדי': 'Haredi',
+        'יהודה ושומרון': 'Yehuda and Shomron',
+        'יישוב': 'community',
+        'יישובים': 'communities',
+        'כטב"ם': 'UAV',
+        'כטמ"ם': 'UAV',
+        'לוט"ר': 'LOTAR (counter-terrorism special forces)',
         'מחבל': 'terrorist',
         'מחבלים': 'terrorists',
-        'הותר לפרסום': 'released for publication',
-        'חרדי': 'Ultra-Orthodox'
+        'מרגש': 'moving',
+        'עוטף עזה': 'the Gaza envelope',
     },
     "fr": {
         'אזעקות': 'sirènes'
     }
+}
+
+openai_fix_translations = {
+    "en": {
+        'fighter': 'soldier',
+        'infrastructures': 'infrastructure',
+        'Judea': 'Yehuda',  # per Gabriela they sometimes show individually
+        'Samaria': 'Shomron',
+        'spokesman': 'spokesperson',
+        'slightly injured': 'lightly injured',
+    }, "fr": {}
 }
 
 def openai_translate(text: str, target_language_code: str, source_language: str) -> str:
@@ -299,8 +327,9 @@ def openai_translate(text: str, target_language_code: str, source_language: str)
             messages.extend([
                 {"role": "system",
                  "content": "In addition, the following python dictionary indicates English words which " +
-                            "sometimes appear in the translation results, and alternatives which should be used instead."},
-                {"role": "user", "content": [{"type": "text", "text": "{'fighter':'soldier'}"}]}
+                            "sometimes appear in the translation results, and alternatives which must be used instead."},
+                {"role": "system", 
+                 "content": json.dumps(openai_fix_translations["en"], ensure_ascii=False)}
             ])
         elif target_language_code == 'fr':
             messages.extend([

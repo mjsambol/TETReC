@@ -43,7 +43,7 @@
                                     </select>
                                     <span style="font-size: 14px;">using:</span>
                                     <select name="tx-engine" style="font-size: 16px; padding:8px 8px"
-                                    onchange="document.getElementById('submit-button').disabled = false;">
+                                    onchange="translation_engine_changed(this.value);">
                                         <option value="Google">Google</option>
                                         <option value="OpenAI">OpenAI</option>
                                     </select>
@@ -54,6 +54,13 @@
                                            style="font-size: 20px; padding:8px 8px">
                                 </td>
                             </tr>
+                            <tr>
+                                <td colspan="3">
+                                    <span style="font-size: 14px;" id="openai-custom-dirs-label" hidden>Custom directions:</span>
+                                    <br>
+                                    <textarea name="openai-custom-dirs" id="openai-custom-dirs" rows="5" cols="60" hidden></textarea>
+                                </td>
+                            </tr>
                         </table>
                     </td>
                     <td width="10"> </td>
@@ -62,6 +69,12 @@
             </table>
         </form>        
         <script>
+            function translation_engine_changed(selected_value) { 
+                document.getElementById('submit-button').disabled = false;
+                document.getElementById('openai-custom-dirs').hidden=(selected_value != "OpenAI");
+                document.getElementById('openai-custom-dirs-label').hidden=(selected_value != "OpenAI");
+            }
+
             function input_page_updates(latest_status) {
                 states = latest_status["by_lang"]["--"]["states"];
                 // if relevant, update the color of the submit button

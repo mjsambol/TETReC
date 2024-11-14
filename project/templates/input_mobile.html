@@ -6,7 +6,7 @@
     </head>    
     <body>
 
-    <form method="POST" action="/translate">
+    <form method="POST" action="/translate" onsubmit="document.getElementById('submit-button').disabled = true; return true;">
         <input type="hidden" name="heb_draft_id" value="{{draft_id}}">
         <input type="hidden" name="heb_author_id" value="{{creator_id}}">
 
@@ -15,14 +15,29 @@
         <table border="0" width="100%">
             <tr>
                 <td width="67%" align="center"><span style="font-size: 45px;">Translate to:</span> 
-                    <select name="target-lang" style="font-size: 50px; padding:8px 8px">
+                    <select name="target-lang" style="font-size: 50px; padding:8px 8px" 
+                    onchange="document.getElementById('submit-button').disabled = false;">
                         <option value="en">English</option>
                         <option value="fr">Francais</option>
                         <option value="YY">נוער</option>
-                    </select></td>
+                    </select>
+                    <span style="font-size: 14px;">using:</span>
+                    <select name="tx-engine" style="font-size: 16px; padding:8px 8px"
+                    onchange="translation_engine_changed(this.value);">
+                        <option value="Google">Google</option>
+                        <option value="OpenAI">OpenAI</option>
+                    </select>                    
+                </td>
                 <td width="15%" align="center" id="heb_status_label">...</td>
                 <td width="18%" align="right">
-        <input type="submit" id="submit-button" style="font-size: 50px; padding:8px 8px">
+                    <input type="submit" id="submit-button" style="font-size: 50px; padding:8px 8px">
+                </td>
+            </tr>
+            <tr>
+                <td colspan="3">
+                    <span style="font-size: 14px;" id="openai-custom-dirs-label" hidden>Custom directions:</span>
+                    <br>
+                    <textarea name="openai-custom-dirs" id="openai-custom-dirs" rows="5" cols="60" hidden></textarea>
                 </td>
             </tr>
         </table>
@@ -38,12 +53,18 @@
         <a href="/draft?ts={{ draft['timestamp'].strftime('%Y%m%d-%H%M%S') }}">
            {{ local_timestamps[draft['timestamp']][0].strftime('%H:%M') }}
             - {{ local_timestamps[draft['timestamp']][1].strftime('%H:%M') }}</a> 
-               ({{supported_langs[draft['translation_lang']]}}, by {{draft['states'][0]['by']}})
+               ({{draft['translation_engine']}} {{supported_langs[draft['translation_lang']]}}, by {{draft['states'][0]['by']}})
             <br><br>
         {% endif %}            
     {% endfor %}
     </div>
     <script>
+        function translation_engine_changed(selected_value) { 
+            document.getElementById('submit-button').disabled = false;
+            document.getElementById('openai-custom-dirs').hidden=(selected_value != "OpenAI");
+            document.getElementById('openai-custom-dirs-label').hidden=(selected_value != "OpenAI");
+        }
+
         function input_page_updates(latest_status) {
             states = latest_status["by_lang"]["--"]["states"];
             // if relevant, update the color of the submit button

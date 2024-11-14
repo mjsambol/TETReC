@@ -87,7 +87,7 @@ datastore_client = DatastoreClientProxy.get_instance()
 
 
 tamtzit = Blueprint('tamtzit', __name__)
-section_header_pat = re.compile("[📌>] \*?_?([^_:*]+):_?\*?")
+section_header_pat = re.compile(r"[📌>] \*?_?([^_:*]+):_?\*?")
 
 
 def detect_mobile(param_request, page_name):
@@ -670,7 +670,9 @@ def route_translate():
     }
 
     translation_engine = request.form.get("tx-engine")
-    info = process_translation_request(heb_text, target_language_code, translation_engine)
+    openai_custom_dirs = request.form.get("openai-custom-dirs")
+
+    info = process_translation_request(heb_text, target_language_code, translation_engine, openai_custom_dirs)
     dt = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     draft_timestamp = dt.strftime('%Y%m%d-%H%M%S')
     utc_draft_timestamp = dt.astimezone(tz=ZoneInfo("UTC"))
@@ -876,9 +878,11 @@ def route_translation_schedule_signup():
     user_schedule_availability = get_user_availability(db_user_info, sched_dates['next_week_from_str'])
     usa_as_json = json.dumps(user_schedule_availability['available'])
     editions_to_skip = get_user_availability(zero_user, sched_dates['next_week_from_str'])
+    is_summer_daylight_savings_time = bool(datetime.now(tz=ZoneInfo("Asia/Jerusalem")).dst())
 
     debug("tx_schedule_signup returning availability: " + Markup(usa_as_json))
     return render_template("tx_signup.html", week=sched_obj.week,
+                           with_early_motzash=not is_summer_daylight_savings_time,
                            week_being_scheduled=sched_dates['week_being_scheduled'],
                            user_availability=Markup(usa_as_json), read_only=sched_dates['read_only'],
                            editions_to_skip=Markup(json.dumps(editions_to_skip['available'])))
@@ -1049,7 +1053,7 @@ def nightly_archive_cleanup():
     return "OK"
 
 
-def process_translation_request(heb_text, target_language_code, translation_engine="Google"):
+def process_translation_request(heb_text, target_language_code, translation_engine="Google", openai_custom_dirs=""):
     # heb_lines = heb_text.split("\n")
 
     debug(f"RAW HEBREW:--------\n{heb_text}")
@@ -1095,7 +1099,8 @@ def process_translation_request(heb_text, target_language_code, translation_engi
     if target_language_code in ["YY", "he"]:
         translated = heb_text
     else:
-        translated = translate_text(heb_text, target_language_code=target_language_code, engine=translation_engine)
+        translated = translate_text(heb_text, target_language_code=target_language_code, 
+                                    engine=translation_engine, custom_dirs=openai_custom_dirs)
     debug(f"RAW TRANSLATION:--------\n{translated}")
     debug(f"--------------------------")
 

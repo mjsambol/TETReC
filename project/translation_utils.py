@@ -252,11 +252,11 @@ def post_translation_swaps(text, target_language_code):
     return text
 
 
-def translate_text(text: str, target_language_code: str, source_language='he', engine="Google") -> str:
+def translate_text(text: str, target_language_code: str, source_language='he', engine="Google", custom_dirs="") -> str:
     if engine == "Google":
         return google_translate(text, target_language_code, source_language)
     else:
-        return openai_translate(text, target_language_code, source_language)
+        return openai_translate(text, target_language_code, source_language, custom_dirs)
 
 openai_force_translations = {
     "en": {
@@ -301,7 +301,7 @@ openai_fix_translations = {
     }, "fr": {}
 }
 
-def openai_translate(text: str, target_language_code: str, source_language: str) -> str:
+def openai_translate(text: str, target_language_code: str, source_language: str, custom_dirs: str) -> str:
         debug(f"translate_text: using OpenAI as engine... ")  # Hebrew is ======\n{text}\n======")
         debug("Forcing these terms: \n " +
               json.dumps(openai_force_translations[target_language_code] | title_translations[target_language_code],
@@ -340,11 +340,15 @@ def openai_translate(text: str, target_language_code: str, source_language: str)
                  Enfin, כטב"ם est un drone explosif alors que כטמ"ם un drone."""}
             ])
 
+        if len(custom_dirs) > 0:
+            messages.extend([{"role": "system", "content": custom_dirs}])
+
         messages.extend([
             {"role": "user",
              "content": f"Translate the following Hebrew text to {target_language_name}: \n" + text
              }])
 
+        debug(f"openai_translate(): sending the following directions to openAI: {messages}")
         completion = openai_client.chat.completions.create(model="gpt-4o-mini", messages=messages)
             # {"role": "system", "content": "Do not abbreviate anything which is not abbreviated in the Hebrew."""},
             # {"role": "system", "content": "Text which indicates when the news item happened, such as 'last night' or 'this morning', should be minimized in the translation."},

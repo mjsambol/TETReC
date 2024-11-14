@@ -341,7 +341,7 @@ def openai_translate(text: str, target_language_code: str, source_language: str,
             ])
 
         if len(custom_dirs) > 0:
-            messages.extend([{"role": "system", "content": custom_dirs}])
+            messages.extend([{"role": "user", "content": custom_dirs}])
 
         messages.extend([
             {"role": "user",

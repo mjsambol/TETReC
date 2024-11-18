@@ -16,6 +16,7 @@ locales['en'] = "en_US.UTF-8"
 locales['fr'] = "fr_FR.UTF-8"
 locales['he'] = 'he_IL.UTF-8'
 locales['YY'] = 'he_IL.UTF-8'
+locales['H1'] = 'he_IL.UTF-8'
 sections = {} # noqa
 sections['keys_from_Hebrew'] = {
     "מלחמת חרבות ברזל": "SwordsOfIron",
@@ -148,3 +149,4 @@ editions['en'] = ['Morning', 'Afternoon', 'Evening']
 editions['fr'] = ['Matin', Markup("l'après-midi"), 'soir']
 editions['he'] = ['בוקר', 'צוהריים', 'ערב']
 editions['YY'] = ['בוקר', 'צוהריים', 'ערב']
+editions['H1'] = ['בוקר', 'צוהריים', 'ערב']

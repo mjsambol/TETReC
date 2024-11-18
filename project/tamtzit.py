@@ -27,6 +27,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 import json
 import re
+from textwrap import dedent
 from zoneinfo import ZoneInfo
 
 from babel.dates import format_date, format_datetime
@@ -48,6 +49,7 @@ from .draft_utils import create_draft, DraftStates, fetch_drafts, get_latest_day
 from .draft_utils import make_new_archive_entry, upload_to_cloud_storage, update_hebrew_draft, update_translation_draft
 from .diff_draft_versions import get_translated_additions_since_ok_to_tx
 from .language_mappings import editions, keywords, sections, supported_langs_mapping, translated_section_names
+from .template_text_chunks import make_header, make_footer
 from .translation_utils import translate_text
 from .weekly_schedule import Schedule
 
@@ -337,6 +339,42 @@ def route_use_invitation_link():
         return render_template("error.html", dont_show_home_link=True,
                                msg="Invalid authentication link. Please contact an admin.",
                                heb_msg="הלינק לא תקין, צור קשר עם משה")
+
+
+@tamtzit.route('/headers', methods=['POST', 'GET'])
+def route_test_headers():
+
+    if request.method == 'GET':
+        return render_template("test_headers.html")
+    elif request.method == 'POST':
+        inputs = request.get_json()
+        target_dt = inputs["date"]
+        dt = datetime.fromisoformat(target_dt).replace(tzinfo=ZoneInfo("Asia/Jerusalem"))
+        if inputs["time"] == "morn":  # noon eve motz
+            dt = dt.replace(hour=7)
+        elif inputs["time"] == "noon":
+            dt = dt.replace(hour=13)
+        elif inputs["time"] == "eve":
+            dt = dt.replace(hour=19)
+        elif inputs["time"] == "motz":
+            dt = dt.replace(hour=17)
+
+        lang = inputs["lang"]
+
+        date_info = make_date_info(dt, lang)
+        print(f"dt is {date_info}")
+        try:
+            header = make_header(lang, date_info)
+            body = dedent("""\
+            תוכן תוכן תוכן 
+            תוכן תוכן תוכן 
+            תוכן תוכן תוכן       
+            """)
+            footer = make_footer(lang, date_info)
+            return {"this":"thing", "that":(header + body + footer)}
+        except:
+            return {"that": "האפשרות הזאת לא קיימת"}
+
 
 
 @tamtzit.route('/heb')

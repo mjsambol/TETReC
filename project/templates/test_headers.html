@@ -1,0 +1,82 @@
+<html>
+    <head>
+        <style>
+            optgroup {font-size: 16px;}
+            body {font-size: 16px;}
+            button {font-size: 16px;}
+        </style>
+        <script>
+            function gettext(){
+//  e.preventDefault()
+
+ fetch('/headers', {
+  method: 'POST',
+  body: JSON.stringify({
+    lang: document.getElementById('language').value,
+    time: document.getElementById('time_of_day').value,
+    date: document.getElementById('date').value
+  }),
+  headers: {
+    'Content-type': 'application/json; charset=UTF-8',
+  }
+  })
+  .then(function(response){ 
+    return response.json()})
+  .then(function(data)
+  {console.log(data)
+  text=document.getElementById("text");
+  text.value = data.that
+}).catch(error => console.error('Error:', error)); 
+            }
+
+            function setRTL() {
+                selected_lang = document.getElementById("language").value 
+
+                if (["en", "fr"].some(str => str.includes(selected_lang))) {
+                    b = document.getElementById("body").setAttribute("dir", "ltr");
+                } else {
+                    b = document.getElementById("body").setAttribute("dir", "rtl");
+                }
+            }
+        </script>
+    </head>
+    <body dir="rtl" id="body">
+        <center>
+            <br><br>
+            <font size="+2">
+            <form>
+                שפה:
+                <select id="language" name="lang" onchange="gettext();setRTL();return false;">
+                    <optgroup>
+                    <option selected value="he">עברית</option>
+                    <option value="H1">עברית יומית</option>
+                    <option value="YY">נוער</option>
+                    <option value="en">אנגלית</option>
+                    <option value="fr">צרפתית</option>
+                </optgroup>
+                </select>
+                
+                מהדורה:
+<select id="time_of_day" name="time" onchange="gettext();return false;">
+    <optgroup>
+    <option value="morn">בוקר</option>
+    <option value="noon">צהריים</option>
+    <option value="eve">ערב</option>
+    <option value="motz">מוצש מוקדם</option>
+</optgroup>
+</select>
+
+<label for="when">תאריך:</label>
+<input type="date" id="date" name="date" onchange="gettext();return false;">
+<br><br>
+
+<textarea id="text" name="text" rows="30" cols="80"></textarea>
+            </form>
+        </font>
+        </center>
+    </body>
+    <script>
+        document.getElementById('date').valueAsDate = new Date();
+        gettext();
+    </script>
+</html>

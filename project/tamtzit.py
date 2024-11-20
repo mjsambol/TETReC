@@ -362,7 +362,6 @@ def route_test_headers():
         lang = inputs["lang"]
 
         date_info = make_date_info(dt, lang)
-        print(f"dt is {date_info}")
         try:
             header = make_header(lang, date_info)
             body = dedent("""\
@@ -415,9 +414,12 @@ def route_hebrew_template():
         # to fixing it would be to ensure that _something_ is always saved to the DB, not blank; it seems not worse
         # to ensure that the call to render_template is kept as close as possible between here and the call below.
         date_info = make_date_info(dt, 'he')
+        header = make_header('he', date_info)
+        footer = make_footer('he', date_info)
 
         response = make_response(
             render_template(next_page, date_info=date_info, heb_text=Markup(draft['hebrew_text']),
+                            header=header, footer=footer,
                             draft_key=draft.key.to_legacy_urlsafe().decode("utf8"),
                             ok_to_translate=("ok_to_translate" in draft and draft["ok_to_translate"]),
                             is_finished=('is_finished' in draft and draft['is_finished']), in_progress=True,
@@ -434,6 +436,8 @@ def route_hebrew_template():
     key = create_draft('', current_user_info, translation_lang='--')
     debug(f'Creating a new Hebrew draft with key {key.to_legacy_urlsafe().decode("utf8")}')
     date_info = make_date_info(dt, 'he')
+    header = make_header('he', date_info)
+    footer = make_footer('he', date_info)
 
     editor_name = "עוד לא ידוע"
     if "editor" in current_user_info["role"]:
@@ -441,6 +445,7 @@ def route_hebrew_template():
 
     response = make_response(
         render_template(next_page, date_info=date_info, draft_key=key.to_legacy_urlsafe().decode("utf8"),
+                        header=header, footer=footer,                        
                         ok_to_translate=False, is_finished=False, in_progress=False,
                         heb_font_size=get_font_sz_prefs(request)['he'],
                         author_user_name=current_user_info["name_hebrew"],
@@ -475,7 +480,10 @@ def route_hebrew_edit_daily_summary():
 
         debug(f'Creating a new H1 draft with key {key.to_legacy_urlsafe().decode("utf8")}')
         date_info = make_date_info(dt, 'he')
+        header = make_header('H1', date_info)
+        footer = make_footer('H1', date_info)
         response = make_response(render_template(next_page, date_info=date_info,
+                                                 header=header, footer=footer,
                                                  draft_key=key.to_legacy_urlsafe().decode("utf8"),
                                                  heb_text_body_only=Markup(request.form.get("hebrew_body_text")),
                                                  ok_to_translate=False, is_finished=False, in_progress=False,
@@ -711,12 +719,15 @@ def route_translate():
     openai_custom_dirs = request.form.get("openai-custom-dirs")
 
     info = process_translation_request(heb_text, target_language_code, translation_engine, openai_custom_dirs)
+    header = make_header(target_language_code, info['date_info'])
+    footer = make_footer(target_language_code, info['date_info'])
+
     dt = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     draft_timestamp = dt.strftime('%Y%m%d-%H%M%S')
     utc_draft_timestamp = dt.astimezone(tz=ZoneInfo("UTC"))
     utc_draft_timestamp_str = utc_draft_timestamp.strftime('%Y%m%d-%H%M%S')
 
-    translated = render_template(target_lang.lower() + '.html', **info, draft_timestamp=draft_timestamp, **names)
+    translated = render_template(target_lang.lower() + '.html', **info, header=header, footer=footer, draft_timestamp=draft_timestamp, **names)
     translated = re.sub('\n{3,}', '\n\n', translated)
     # this is necessary because the template can generate large gaps due to unused sections
 

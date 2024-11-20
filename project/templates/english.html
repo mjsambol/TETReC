@@ -1,20 +1,4 @@
-{% if date_info.motzei_shabbat_early %}*Motzei Shabbat Update*
-
-Dear readers, shavua tov. This is an abridged edition. 
-A regular edition will be sent after 9 PM Israel time.
-
-•   •   •
-
-{% elif date_info.erev_shabbat %}*Dear readers,*
-The next update will be sent about an hour after the end of Shabbat in Israel. Shabbat shalom!
-
-•   •   •
-
-{% endif %}📻 *Israel News Highlights*
-*{{date_info.part_of_day}} Edition: {{date_info.day_of_week}}, {{date_info.hebrew_dom}} {{date_info.hebrew_month}}, {{date_info.hebrew_year}}* / {{date_info.secular_month}} {{date_info.secular_dom}}, {{date_info.secular_year}}
-
-  •   •   •
-
+{{ header }}
 📌 *Swords of Iron*:
 {% for section in sections %}
 {% if section in organized and organized[section] | length > 0 %}
@@ -28,11 +12,4 @@ The next update will be sent about an hour after the end of Shabbat in Israel. S
 
 Author: {{heb_author_in_en}}
 Translator: {{translator_in_en}}
-
- •   •   •
-
-✓ *To subscribe to Israel News Highlights:* 
-     https://link.mmb.org.il/INH_NEWS 
-
-✓ *For suggestions or support via WhatsApp:* 
-     +972524393118
+{{ footer }}

@@ -153,30 +153,10 @@
                 <td width="60%" valign="top" id="orig_heb_panel">
 
         <textarea id="heb_text" style="font-size:22px;" name="orig_text" rows="30" cols="70" dir="rtl" oninput="updatePreview();translation_changed();">
-{%if heb_text | length > 0 %}{{ heb_text }}{% else %}{% 
-    if date_info.motzei_shabbat_early %}*עדכון מוצאי שבת*
-
-קוראים יקרים, זהו עדכון מקוצר. מהדורה רגילה תישלח אחרי 21:00.
-
-•   •   •
-{% else %}{% if date_info.erev_shabbat %}{% if date_info.motzei_shabbat_early %}
-*קוראים יקרים,*
-*המהדורה הבאה תישלח כשעה לאחר צאת השבת.*
-
-•   •   •
-
-{% else %}
-*קוראים יקרים,*
-*המהדורה הבאה תישלח במוצאי שבת, בשעה הרגילה של מהדורת הערב.*
-
-•   •   •
-
-{% endif %}{% endif %}📻 *תמצית החדשות*
-*{% if heb_text_body_only | length > 0 %}מהדורה יומית{% else %}מהדורת {{date_info.part_of_day}}{%endif%}, {{date_info.day_of_week}}, {{date_info.hebrew_dom_he}} ב{{date_info.hebrew_month_he}} {{date_info.hebrew_year_he}}*, {{date_info.secular_dom}} ב{{date_info.secular_month}} {{date_info.secular_year}}
-
-•   •   •
-{%endif%}
-{% if heb_text_body_only | length > 0 %}{{ heb_text_body_only }}{% else %}📌 *_מלחמת חרבות ברזל:_*
+{%if heb_text | length > 0 %}{{ heb_text }}{% else 
+%}{{ header }}{% 
+if heb_text_body_only | length > 0 %}{{ heb_text_body_only }}{% else 
+%}📌 *_מלחמת חרבות ברזל:_*
 
 > *החזית הצפונית:*
 - 
@@ -226,18 +206,7 @@
 {% endif %}•   •   •
 
 כתיבה: {{author_user_name}}. עריכה לשונית: {{editor_user_name}}.
-
-•   •   •
-
-✓ *להצטרפות לתמצית החדשות:*{% if heb_text_body_only | length > 0 %}
-     https://link.mmb.org.il/1news{% else %}
-     https://link.mmb.org.il/news{% endif %}
-
-✓ *בדף הפייסבוק שלנו כבר ביקרת?*
-     https://link.mmb.org.il/news_facebook
- 
-✓ *לפניות למוקד הוואטסאפ שלנו:*
-     052-439-3118 {% endif %}</textarea>
+{{ footer }}{% endif %}</textarea>
 
 <table width=100%>
     <tr>

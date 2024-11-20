@@ -1,27 +1,5 @@
-{% if date_info.motzei_shabbat_early %}*Mise à jour résumée du samedi soir.*
-
-Chers lecteurs, 
-Ceci est une mise à jour résumée de l'actualité. L'édition régulière sera publiée après 21h30.
-
-•   •   •
-{% else %}{% if date_info.erev_shabbat %}{% if date_info.motzei_shabbat_early %}*Chers lecteurs,*
-*Cette édition est la dernière de la journée. La prochaine édition sera envoyée immédiatement après la sortie de Chabbat (Heure française).*
-Chabbat Chalom
-
-•   •   •
-
-{% else %}*Chers lecteurs,*
-La prochaine édition sera publiée demain soir à l'heure habituelle (entre 21h30 et 22h30). Chabbat Chalom
-
-•   •   •
-
-{% endif %}{% endif %}📻 *L'essentiel de l'actualité*
-*Édition {% if date_info.part_of_day in ('Matin','soir') %}du{% else %}de{% endif %} {{date_info.part_of_day}}: {{date_info.day_of_week}} {{date_info.hebrew_dom}} {{date_info.hebrew_month}} {{date_info.hebrew_year}}* / {{date_info.secular_dom}} {{date_info.secular_month}} {{date_info.secular_year}}
-
-  •   •   •
-
+{{ header }}
 📌 *Guerre des Épées de Fer*:
-{%endif%}
 {% for section in sections %}
 {% if section in organized and organized[section] | length > 0 %}
 {% if section in ['SOUTH','NORTH','YandS']%}>{%else%}📌{%endif%} *{{sections[section]}}:*
@@ -34,11 +12,4 @@ La prochaine édition sera publiée demain soir à l'heure habituelle (entre 21h
 
 Rédaction: {{heb_author_in_en}}
 Traduction: {{translator_in_en}}
-
- •   •   •
-
-✓ *Pour rejoindre News Israel L'essentiel:* 
-     https://link.mmb.org.il/news_f 
-
-✓ *Pour toute demande ou contact:* 
-     +972587815211
+{{ footer }}

@@ -23,8 +23,8 @@ friday_afternoon_not_dst = {  # not in_dst == WINTER i.e. Simchat Torah to Pesac
     "fr":
         dedent("""\
         *Chers lecteurs,*
-        *Cette édition est la dernière de la journée. La prochaine édition sera envoyée immédiatement après la sortie de Chabbat (Heure française).*
-        Chabbat Chalom
+        *Cette édition est la dernière de la journée.* La prochaine édition sera publiée environ 1 heure après la sortie de Chabbat (heure Israélienne). 
+        Chabbat Chalom               
         """)
 }
 friday_afternoon_not_dst["YY"] = friday_afternoon_not_dst["he"]

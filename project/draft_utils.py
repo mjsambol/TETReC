@@ -397,7 +397,7 @@ def make_date_info(dt, lang):
     elif 12 <= dt.hour < 18:
         dt_edition = editions[lang][1]
 
-    is_summer_daylight_savings_time = bool(datetime.now(tz=ZoneInfo("Asia/Jerusalem")).dst())
+    is_summer_daylight_savings_time = bool(dt.dst())
 
     # locale.setlocale(locale.LC_TIME, locales[lang])
 

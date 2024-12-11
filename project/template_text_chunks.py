@@ -130,7 +130,8 @@ def make_header(lang_code: str, date_info: DateInfo) -> str:
 
     elif lang_code == "en":
         result += "📻 *Israel News Highlights*\n"
-        result += f"*{date_info.part_of_day} Edition: {date_info.day_of_week}, {date_info.hebrew_dom} {date_info.hebrew_month}, {date_info.hebrew_year}*"
+        part_of_day = "Early Evening" if date_info.motzei_shabbat_early else date_info.part_of_day
+        result += f"*{part_of_day} Edition: {date_info.day_of_week}, {date_info.hebrew_dom} {date_info.hebrew_month}, {date_info.hebrew_year}*"
         result += f" / {date_info.secular_month} {date_info.secular_dom}, {date_info.secular_year}"
 
     elif lang_code == "fr":
@@ -152,6 +153,14 @@ def make_header(lang_code: str, date_info: DateInfo) -> str:
         
         """)
 
+    if lang_code in ['he', 'H1']:
+        result += dedent("""\
+        לפרסום העסק שלכם לעשרות אלפים בתמצית החדשות לחצו 👇
+        https://link.mmb.org.il/mpirsum
+
+        •   •   •
+        
+        """)
     return result
 
 
@@ -162,7 +171,7 @@ def make_footer(lang_code: str, date_info: DateInfo) -> str:
 
         """)
 
-    if lang_code in ["he", "H1", "YY"]:
+    if lang_code in ["he", "H1"]:
         
         if lang_code == "H1":
             result += dedent("""\
@@ -172,10 +181,6 @@ def make_footer(lang_code: str, date_info: DateInfo) -> str:
             result += dedent("""\
             ✓ *להצטרפות לתמצית החדשות:*
                 https://link.mmb.org.il/news""")
-        elif lang_code == "YY":
-            result += dedent("""\
-            ✓ *להצטרפות לקבוצות תמצית החדשות לנוער:*
-                https://link.mmb.org.il/newsteen""")
 
         result += dedent("""
                          
@@ -184,6 +189,11 @@ def make_footer(lang_code: str, date_info: DateInfo) -> str:
             
             ✓ *לפניות למוקד הוואטסאפ שלנו:*
                 052-439-3118""")
+        
+    elif lang_code == "YY":
+        result += dedent("""\
+        ✓ *להצטרפות לקבוצות תמצית החדשות לנוער:*
+            https://link.mmb.org.il/newsteen""")
         
     elif lang_code == "en":
         result += dedent("""\

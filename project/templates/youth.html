@@ -1,27 +1,5 @@
-{% if date_info.motzei_shabbat_early %}*עדכון מוצאי שבת*
-
-קוראים יקרים, זהו עדכון מקוצר. מהדורה רגילה תישלח אחרי 21:00.
-
-•   •   •
-{% else %}{% if date_info.erev_shabbat %}{% if date_info.motzei_shabbat_early %}
-*קוראים יקרים,*
-*המהדורה הבאה תישלח כשעה לאחר צאת השבת.*
-
-•   •   •
-
-{% else %}
-*קוראים יקרים,*
-*המהדורה הבאה תישלח במוצאי שבת, בשעה הרגילה של מהדורת הערב.*
-
-•   •   •
-
-{% endif %}{% endif %}📻 *תמצית החדשות לנוער*
-*מהדורת {{date_info.part_of_day}}, {{date_info.day_of_week}}, {{date_info.hebrew_dom_he}} ב{{date_info.hebrew_month_he}} {{date_info.hebrew_year_he}}*, {{date_info.secular_dom}} ב{{date_info.secular_month}} {{date_info.secular_year}}
-
-•   •   •
-
+{{ header }}
 *_מלחמת חרבות ברזל:_*
-{%endif%}
 {% if 'UNKNOWN' in organized and organized['UNKNOWN'] | length > 0 %}
 ⬇️ *--לא ברור איפה זה שייך--*
 {% for line in organized['UNKNOWN'] %}

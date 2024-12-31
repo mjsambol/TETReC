@@ -117,7 +117,7 @@ def get_edition_name_from_text(edition, as_english_always=True):
     text = edition['hebrew_text']
     debug(f"g_e_n_f_t: lang={lang}")
     m = re.search("^\*?מהדורת ([א-ת]+),", text, re.MULTILINE)   # noqa - the pattern works
-    # The pattern WON'T match on the daily summary!
+    # The pattern WON'T match on the daily summary or motzei Shabbat!
     if m:
         debug(f"g_e_n_f_t found {m.group(1)}, localizing...")
         edition_index = editions['he'].index(m.group(1))
@@ -134,6 +134,14 @@ def get_edition_name_from_text(edition, as_english_always=True):
                 return "Heb Daily Summary"
             else:
                 return "מהדורה יומית"
+        else:
+            m = re.search("^\*?מהדורת מוצאי שבת, ", text, re.MULTILINE)   # noqa
+            if m:
+                debug("g_e_n_f_t found motzei Shabbat edition, localizing...")
+                if as_english_always:
+                    return editions['en'][1]
+                else:
+                    return editions['he' if lang == '--' else lang][1]
     debug(f"g_e_n_f_t: lang={lang}, can't find edition name, returning UNKNOWN, text was: \n\n{text}\n\n")
     return "UNKNOWN"
 

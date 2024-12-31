@@ -99,7 +99,8 @@
                 
                 if ("{{req_rule}}".indexOf("daily_summary") == -1 &&
                     ((("{{date_info.day_of_week_digit}}"=="5") && ("{{date_info.part_of_day}}" == "צוהריים"))  || 
-                     (("{{date_info.day_of_week_digit}}"!="6") && ("{{date_info.part_of_day}}" == "ערב")))) {
+                     (("{{date_info.day_of_week_digit}}"!="6" || !date_info.is_dst) && 
+                      ("{{date_info.part_of_day}}" == "ערב")))) {
                     document.location = "/start_daily_summary";
                 } else {
                     document.location = "/";
@@ -167,6 +168,11 @@ if heb_text_body_only | length > 0 %}{{ heb_text_body_only }}{% else
 - 
 
 - 
+
+> *החזית מול תימן:*
+-
+
+-
 
 > *חזית איו"ש:*
 - 

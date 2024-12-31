@@ -18,6 +18,12 @@
 {{line}}
 {% endfor %}{% endif %}
 
+{% if 'YEMEN' in organized and organized['YEMEN'] | length > 0 %}
+> *החזית מול תימן:*
+{% for line in organized['YEMEN'] %}
+{{line}}
+{% endfor %}{% endif %}
+
 {% if 'YandS' in organized and organized['YandS'] | length > 0 %}
 *חזית איו"ש:*
 {% for line in organized['YandS'] %}

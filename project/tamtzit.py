@@ -850,7 +850,7 @@ def get_scheduling_dates():
     this_week_from_str = format_date(this_week_from, "MMMM d", locale='en')
     this_week_to = this_week_from + timedelta(days=6)
     this_week_to_str = format_date(this_week_to, "MMMM d", locale='en')
-    read_only = (dow == 6 and now.hour >= 22) #or (dow == 0 and now.hour < 6)
+    read_only = (dow == 6 and now.hour >= 21) #or (dow == 0 and now.hour < 6)
     next_week_from = now + timedelta(days=(7 - dow))
     next_week_to = next_week_from + timedelta(days=6)
     next_week_from_str = format_date(next_week_from, "MMMM d", locale='en')
@@ -928,6 +928,8 @@ def route_translation_schedule_signup():
     usa_as_json = json.dumps(user_schedule_availability['available'])
     editions_to_skip = get_user_availability(zero_user, sched_dates['next_week_from_str'])
     is_summer_daylight_savings_time = bool(datetime.now(tz=ZoneInfo("Asia/Jerusalem")).dst())
+    if not is_summer_daylight_savings_time:
+        editions_to_skip["available"]["Saturday"][1] = 0
 
     debug("tx_schedule_signup returning availability: " + Markup(usa_as_json))
     return render_template("tx_signup.html", week=sched_obj.week,
@@ -1159,6 +1161,15 @@ def process_translation_request(heb_text, target_language_code, translation_engi
     kw = keywords[target_language_code]
     section_titles = sections[target_language_code]
 
+    def kw_match(keywords, line):
+        if type(keywords) is str:
+            return keywords in line
+        elif type(keywords) is list:
+            for keyword in keywords:
+                if keyword in line:
+                    return True
+        return False
+
     section = None
     organized = defaultdict(list)
     for line in translated_lines:
@@ -1184,18 +1195,21 @@ def process_translation_request(heb_text, target_language_code, translation_engi
                 debug("post three dots, switching to 'unknown'")
                 section = organized['UNKNOWN']
                 continue
-        if section is None and (kw["edition"] in line.lower() or "edition" in line.lower()) and '202' in line.lower():
+        if section is None and (kw_match(kw["edition"], line.lower())) and '202' in line.lower():
             debug("skipping what looks like the intro edition line")
             continue
         if line.startswith("> "):
             debug("bullet line...")
-            if kw["southern"] in line.lower() and 'SOUTH' not in organized:
+            if (kw_match(kw["southern"], line.lower())) and 'SOUTH' not in organized:
                 debug("starting south section")
                 section = organized['SOUTH']
-            elif kw["northern"] in line.lower() and 'NORTH' not in organized:
+            elif (kw_match(kw["northern"], line.lower())) and 'NORTH' not in organized:
                 debug("starting north section")
                 section = organized['NORTH']
-            elif kw["jands"] in line.lower() and 'YandS' not in organized:
+            elif (kw_match(kw["yemen"], line.lower())) and "YEMEN" not in organized:
+                debug("starting Yemen section")
+                section = organized['YEMEN']
+            elif (kw_match(kw["jands"], line.lower())) and 'YandS' not in organized:
                 debug("starting J&S section")
                 section = organized['YandS']
             # elif kw["policy"] in line.lower() and "politics" in line.lower() and 'PandP' not in organized:
@@ -1209,32 +1223,31 @@ def process_translation_request(heb_text, target_language_code, translation_engi
                 section.append(Markup(line))
         elif line.startswith("📌"):
             debug("pin line...")
-            if kw['intro_pin'] in line.lower() or "iron swords war" in line.lower() or "swords of iron" in line.lower():
+            if kw_match(kw["intro_pin"], line.lower()):
                 debug("skipping what looks like the intro pin line")
                 continue
-            if kw["security"] in line.lower():
+            if kw_match(kw["security"], line.lower()):
                 debug("starting Security section")
                 section = organized['Security']
-            elif kw["in israel"] in line.lower() or section_titles["InIsrael"] in line:
+            elif kw_match(kw["in israel"], line.lower()):
                 debug("starting inIsrael section")
                 section = organized['InIsrael']
-            elif kw["world"] in line.lower():
+            elif kw_match(kw["world"], line.lower()):
                 debug("starting world section")
                 section = organized["Worldwide"]
-            elif kw["policy"] in line.lower() and kw["politics"] in line.lower():
+            elif kw_match(kw["policy"], line.lower()):
                 debug("starting policy section")
                 section = organized['PandP']
-            elif kw["weather"] in line.lower():
+            elif kw_match(kw["weather"], line.lower()):
                 debug("Starting weather section")
                 section = organized['Weather']
-            elif kw["economy"] in line.lower():
+            elif kw_match(kw["economy"], line.lower()):
                 debug("Starting economy section")
                 section = organized["Economy"]
-            elif kw["sport"] in line.lower():
+            elif kw_match(kw["sport"], line.lower()):
                 debug("Starting sports section")
                 section = organized["Sports"]
-            elif (kw["finish"] in line.lower() or "good note" in line.lower() or "end well" in line.lower()
-                  or "positive note" in line.lower() or section_titles["FinishWell"] in line):
+            elif kw_match(kw["finish"], line.lower()):
                 debug("Starting good news section")
                 section = organized['FinishWell']
             else:

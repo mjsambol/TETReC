@@ -188,7 +188,7 @@
                         <br><br>
                     {% endfor %}
 <!--  -->
-                    <textarea rows="8" cols="80" id="{{ sections_in_order[section] }}-textarea">{% if section in ['החזית הצפונית','החזית הדרומית','חזית איו"ש','חזית איראן'] %}> *{{section}}*:{% else %}📌 *_{{section}}_*:{% endif %}
+                    <textarea rows="8" cols="80" id="{{ sections_in_order[section] }}-textarea">{% if section in ['החזית הצפונית','החזית הדרומית','חזית איו"ש','חזית איראן','החזית מול תימן'] %}> *{{section}}*:{% else %}📌 *_{{section}}_*:{% endif %}
 </textarea><!-- this is placed very purposefully so that there will be a newline but no more than that on the next line -->
                     <script>all_text_areas.push("{{ sections_in_order[section] }}-textarea");</script>
                     <br><br>

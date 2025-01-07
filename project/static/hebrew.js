@@ -15,7 +15,7 @@ function updatePreview() {
 
 function done() {
     disable_done_button();
-    saveDraft(force=true);
+    saveDraft(force=true, set_finished=true);
     is_finished = last_draft_save_result_good;
 }
 
@@ -82,7 +82,7 @@ function translation_changed() {
     } 
 }
 
-function saveDraft(force=false) {
+function saveDraft(force=false, set_finished=false) {
     if (is_finished && !force) {
         return;
     }
@@ -95,7 +95,7 @@ function saveDraft(force=false) {
             {
                 draft_key: draft_key,
                 source_text: curr_text,
-                is_finished: is_finished,
+                is_finished: set_finished,
                 to_translators: ok_to_translate
             },
             function(data,status) {

@@ -92,7 +92,7 @@
             }
 
             function publish() {
-                saveDraft(true);
+                saveDraft(force=true, set_finished=true);
                 document.getElementById("finish_button").style.backgroundColor="#66BB66";
                 observe_only();
                 document.getElementById("finish_button").disabled = false; // this is because it seems sometimes the publish signal isn't
@@ -101,7 +101,7 @@
                 is_finished = last_draft_save_result_good;
             }
 
-            function saveDraft(force=false) {
+            function saveDraft(force=false, set_finished=false) {
                 if (manual_saves_only && !force) {
                     return;
                 }
@@ -116,7 +116,7 @@
                         {
                             draft_key: "{{draft_key}}",
                             translation: curr_translation,
-                            is_finished: is_finished
+                            is_finished: set_finished
                         },
                         function(data,status) {
                             console.log("Draft save status: " + status);

@@ -58,6 +58,7 @@
             var is_finished = "True" === "{{is_finished}}";
             var in_progress = "True" === "{{in_progress}}";
             var manual_saves_only = "True" === "{{user_info['overrides'] is defined and 'manual_save_only' in user_info['overrides']}}";
+            var last_draft_save_result_good = false;
 
             function copy_to_clipboard() {
                 copyToClipboard('translated_text');
@@ -91,13 +92,13 @@
             }
 
             function publish() {
-                is_finished = true;
                 saveDraft(true);
                 document.getElementById("finish_button").style.backgroundColor="#66BB66";
                 observe_only();
                 document.getElementById("finish_button").disabled = false; // this is because it seems sometimes the publish signal isn't
                                                                           // being received or acked, and editors think changes not yet saved
                                                                           // so I'm making it possible to "publish" repeatedly.
+                is_finished = last_draft_save_result_good;
             }
 
             function saveDraft(force=false) {
@@ -109,21 +110,28 @@
                 }
                 curr_translation = document.getElementById('translated_text').value;
                 if (force || last_saved_translation.localeCompare(curr_translation) != 0) {
-                
-                    $.post("/saveDraft",
-                    {
-                        draft_key: "{{draft_key}}",
-                        translation: curr_translation,
-                        is_finished: is_finished
-                    },
-                    function(data,status) {
-                        console.log("Draft save status: " + status);
-                        last_saved_translation = curr_translation;
-                        if (status === "success") {
-                            document.getElementById("is_saved").innerText = "All Changes Saved";
-                            document.getElementById("is_saved").style.color = "#33AA33";
-                        }
-                    });
+
+                    try {
+                        $.post("/saveDraft",
+                        {
+                            draft_key: "{{draft_key}}",
+                            translation: curr_translation,
+                            is_finished: is_finished
+                        },
+                        function(data,status) {
+                            console.log("Draft save status: " + status);
+                            if (status === "success") {
+                                document.getElementById("is_saved").innerText = "All Changes Saved";
+                                document.getElementById("is_saved").style.color = "#33AA33";
+                                last_saved_translation = curr_translation;
+                                last_draft_save_result_good = true;
+                            } else {
+                                last_draft_save_result_good = false;
+                            }
+                        });
+                    } catch (err) {
+                        alert("Error communicating with the server, changes NOT saved. Will retry in 30 seconds.");
+                    }
                 }
             }
 

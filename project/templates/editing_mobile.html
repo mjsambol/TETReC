@@ -91,10 +91,13 @@
 
             var starting_hebrew_text = `{{heb_text}}`;
             var last_saved_translation = `{{translated}}`;
+            var last_draft_save_result_good = false;
 
             function done() {
                 saveDraft(true);
-                window.location='/';
+                if (last_draft_save_result_good) {
+                    window.location='/';
+                }
             }
 
             function translation_changed() {
@@ -111,21 +114,28 @@
                 if (!finalize && last_saved_translation.localeCompare(curr_translation) === 0) {
                     return;
                 }
-                
-                $.post("/saveDraft",
-                {
-                    draft_key: "{{draft_key}}",
-                    translation: curr_translation,
-                    is_finished: finalize
-                },
-                function(data,status) {
-                    console.log("Draft save status: " + status);
-                    last_saved_translation = curr_translation;
-                    if (status === "success") {
-                        document.getElementById("is_saved").innerText = "All Changes Saved";
-                        document.getElementById("is_saved").style.color = "#33AA33";
-                    }
-                });
+
+                try {
+                    $.post("/saveDraft",
+                    {
+                        draft_key: "{{draft_key}}",
+                        translation: curr_translation,
+                        is_finished: finalize
+                    },
+                    function(data,status) {
+                        console.log("Draft save status: " + status);
+                        if (status === "success") {
+                            document.getElementById("is_saved").innerText = "All Changes Saved";
+                            document.getElementById("is_saved").style.color = "#33AA33";
+                            last_saved_translation = curr_translation;
+                            last_draft_save_result_good = true;
+                        } else {
+                            last_draft_save_result_good = false;
+                        }
+                    });
+                } catch (err) {
+                    alert("Error communicating with the server, changes NOT saved. Will retry in 30 seconds.");
+                }
             }
 
             setInterval(function(){saveDraft()}, 10000);  // automatically save a draft every 30 seconds, if the text has changed

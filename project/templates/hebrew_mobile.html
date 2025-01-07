@@ -24,17 +24,27 @@
     <head>
         <title>Tamtzit - Hebrew Editing (mobile)</title>
         <script src="{{url_for('static', filename='tamtzit-common.js', version='20240808')}}"></script>
+        <script>
+            //
+            // These variables are needed for the hebrew.js import which follows
+            // They need to be defined here so that their values are assigned by Flask's templating
+            //
+            const user_role = "{{user_role}}"; // required for the status box
+            const dont_remove_footer = "True" === "{{user_info['overrides'] is defined and 'dont_remove_footer' in user_info['overrides']}}";
+            var last_saved_text = `{{heb_text}}`;
+            var is_finished = "True" === "{{is_finished}}";
+            var ok_to_translate = "True" === "{{ok_to_translate}}";
+            const editor_name = "{{editor_user_name}}";
+            const draft_key = "{{draft_key}}";
+            const continue_to_daily_summary = "{{req_rule}}".indexOf("daily_summary") == -1 &&
+        ((("{{date_info.day_of_week_digit}}"=="5") && ("{{date_info.part_of_day}}" == "צוהריים"))  ||                   // Friday afternoon
+         (("{{date_info.day_of_week_digit}}"!="6" || !date_info.is_dst) && ("{{date_info.part_of_day}}" == "ערב")));  // Evening and (NOT Saturday or Not Summer)
+        </script>
+        <script src="{{url_for('static', filename='hebrew.js', version='20250107')}}"></script>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 
         <script>
-            const TEXT_BEING_EDITED = "heb_text";
-            const LENGTH_LABEL = "אורך:";
-            const CHARACTERS_LABEL = "אותיות";
-
-            var user_role = "{{user_role}}"; // required for the status box
-            var dont_remove_footer = "True" === "{{user_info['overrides'] is defined and 'dont_remove_footer' in user_info['overrides']}}";
-
             function showPrev() {
                 document.getElementById("orig_heb_panel").style.display="none";
                 document.getElementById("preview_panel").style.display="initial";
@@ -49,107 +59,6 @@
                 document.getElementById("prev_button").style.display="initial";
                 document.getElementById("edit_button").style.display="none";
             }
-
-            var last_saved_text = `{{heb_text}}`;
-            var is_finished = "True" === "{{is_finished}}";
-            var ok_to_translate = "True" === "{{ok_to_translate}}";
-
-            function done() {
-                disable_done_button();
-                is_finished = true;
-                saveDraft(force=true);
-            }
-
-            function disable_done_button() {
-                document.getElementById("done_button").style.backgroundColor="#66BB66";
-                document.getElementById("done_button").disabled = true;
-                document.getElementById("heb_text").disabled = true;
-                document.getElementById("edit_anyway_button").style.visibility = "visible";
-            }
-
-            function disable_send_to_translators() {
-                document.getElementById("to_translation_button").style.backgroundColor="#66BB66";
-                document.getElementById("to_translation_button").disabled = true;
-             //   document.getElementById("done_button").disabled = false;    // why is this here? Commenting this out 2024-05-16
-            }
-
-            function observe_only() {
-                document.getElementById("to_translation_button").disabled = true;
-                document.getElementById("done_button").disabled = true;
-                document.getElementById("heb_text").disabled = true;
-                document.getElementById("edit_anyway_button").style.visibility = "visible";
-            }
-
-            function enable_edit() {
-                document.getElementById("heb_text").disabled = false;
-                document.getElementById("edit_anyway_button").style.visibility = "hidden";
-                if (ok_to_translate) {
-                    if (user_role.includes("editor") || user_role.includes("admin")) {
-                        document.getElementById("done_button").style.backgroundColor="#DDDDDD";
-                        document.getElementById("done_button").disabled = false;
-                    }
-                    if (user_role.includes("editor") && document.getElementById("heb_text").value.includes("עריכה לשונית: עוד לא ידוע")) {
-                        document.getElementById("heb_text").value = 
-                            document.getElementById("heb_text").value.replace("עריכה לשונית: עוד לא ידוע", "עריכה לשונית: {{editor_user_name}}");
-                    }
-                } else {
-                    document.getElementById("to_translation_button").disabled = false;
-                    document.getElementById("to_translation_button").style.backgroundColor="#DDDDDD";
-                }
-            }
-
-            function to_translators() {
-                disable_send_to_translators();
-                observe_only();
-                ok_to_translate = true;
-                saveDraft(force=true);
-                
-                if ("{{req_rule}}".indexOf("daily_summary") == -1 &&
-                    ((("{{date_info.day_of_week_digit}}"=="5") && ("{{date_info.part_of_day}}" == "צוהריים"))  || 
-                     (("{{date_info.day_of_week_digit}}"!="6") && ("{{date_info.part_of_day}}" == "ערב")))) {
-                    document.location = "/start_daily_summary";
-                } else {
-                    document.location = "/";
-                }
-            }
-
-            function translation_changed() {
-                if (last_saved_text.localeCompare(document.getElementById('heb_text').value) != 0) {
-                        document.getElementById("is_saved").innerText = "השינויים עוד לא שמורים!";
-                        document.getElementById("is_saved").style.color = "#FF0000";
-                        document.getElementById("finish_button").innerText = "העתק את כל התוכן";
-                        is_finished = false;
-                } 
-            }
-
-            function saveDraft(force=false) {
-                if (is_finished && !force) {
-                    return;
-                }
-                curr_text = document.getElementById('heb_text').value;
-                if (force || last_saved_text.localeCompare(curr_text) != 0) {
-                    console.log("saving, text was\n\n"+last_saved_text+"\n\ntext is now\n\n" + curr_text);
-                    $.post("/saveDraft",
-                    {
-                        draft_key: "{{draft_key}}",
-                        source_text: curr_text,
-                        is_finished: is_finished,
-                        to_translators: ok_to_translate
-                    },
-                    function(data,status) {
-                        console.log("Draft save status: " + status);
-                        last_saved_text = curr_text;
-                        if (status === "success") {
-                            document.getElementById("is_saved").innerText = "כל השינויים שמורים";
-                            document.getElementById("is_saved").style.color = "#33AA33";
-                        }
-                    });
-                }
-            }
-
-            setInterval(function(){saveDraft()}, 10000);  // automatically save a draft every 30 seconds, if the text has changed
-
-
         </script>
     </head>
     <body>

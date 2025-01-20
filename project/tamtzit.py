@@ -699,61 +699,59 @@ def route_translate():
        /translate creates a new entry based on the submission of the form at /  (POST)
        /draft     edits an existing entry based on a link on the main page      (GET)
     """
-    heb_text = request.form.get('orig_text')
-    if not heb_text:
-        return "Input field was missing."
-
-    target_language_code = request.form.get('target_lang')
     basic_user_info = user_data_from_req(request)
     user_info = get_user(user_id=basic_user_info["user_id"])
+    transaction_context = {"user_info": user_info}
     draft_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
 
+    heb_text = request.form.get('orig_text')
     translation_engine = request.form.get("tx_engine")
+    target_language_code = request.form.get('target_lang')
+
     if translation_engine == "OpenAI":
-        # create a request for asynchronous translation
-        key = datastore_client.key("async_job")
-        entity = datastore.Entity(key=key)
-        entity.update({"created_at": draft_timestamp,
-                       "created_by": user_info["name"],
-                       "operation": "translation",
-                       "translation_lang": target_language_code,
-                       "heb_draft_id": request.form.get('heb_draft_id'),
-                       "translation_engine": "openai/gpt-4o",
-                       "translation_custom_dirs": request.form.get("openai-custom-dirs")
-                       })
-        datastore_client.put(entity)
-        entity = datastore_client.get(entity.key)
+        if target_language_code is not None and len(target_language_code) > 0:
+            # create a request for asynchronous translation - we get here based on submit of input.html
+            key = datastore_client.key("async_job")
+            entity = datastore.Entity(key=key)
+            entity.update({"created_at": draft_timestamp,
+                           "created_by": user_info["name"],
+                           "operation": "translation",
+                           "translation_lang": target_language_code,
+                           "heb_draft_id": request.form.get('heb_draft_id'),
+                           "heb_author_id": request.form.get('heb_author_id'),
+                           "translation_engine": "openai/gpt-4o",
+                           "translation_custom_dirs": request.form.get("openai-custom-dirs")
+                           })
+            datastore_client.put(entity)
+            entity = datastore_client.get(entity.key)
 
-        # @TODO call an endpoint exposed by the async processor to let it know there's a pending request
+            # @TODO call an endpoint exposed by the async processor to let it know there's a pending request
 
-        # @TODO implement the /check_async endpoint here to check if the job has been completed, and if so to return an
-        #       ID which can then be used in another call back to this method which will process the translated text, breaking it up,
-        #       creating a draft in the DB, etc.
+            # return a *new* page - OpenAI is processing your request, this page will auto-refresh when it is ready
+            return render_template("async_pending.html", async_request_id=entity.key.id,
+                                   heb_draft_id=request.form.get('heb_draft_id'),
+                                   heb_author_id=request.form.get('heb_author_id'),
+                                   orig_text=heb_text,
+                                   target_lang=target_language_code)
+        else:
+            # fetch and process the results of asynchronous translation - we get here based on call from async_pending.html
+            query = datastore_client.query(kind="async_job")
+            query.add_filter(filter=PropertyFilter("id", "=", request.form.get("tx_async_request_id")))
+            jobs = query.fetch()
+            job = jobs[0]
 
-        # @TODO in the async_pending page, when /check_async returns true, call this endpoint with the required inputs to indicate
-        #       that it should do translation, but not from scratch, with existing results. This method will then redirect us to /draft
+            transaction_context["heb_draft_id"] = job["heb_draft_id"]
+            transaction_context["translation_result"] = job["translation_result"]
+            heb_author_id = job["heb_author_id"]
+            target_language_code = job["translation_lang"]
+    else:
+        # we're translating with Google
 
-        # return a *new* page - OpenAI is processing your request, this page will auto-refresh when it is ready
-        return render_template("async_pending.html", async_request_id=entity.key.id,
-                               heb_draft_id=request.form.get('heb_draft_id'),
-                               heb_author_id=request.form.get('heb_author_id'),
-                               orig_text=heb_text,
-                               target_lang=target_language_code)
+        transaction_context["heb_draft_id"] = request.form.get('heb_draft_id')
+        heb_author_id = request.form.get('heb_author_id')
 
-    # don't create the draft DB entry yet, so no link in the ongoing drafts list - what would happen if it was clicked?
-    # that new page keeps polling (a new API)
-    # when the translation work is done in the background, and the "raw" openAI translation is ready,
-    # then this method will be called again with a pointer to that raw translation and it (the pointer) can be
-    # passed to process_translation_request as part of the transaction_context
-    # where it will then be broken into sections, etc.
-
-    # if we've reached this point then we're translating with Google
-
-    # additional information we want to have available without making everything an explicit method param
-    transaction_context = {"user_info": user_info, "heb_draft_id": request.form.get('heb_draft_id')}
-
-    info = process_translation_request(heb_text, target_language_code, translation_engine,
-                                       transaction_context)
+    # Continue below if translating with Google or parsing raw translation result from async call to OpenAI
+    info = process_translation_request(heb_text, target_language_code, translation_engine, transaction_context)
 
     date_info = make_date_info(draft_timestamp, target_language_code)
     header = make_header(target_language_code, date_info)
@@ -764,7 +762,7 @@ def route_translate():
     utc_draft_timestamp = draft_timestamp.astimezone(tz=ZoneInfo("UTC"))
     utc_draft_timestamp_str = utc_draft_timestamp.strftime('%Y%m%d-%H%M%S')
 
-    draft_creator_user_info = get_user(user_id=request.form.get('heb_author_id'))
+    draft_creator_user_info = get_user(user_id=heb_author_id)
     names = {
         "heb_author_in_heb": draft_creator_user_info["name_hebrew"],
         "heb_author_in_en": draft_creator_user_info["name"],
@@ -785,6 +783,21 @@ def route_translate():
     
     # redirect to /draft so that we'll have the proper link in the URL bar for sharing
     return make_response(redirect(url_for("tamtzit.route_continue_draft", ts=utc_draft_timestamp_str, edit="true")))
+
+
+@tamtzit.route("/check_async")
+@require_login
+def route_check_async():
+    debug(f"route_check_async: async_request_id is {request.form.get('async_request_id')}")
+
+    query = datastore_client.query(kind="async_job")
+    query.add_filter(filter=PropertyFilter("id", "=", request.form.get('async_request_id')))
+    jobs = query.fetch()
+    for job in jobs:
+        debug(f"Got back {job}")
+        if "result" in job:
+            return job["result"]
+    return "Pending"
 
 
 @tamtzit.route("/saveDraft", methods=['POST'])
@@ -1202,12 +1215,12 @@ def process_translation_request(heb_text, target_language_code, translation_engi
     if target_language_code in ["YY", "he"]:
         translated = heb_text
     else:
-        # BUT this is no good, we're not going to get back text that we can break into sections,
-        # so wer'e going to need to hack some special return, and then call this method again later...
-        # better to create the async request earlier in the call chain, and not call this method until
-        # we have translated text to break up.
-        translated = translate_text(heb_text, target_language_code=target_language_code,
+        if transaction_context.get("translation_result", None) is not None:
+            translated = transaction_context.get("translation_result")
+        else:
+            translated = translate_text(heb_text, target_language_code=target_language_code,
                                     engine=translation_engine, transaction_context=transaction_context)
+
     debug(f"RAW TRANSLATION:--------\n{translated}")
     debug(f"--------------------------")
 

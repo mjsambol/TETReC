@@ -262,7 +262,7 @@ def translate_text(text: str, target_language_code: str, source_language='he', e
     if engine == "Google":
         return google_translate(text, target_language_code, source_language)
     else:
-        return openai_translate(text, target_language_code, source_language, custom_dirs, transaction_context)
+        return openai_translate(text, target_language_code, source_language, custom_dirs="", transaction_context=transaction_context)
 
 openai_force_translations = {
     "en": {

@@ -28,25 +28,60 @@
         <script>
             var numChecks = 0;
             var secondsLeft = 90;
+            var lastCheckResult = "";
+
+            function submit_translation_form(data) {
+                var form = document.createElement('form');
+                document.body.appendChild(form);
+                form.method = 'post';
+                form.action = "/translate";
+                for (var name in data) {
+                    var input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = name;
+                    input.value = data[name];
+                    form.appendChild(input);
+                }
+                form.submit();
+                document.body.removeChild(form);
+            }
 
             function ping_server() {
-                fetch("/check_async?" + new URLSearchParams({
-                    at: Date.now()
-                })
-                ).then(
-                    // as long as it returns success, don't do anything
-                    // (response) => {return response.json();}
-                ).then(
-                    // (obj) => {
-                    // }
-                ).catch(function(error) {
-                    console.log(error);
-                });
 
-                numChecks += 1;
-                secondsLeft -= 5;
-                document.getElementById("numChecks").innerHTML = numChecks;
-                document.getElementById("timeToFail").innerHTML = secondsLeft;
+                if (secondsLeft > 0) {
+
+                    fetch("/check_async?" + new URLSearchParams({
+                        async_request_id: "{{async_request_id}}"
+                    })
+                    ).then(response => response.text()
+                    ).then(body => {
+                            console.log(body);
+                            lastCheckResult = body;
+                            if (lastCheckResult == "Success") {
+                                alert("it worked!");
+                                data = {
+                                    tx_engine: "OpenAI",
+                                    tx_async_request_id: "{{async_request_id}}"
+                                }
+                                submit_translation_form(data);
+                                return;
+                            }
+                            numChecks += 1;
+                            secondsLeft -= 5;
+                            document.getElementById("numChecks").innerHTML = numChecks;
+                            document.getElementById("timeToFail").innerHTML = secondsLeft;
+                            document.getElementById("lastCheckResult").innerHTML = lastCheckResult;
+                        }
+                    ).catch(function(error) {
+                        console.log(error);
+                        numChecks += 1;
+                        secondsLeft -= 5;
+                        document.getElementById("numChecks").innerHTML = numChecks;
+                        document.getElementById("timeToFail").innerHTML = secondsLeft;
+                        document.getElementById("lastCheckResult").innerHTML = error;
+                    });
+                }
+                
                 if (secondsLeft > 0) {
                     setTimeout(function(){ping_server()}, 5000);
                 } else {
@@ -57,19 +92,7 @@
                         target_lang: "{{target_lang}}",
                         tx_engine: "Google"
                     }
-                    var form = document.createElement('form');
-                    document.body.appendChild(form);
-                    form.method = 'post';
-                    form.action = "/translate";
-                    for (var name in data) {
-                        var input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = name;
-                        input.value = data[name];
-                        form.appendChild(input);
-                    }
-                    form.submit();
-                    document.body.removeChild(form);
+                    submit_translation_form(data);
                 }
             }
 
@@ -91,7 +114,10 @@
                 For debugging purposes, the request ID is {{async_request_id}}.
                 <br><br><br><br>
                 <span id="numChecks" class="text" style="font-weight: bold">0</span>
-                <span class="text">status checks have been completed. Fallback to Google in </span>
+                <span class="text">status checks have been completed. <br>
+                    The last result indicated that the request is</span>
+                <span id="lastCheckResult" class="text" style="font-weight: bold">...</span>.<br>
+                    <span class="text">Fallback to Google in </span>
                 <span id="timeToFail" class="text" style="font-weight: bold">90</span> seconds.
             </div><br>
         </td></tr></table>

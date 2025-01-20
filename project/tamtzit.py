@@ -433,7 +433,7 @@ def route_hebrew_template():
         return response
 
     # if no current draft was found, create a new one so that we have a key to work with and save to while editing
-    key = create_draft('', current_user_info, translation_lang='--')
+    key = create_draft('', current_user_info, dt, translation_lang='--')
     debug(f'Creating a new Hebrew draft with key {key.to_legacy_urlsafe().decode("utf8")}')
     date_info = make_date_info(dt, 'he')
     header = make_header('he', date_info)
@@ -476,7 +476,7 @@ def route_hebrew_edit_daily_summary():
     dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
 
     if request.method == 'POST':
-        key = create_draft(heb_text='', user_info=current_user_info, translation_lang='H1')
+        key = create_draft(heb_text='', user_info=current_user_info, draft_timestamp=dt, translation_lang='H1')
 
         debug(f'Creating a new H1 draft with key {key.to_legacy_urlsafe().decode("utf8")}')
         date_info = make_date_info(dt, 'he')
@@ -703,10 +703,67 @@ def route_translate():
     if not heb_text:
         return "Input field was missing."
 
-    target_language_code = request.form.get('target-lang')
-    target_lang = supported_langs_mapping[target_language_code]
+    target_language_code = request.form.get('target_lang')
     basic_user_info = user_data_from_req(request)
     user_info = get_user(user_id=basic_user_info["user_id"])
+    draft_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
+
+    translation_engine = request.form.get("tx_engine")
+    if translation_engine == "OpenAI":
+        # create a request for asynchronous translation
+        key = datastore_client.key("async_job")
+        entity = datastore.Entity(key=key)
+        entity.update({"created_at": draft_timestamp,
+                       "created_by": user_info["name"],
+                       "operation": "translation",
+                       "translation_lang": target_language_code,
+                       "heb_draft_id": request.form.get('heb_draft_id'),
+                       "translation_engine": "openai/gpt-4o",
+                       "translation_custom_dirs": request.form.get("openai-custom-dirs")
+                       })
+        datastore_client.put(entity)
+        entity = datastore_client.get(entity.key)
+
+        # @TODO call an endpoint exposed by the async processor to let it know there's a pending request
+
+        # @TODO implement the /check_async endpoint here to check if the job has been completed, and if so to return an
+        #       ID which can then be used in another call back to this method which will process the translated text, breaking it up,
+        #       creating a draft in the DB, etc.
+
+        # @TODO in the async_pending page, when /check_async returns true, call this endpoint with the required inputs to indicate
+        #       that it should do translation, but not from scratch, with existing results. This method will then redirect us to /draft
+
+        # return a *new* page - OpenAI is processing your request, this page will auto-refresh when it is ready
+        return render_template("async_pending.html", async_request_id=entity.key.id,
+                               heb_draft_id=request.form.get('heb_draft_id'),
+                               heb_author_id=request.form.get('heb_author_id'),
+                               orig_text=heb_text,
+                               target_lang=target_language_code)
+
+    # don't create the draft DB entry yet, so no link in the ongoing drafts list - what would happen if it was clicked?
+    # that new page keeps polling (a new API)
+    # when the translation work is done in the background, and the "raw" openAI translation is ready,
+    # then this method will be called again with a pointer to that raw translation and it (the pointer) can be
+    # passed to process_translation_request as part of the transaction_context
+    # where it will then be broken into sections, etc.
+
+    # if we've reached this point then we're translating with Google
+
+    # additional information we want to have available without making everything an explicit method param
+    transaction_context = {"user_info": user_info, "heb_draft_id": request.form.get('heb_draft_id')}
+
+    info = process_translation_request(heb_text, target_language_code, translation_engine,
+                                       transaction_context)
+
+    date_info = make_date_info(draft_timestamp, target_language_code)
+    header = make_header(target_language_code, date_info)
+    footer = make_footer(target_language_code, date_info)
+
+    # dt = info['date_info'].based_on_dt
+    draft_timestamp_str = draft_timestamp.strftime('%Y%m%d-%H%M%S')
+    utc_draft_timestamp = draft_timestamp.astimezone(tz=ZoneInfo("UTC"))
+    utc_draft_timestamp_str = utc_draft_timestamp.strftime('%Y%m%d-%H%M%S')
+
     draft_creator_user_info = get_user(user_id=request.form.get('heb_author_id'))
     names = {
         "heb_author_in_heb": draft_creator_user_info["name_hebrew"],
@@ -715,25 +772,16 @@ def route_translate():
         "translator_in_en": user_info["name"]
     }
 
-    translation_engine = request.form.get("tx-engine")
-    openai_custom_dirs = request.form.get("openai-custom-dirs")
-
-    info = process_translation_request(heb_text, target_language_code, translation_engine, openai_custom_dirs)
-    header = make_header(target_language_code, info['date_info'])
-    footer = make_footer(target_language_code, info['date_info'])
-
-    dt = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
-    draft_timestamp = dt.strftime('%Y%m%d-%H%M%S')
-    utc_draft_timestamp = dt.astimezone(tz=ZoneInfo("UTC"))
-    utc_draft_timestamp_str = utc_draft_timestamp.strftime('%Y%m%d-%H%M%S')
-
-    translated = render_template(target_lang.lower() + '.html', **info, header=header, footer=footer, draft_timestamp=draft_timestamp, **names)
+    target_lang = supported_langs_mapping[target_language_code]
+    translated = render_template(target_lang.lower() + '.html', **info, header=header, footer=footer,
+                                 draft_timestamp=draft_timestamp_str, **names)
     translated = re.sub('\n{3,}', '\n\n', translated)
     # this is necessary because the template can generate large gaps due to unused sections
 
     # store the draft in DB so that someone else can continue the translation work
-    create_draft(heb_text, user_info, translation_text=translated, translation_lang=target_language_code,
-                 translation_engine=translation_engine, heb_draft_id=request.form.get('heb_draft_id'))
+    create_draft(heb_text, user_info, draft_timestamp=draft_timestamp, translation_text=translated,
+                 translation_lang=target_language_code, translation_engine=translation_engine,
+                 heb_draft_id=transaction_context['heb_draft_id'])
     
     # redirect to /draft so that we'll have the proper link in the URL bar for sharing
     return make_response(redirect(url_for("tamtzit.route_continue_draft", ts=utc_draft_timestamp_str, edit="true")))
@@ -1104,7 +1152,8 @@ def nightly_archive_cleanup():
     return "OK"
 
 
-def process_translation_request(heb_text, target_language_code, translation_engine="Google", openai_custom_dirs=""):
+def process_translation_request(heb_text, target_language_code, translation_engine="Google",
+                                transaction_context: dict = {}):
     # heb_lines = heb_text.split("\n")
 
     debug(f"RAW HEBREW:--------\n{heb_text}")
@@ -1147,11 +1196,18 @@ def process_translation_request(heb_text, target_language_code, translation_engi
     debug(f"STRIPPED OF HEADER & FOOTER:--------\n{heb_text}")
     debug(f"--------------------------")
 
+    # dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
+    # date_info = make_date_info(dt, target_language_code)
+
     if target_language_code in ["YY", "he"]:
         translated = heb_text
     else:
-        translated = translate_text(heb_text, target_language_code=target_language_code, 
-                                    engine=translation_engine, custom_dirs=openai_custom_dirs)
+        # BUT this is no good, we're not going to get back text that we can break into sections,
+        # so wer'e going to need to hack some special return, and then call this method again later...
+        # better to create the async request earlier in the call chain, and not call this method until
+        # we have translated text to break up.
+        translated = translate_text(heb_text, target_language_code=target_language_code,
+                                    engine=translation_engine, transaction_context=transaction_context)
     debug(f"RAW TRANSLATION:--------\n{translated}")
     debug(f"--------------------------")
 
@@ -1262,16 +1318,13 @@ def process_translation_request(heb_text, target_language_code, translation_engi
 
             section.append(Markup(line))
 
-    dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
-    date_info = make_date_info(dt, target_language_code)
-
     if len(organized["UNKNOWN"]) == 0:
         del organized["UNKNOWN"]
 
     # for the first pass the translation isn't sent as a block of text but rather 
     # as small blocks broken down by section. Later after the first human review pass we'll save it
     # as a contiguous block in the DB and going forward work from that
-    result = {'heb_text': heb_text, 'date_info': date_info, 'organized': organized,
+    result = {'heb_text': heb_text, 'organized': organized,  # 'date_info': date_info,
               'sections': sections[target_language_code]}
     return result
 

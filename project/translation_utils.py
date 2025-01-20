@@ -1,9 +1,14 @@
 import json
 import re
-from google.cloud import translate
+from textwrap import dedent
+from google.cloud import translate, datastore
 from openai import OpenAI
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
-from .common import debug
+from .common import debug, DatastoreClientProxy
+from .common import JERUSALEM_TZ
+
 from .language_mappings import supported_langs_mapping
 
 PROJECT_ID = "tamtzit-hadashot"
@@ -252,11 +257,12 @@ def post_translation_swaps(text, target_language_code):
     return text
 
 
-def translate_text(text: str, target_language_code: str, source_language='he', engine="Google", custom_dirs="") -> str:
+def translate_text(text: str, target_language_code: str, source_language='he', engine="Google",
+                   transaction_context: dict = {}) -> str:
     if engine == "Google":
         return google_translate(text, target_language_code, source_language)
     else:
-        return openai_translate(text, target_language_code, source_language, custom_dirs)
+        return openai_translate(text, target_language_code, source_language, custom_dirs, transaction_context)
 
 openai_force_translations = {
     "en": {
@@ -301,11 +307,12 @@ openai_fix_translations = {
     }, "fr": {}
 }
 
-def openai_translate(text: str, target_language_code: str, source_language: str, custom_dirs: str) -> str:
+def openai_translate(text: str, target_language_code: str, source_language: str, custom_dirs: str,
+                     transaction_context: dict = {}) -> str:
         debug(f"translate_text: using OpenAI as engine... ")  # Hebrew is ======\n{text}\n======")
-        debug("Forcing these terms: \n " +
-              json.dumps(openai_force_translations[target_language_code] | title_translations[target_language_code],
-                                                    ensure_ascii=False, indent=4))
+        # debug("Forcing these terms: \n " +
+        #       json.dumps(openai_force_translations[target_language_code] | title_translations[target_language_code],
+        #                                             ensure_ascii=False, indent=4))
         target_language_name = supported_langs_mapping[target_language_code]
         openai_client = OpenAI()
 
@@ -332,28 +339,108 @@ def openai_translate(text: str, target_language_code: str, source_language: str,
                  "content": json.dumps(openai_fix_translations["en"], ensure_ascii=False)}
             ])
         elif target_language_code == 'fr':
-            messages.extend([
+            messages = [
                 {"role": "system",
-                 "content": """Traduire en français style journaliste, sachant que je suis un journaliste israélien sioniste, 
-                 et de ce fait ne parle pas de "Judée et Samarie" mais de "la région de Yehouda et Shomron", 
-                 pas de colonies mais de localités, pas de colons mais d'habitants. 
-                 Enfin, כטב"ם est un drone explosif alors que כטמ"ם un drone."""}
-            ])
+                 "content": dedent('''
+                Je suis un journaliste israélien sioniste, et de ce fait ne parle pas de "Judée et Samarie" mais de "la région de Yehouda et Shomron", pas de colonies mais de localités, pas de colons mais d'habitants. 
+
+                Grades de Tsahal:
+                אל"מ = Colonel
+                אלוף = Général
+                אלוף משנה = Colonel
+                טוראי = Soldat
+                סא"ל = Lieutenant-colonel
+                סג"מ = Sous-lieutenant
+                סגן = Lieutenant
+                סגן-אלוף = Lieutenant-colonel
+                סגן-משנה = Sous-lieutenant
+                סמ"ר = Caporal-chef
+                סמל = Caporal
+                סמל ראשון = Caporal-chef
+                סרן = Capitaine
+                רא"ל = Chef d'état-major
+                רב טוראי = Première classe
+                רב סרן = Commandant
+                רב-אלוף = Chef d'état-major
+                רב-נגד = Major
+                רב-סמל = Sergent
+                רב-סמל בכיר = Adjudant-chef
+                רב-סמל מתקדם = Adjudant
+                רב-סמל ראשון = Sergent-chef
+                רב"ט = Première classe
+                רנ"ג = Major
+                רס"ב = Adjudant-chef
+                רס"ל = Sergent
+                רס"מ = Adjudant
+                רס"ן = Commandant
+                רס"ר = Sergent-chef
+                תא"ל = Général de brigade
+                תת-אלוף = Général de brigade
+
+                Jargon militaire:
+                אוגדה = Division
+                פלוגה = Compagnie
+                גדוד = Bataillon
+                חטיבה = Brigade
+                פיקוד העורף = Pikoud Haoref. La première occurrence, ajouter aussi (Commandement du Front intérieur), mais pas les suivantes. Par exemple: Aujourd'hui, une vérification des sirènes du Pikoud Haoref (Commandement du Front intérieur) est prévue à Ein Gedi à 10h05. En cas d'alerte réelle, une deuxième sirène retentira, accompagnée d'une notification via l'application du Pikoud Haoref et d'autres moyens.
+
+                מג"ב = Magav. La première occurrence ajouter (police des frontières), par exemple “quatre combattants de Magav (police des frontières) ont été blessés.”
+                ג'יהאד אסלאמי (גא"פ) = Jihad islamique
+
+                Géographie:
+                בבנימין = dans la région de Binyamin
+                ביהודה ושומרון = dans la région de Yehouda et Shomron
+                אצבע הגליל = Doigt de Galilée
+                יישוב = localité
+                יישובים = localités
+                כותל המערבי = Kotel
+                עכו = Akko
+                גליל העליון = Haute Galilée
+                גליל התחתון = Basse Galilée
+                ברובע הדאחיה בביירות = dans le secteur de Dahieh à Beyrouth
+                עוטף עזה = “enveloppe de Gaza" ou “la région autour de Gaza”. Par exemple “suite au tir de roquettes vers l'enveloppe de Gaza hier”
+                טולכרם = Tulkarem
+                קבר יוסף = tombeau de Yossef
+
+                Autres:
+                בית משפט מחוזי = Cour d'Appel
+                הותר לפרסום = Il a été autorisé à la publication
+                יהי זכרו ברוך = Que sa mémoire soit bénie
+                יהי זכרם ברוך = Que leur mémoire soit bénie
+                "כטב""ם" = drone
+                "כטמ""ם" = drone de combat
+                צהריים = après-midi
+                חשוון = Heshvan
+                פיקוד העורף = Le Pikoud Haoref (Commandement du Front Intérieur)
+                Lorsqu’une personne apparaît pour la 1e fois dans le texte, la nommer par son prénom et nom. Les apparitions suivantes peuvent se suffire du nom de famille.
+                חסידי ברסלב = 'hassidim de Breslev (Bratslav)
+                כ-10 = une dizaine
+                כ-20 = une vingtaine
+                אוטובוס = bus
+                ''')
+            }]
 
         if len(custom_dirs) > 0:
             messages.extend([{"role": "user", "content": custom_dirs}])
 
-        messages.extend([
-            {"role": "user",
-             "content": f"Translate the following Hebrew text to {target_language_name}: \n" + text
-             }])
+        if target_language_code == 'en':
+            messages.extend([{"role": "user", "content": f"Translate the following Hebrew text to {target_language_name}: \n" + text}])
+        elif target_language_code == 'fr':
+            messages.extend([{"role": "user", "content": f"Traduire en français le texte hébreu en tenant compte de toutes ces données\n" + text}])
 
         debug(f"openai_translate(): sending the following directions to openAI: {messages}")
-        completion = openai_client.chat.completions.create(model="gpt-4o-mini", messages=messages)
-            # {"role": "system", "content": "Do not abbreviate anything which is not abbreviated in the Hebrew."""},
-            # {"role": "system", "content": "Text which indicates when the news item happened, such as 'last night' or 'this morning', should be minimized in the translation."},
 
-        return completion.choices[0].message.content
+        datastore_client = DatastoreClientProxy.get_instance()
+
+        # insert a row into the table of pending asynchronous translations
+
+        # return a message indicating that results should be polled for
+
+        # completion = openai_client.chat.completions.create(model="gpt-4o-mini", messages=messages)
+        #     # {"role": "system", "content": "Do not abbreviate anything which is not abbreviated in the Hebrew."""},
+        #     # {"role": "system", "content": "Text which indicates when the news item happened, such as 'last night' or 'this morning', should be minimized in the translation."},
+        #
+        # return completion.choices[0].message.content
 
 
 def google_translate(text: str, target_language_code: str, source_language: str) -> str:
@@ -365,7 +452,7 @@ def google_translate(text: str, target_language_code: str, source_language: str)
     first_section = text[0:break_point]
     second_section = text[break_point:]
 
-    debug(f"translate_text(): Hebrew is -----\n{text}\n-----")
+    debug(f"translate_text(Google): Hebrew is -----\n{text}\n-----")
     debug(f"first section length: {len(first_section)}")
     debug(f"second section length: {len(second_section)}")
     client = translate.TranslationServiceClient()

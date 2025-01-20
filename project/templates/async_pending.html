@@ -1,0 +1,100 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            .text {font-size: 21px; color: #338}
+            .text-h1 {font-size: 23px; font-weight: bold;}
+            .text-h2 {font-size: 25px; font-weight: bold;}
+
+            @media(max-width:990px) {
+                .text {font-size: 27px;}
+                .text-h1 {font-size: 50px;}
+                .text-h2 {font-size: 40px;}
+            }
+            @media(min-width:991px) {
+                .text {font-size: 19px;}
+                .text-h1 {font-size: 23px;}
+                .text-h2 {font-size: 21px;}
+            }
+
+            #containing-table {
+                border-color: #CCC;
+                border-width: 1px;
+                border-style: solid;
+                padding: 10px;
+            }
+        </style>
+
+        <script>
+            var numChecks = 0;
+            var secondsLeft = 90;
+
+            function ping_server() {
+                fetch("/check_async?" + new URLSearchParams({
+                    at: Date.now()
+                })
+                ).then(
+                    // as long as it returns success, don't do anything
+                    // (response) => {return response.json();}
+                ).then(
+                    // (obj) => {
+                    // }
+                ).catch(function(error) {
+                    console.log(error);
+                });
+
+                numChecks += 1;
+                secondsLeft -= 5;
+                document.getElementById("numChecks").innerHTML = numChecks;
+                document.getElementById("timeToFail").innerHTML = secondsLeft;
+                if (secondsLeft > 0) {
+                    setTimeout(function(){ping_server()}, 5000);
+                } else {
+                    data = {
+                        heb_draft_id: "{{heb_draft_id}}",
+                        heb_author_id: "{{heb_author_id}}",
+                        orig_text: `{{orig_text}}`,
+                        target_lang: "{{target_lang}}",
+                        tx_engine: "Google"
+                    }
+                    var form = document.createElement('form');
+                    document.body.appendChild(form);
+                    form.method = 'post';
+                    form.action = "/translate";
+                    for (var name in data) {
+                        var input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = name;
+                        input.value = data[name];
+                        form.appendChild(input);
+                    }
+                    form.submit();
+                    document.body.removeChild(form);
+                }
+            }
+
+            setTimeout(function(){ping_server()}, 5000);
+        </script>
+    </head>
+    <body>
+      <div align="center">
+        <div class="text-h1">Translation In Progress...</div><br>
+        <table width="95%" id="containing-table"><tr><td>
+            <div class="text" align="center">Your translation request is in progress.
+            <br><Br>
+            OpenAI can take about a minute to work. This page will check every 5 seconds to see if the translation is ready.
+            <br><Br>
+            When the translation is ready, this page will automatically update.
+            <br><br>
+            If translation is not complete in one and a half minutes, Google Translate will be used instead.
+                <br><br>
+                For debugging purposes, the request ID is {{async_request_id}}.
+                <br><br><br><br>
+                <span id="numChecks" class="text" style="font-weight: bold">0</span>
+                <span class="text">status checks have been completed. Fallback to Google in </span>
+                <span id="timeToFail" class="text" style="font-weight: bold">90</span> seconds.
+            </div><br>
+        </td></tr></table>
+      </div>
+    </body>
+</html>

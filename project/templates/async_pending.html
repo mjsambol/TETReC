@@ -58,10 +58,11 @@
                             console.log(body);
                             lastCheckResult = body;
                             if (lastCheckResult == "Success") {
-                                alert("it worked!");
                                 data = {
                                     tx_engine: "OpenAI",
-                                    tx_async_request_id: "{{async_request_id}}"
+                                    tx_async_request_id: "{{async_request_id}}",
+                                    target_lang: "{{target_lang}}",
+                                    use_async_results: "True"
                                 }
                                 submit_translation_form(data);
                                 return;
@@ -81,7 +82,7 @@
                         document.getElementById("lastCheckResult").innerHTML = error;
                     });
                 }
-                
+
                 if (secondsLeft > 0) {
                     setTimeout(function(){ping_server()}, 5000);
                 } else {

@@ -1,9 +1,9 @@
 from difflib import SequenceMatcher
 import re
 from collections import defaultdict
-from .common import *
-from .translation_utils import translate_text
-from .language_mappings import sections
+from common import *
+from translation_utils import translate_text
+from language_mappings import sections
 
 
 def parse_for_comparison(text):

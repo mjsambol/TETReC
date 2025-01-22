@@ -1,18 +1,16 @@
 import json
 import re
 from textwrap import dedent
-from google.cloud import translate, datastore
-from openai import OpenAI
-from datetime import datetime
-from zoneinfo import ZoneInfo
+from google.cloud import translate, datastore  # prerequisite: pip install google-cloud-translate
+from openai import OpenAI                      # prerequisite: pip install openai
 
-from .common import debug, DatastoreClientProxy
-from .common import JERUSALEM_TZ
+from common import debug, DatastoreClientProxy
 
-from .language_mappings import supported_langs_mapping
+from language_mappings import supported_langs_mapping, translated_section_names
 
 PROJECT_ID = "tamtzit-hadashot"
 PARENT = f"projects/{PROJECT_ID}"
+section_header_pat = re.compile(r"[📌>] \*?_?([^_:*]+):_?\*?")
 
 def vav_hey(title):
     # this lambda works but is a bit hard to read
@@ -290,6 +288,7 @@ openai_force_translations = {
         'מחבלים': 'terrorists',
         'מרגש': 'moving',
         'עוטף עזה': 'the Gaza envelope',
+        'שר הביטחון כ"ץ': 'Defense Minister Katz'
     },
     "fr": {
         'אזעקות': 'sirènes'
@@ -307,14 +306,18 @@ openai_fix_translations = {
     }, "fr": {}
 }
 
-def openai_translate(text: str, target_language_code: str, source_language: str, custom_dirs: str,
+def openai_translate(text: str, target_language_code: str, source_language: str = "he", custom_dirs: str = "",
                      transaction_context: dict = {}) -> str:
         debug(f"translate_text: using OpenAI as engine... ")  # Hebrew is ======\n{text}\n======")
         # debug("Forcing these terms: \n " +
         #       json.dumps(openai_force_translations[target_language_code] | title_translations[target_language_code],
         #                                             ensure_ascii=False, indent=4))
         target_language_name = supported_langs_mapping[target_language_code]
-        openai_client = OpenAI()
+        try:
+            openai_client = OpenAI()
+        except Exception as err:
+            print("OpenAI init caused error")
+            print(err)
 
         messages = [
             {"role": "system",
@@ -328,7 +331,7 @@ def openai_translate(text: str, target_language_code: str, source_language: str,
              "content": "The following python dictionary must be used to enforce translation of the terms which appear as its keys. " +
                         f"For example, the Hebrew word אזעקות must always be translated as {openai_force_translations[target_language_code]['אזעקות']}."},
             {"role": "system",
-             "content": json.dumps(openai_force_translations[target_language_code] | title_translations[target_language_code], ensure_ascii=False)},
+             "content": json.dumps(openai_force_translations[target_language_code].update(title_translations[target_language_code]), ensure_ascii=False)},
         ]
         if target_language_code == 'en':
             messages.extend([
@@ -430,17 +433,11 @@ def openai_translate(text: str, target_language_code: str, source_language: str,
 
         debug(f"openai_translate(): sending the following directions to openAI: {messages}")
 
-        datastore_client = DatastoreClientProxy.get_instance()
+        completion = openai_client.chat.completions.create(model="gpt-4o", messages=messages)
+            # {"role": "system", "content": "Do not abbreviate anything which is not abbreviated in the Hebrew."""},
+            # {"role": "system", "content": "Text which indicates when the news item happened, such as 'last night' or 'this morning', should be minimized in the translation."},
 
-        # insert a row into the table of pending asynchronous translations
-
-        # return a message indicating that results should be polled for
-
-        # completion = openai_client.chat.completions.create(model="gpt-4o-mini", messages=messages)
-        #     # {"role": "system", "content": "Do not abbreviate anything which is not abbreviated in the Hebrew."""},
-        #     # {"role": "system", "content": "Text which indicates when the news item happened, such as 'last night' or 'this morning', should be minimized in the translation."},
-        #
-        # return completion.choices[0].message.content
+        return completion.choices[0].message.content
 
 
 def google_translate(text: str, target_language_code: str, source_language: str) -> str:
@@ -476,3 +473,46 @@ def google_translate(text: str, target_language_code: str, source_language: str)
     #     print("DEBUG: the second one is:")
     #     print(response.translations[1].translated_text)
     return result
+
+
+def strip_header_and_footer(heb_text, target_language_code):
+    debug(f"RAW HEBREW:--------\n{heb_text}")
+    debug(f"--------------------------")
+
+    debug(f"translated section names is {translated_section_names[target_language_code]}")
+
+    # strip off the header and footer, there is no point translating them and they are complicated to ignore later
+    stripped_heb_text = ""
+    found_a_pin = False
+    in_footer = False
+
+    for line in heb_text.split("\n"):
+        if not found_a_pin:
+            if "📌" in line:
+                found_a_pin = True
+            else:
+                continue   # strip this line, it's header
+        else:
+            if not in_footer and ("• • •" in line or "•   •   •" in line):
+                in_footer = True
+
+            if in_footer:
+                continue   # strip this line, it's footer
+
+        # while we're going through the text, replace Hebrew section headings with those of the target language
+        # it's too messy to translate and then try to figure it out
+        header_match = section_header_pat.match(line)
+        if header_match:
+            debug(f"replacing header\n'{line}'\ngroup1 is '{header_match.group(1)}'")
+            if header_match.group(1) not in translated_section_names[target_language_code]:
+                debug(f"We have no mapping for that, so leaving it alone.")
+            else:
+                line = line.replace(header_match.group(1), translated_section_names[target_language_code][header_match.group(1)])
+            debug(f"now it's {line}")
+
+        stripped_heb_text = stripped_heb_text + line + "\n"
+
+    heb_text = stripped_heb_text
+    debug(f"STRIPPED OF HEADER & FOOTER:--------\n{heb_text}")
+    debug(f"--------------------------")
+    return heb_text

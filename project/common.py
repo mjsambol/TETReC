@@ -7,6 +7,8 @@ from babel.dates import format_date
 from dataclasses import dataclass
 from datetime import datetime
 from zoneinfo import ZoneInfo
+# if running on python 3.8 the above line needs to be changed to
+# from backports.zoneinfo import ZoneInfo
 from enum import Enum, auto
 
 if __package__ is None or __package__ == '':
@@ -83,17 +85,17 @@ def compare_draft_state_lists(dict_of_states1, dict_of_states2):
 
 class DatastoreClientProxy:
 
-    _proxy_instance = None
+    _proxy_instances_by_project = {}
 
-    def __init__(self) -> None:
-        self.client = datastore.Client()
+    def __init__(self, project) -> None:
+        self.client = datastore.Client(project=project)
         self.debug_mode = os.getenv("FLASK_DEBUG") == "1" and not os.getenv("FLASK_DEBUG_USE_PROD") == "1"
 
     @classmethod
-    def get_instance(cls):
-        if not cls._proxy_instance:
-            cls._proxy_instance = DatastoreClientProxy()
-        return cls._proxy_instance    
+    def get_instance(cls, project):
+        if project not in cls._proxy_instances_by_project:
+            cls._proxy_instances_by_project[project] = DatastoreClientProxy(project=project)
+        return cls._proxy_instances_by_project[project]
 
     def key(self, name, value=None):
         if value:

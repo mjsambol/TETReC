@@ -1,7 +1,7 @@
 from textwrap import dedent
 
-from .common import DateInfo
-from .language_mappings import editions
+from common import DateInfo
+from language_mappings import editions
 
 friday_afternoon_not_dst = {  # not in_dst == WINTER i.e. Simchat Torah to Pesach
     "he":

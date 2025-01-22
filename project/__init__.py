@@ -1,6 +1,7 @@
 from flask import Flask
 from google.appengine.api import wrap_wsgi_app
-
+import sys
+import os
 ##
 # This code is taken from
 # https://www.digitalocean.com/community/tutorials/how-to-add-authentication-to-your-app-with-flask-login
@@ -16,6 +17,11 @@ from google.appengine.api import wrap_wsgi_app
 
 
 def create_app():
+    print(f"__init__.py create_app(): path is {sys.path}")
+    print(f"CWD is {os.getcwd()}")
+    print(f"this file is {os.path.realpath(__file__)}")
+    print(f"this file is in {os.path.dirname(os.path.realpath(__file__))}")
+    sys.path.append(os.path.dirname(os.path.realpath(__file__)))
     app = Flask(__name__)
     app.wsgi_app = wrap_wsgi_app(app.wsgi_app)
     app.config['SECRET_KEY'] = 'uiHvrty90p3'
@@ -41,7 +47,7 @@ def create_app():
     # app.register_blueprint(auth_blueprint)
 
     # blueprint for non-auth parts of app
-    from .tamtzit import tamtzit as tamtzit_blueprint
+    from tamtzit import tamtzit as tamtzit_blueprint
     app.register_blueprint(tamtzit_blueprint)
     print("I'm in create_app!")
     return app

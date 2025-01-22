@@ -21,7 +21,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 ######################################################################################################
-
+import os
 import cachetools.func
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -39,19 +39,19 @@ from google.cloud.datastore.query import PropertyFilter
 from markupsafe import Markup
 import requests
 
-from .auth_utils import confirm_user_has_role, consume_invitation, create_invitation, get_user, require_login
-from .auth_utils import require_role, get_user_availability, update_user_availability
-from .auth_utils import send_invitation, validate_weekly_birthcert, zero_user
-from .common import _set_debug, ARCHIVE_BASE, debug, DatastoreClientProxy, expand_lang_code, JERUSALEM_TZ
-from .cookies import Cookies, get_cookie_dict, get_today_noise, make_cookie_from_dict, make_daily_cookie
-from .cookies import user_data_from_req
-from .draft_utils import create_draft, DraftStates, fetch_drafts, get_latest_day_worth_of_editions, make_date_info
-from .draft_utils import make_new_archive_entry, upload_to_cloud_storage, update_hebrew_draft, update_translation_draft
-from .diff_draft_versions import get_translated_additions_since_ok_to_tx
-from .language_mappings import editions, keywords, sections, supported_langs_mapping, translated_section_names
-from .template_text_chunks import make_header, make_footer
-from .translation_utils import translate_text
-from .weekly_schedule import Schedule
+from auth_utils import confirm_user_has_role, consume_invitation, create_invitation, get_user, require_login
+from auth_utils import require_role, get_user_availability, update_user_availability
+from auth_utils import send_invitation, validate_weekly_birthcert, zero_user
+from common import _set_debug, ARCHIVE_BASE, debug, DatastoreClientProxy, expand_lang_code, JERUSALEM_TZ
+from cookies import Cookies, get_cookie_dict, get_today_noise, make_cookie_from_dict, make_daily_cookie
+from cookies import user_data_from_req
+from draft_utils import create_draft, DraftStates, fetch_drafts, get_latest_day_worth_of_editions, make_date_info
+from draft_utils import make_new_archive_entry, upload_to_cloud_storage, update_hebrew_draft, update_translation_draft
+from diff_draft_versions import get_translated_additions_since_ok_to_tx
+from language_mappings import editions, keywords, sections, supported_langs_mapping, translated_section_names
+from template_text_chunks import make_header, make_footer
+from translation_utils import translate_text, strip_header_and_footer
+from weekly_schedule import Schedule
 
 translation_client = translate.TranslationServiceClient()
 
@@ -89,7 +89,6 @@ datastore_client = DatastoreClientProxy.get_instance()
 
 
 tamtzit = Blueprint('tamtzit', __name__)
-section_header_pat = re.compile(r"[📌>] \*?_?([^_:*]+):_?\*?")
 
 
 def detect_mobile(param_request, page_name):
@@ -699,6 +698,7 @@ def route_translate():
        /translate creates a new entry based on the submission of the form at /  (POST)
        /draft     edits an existing entry based on a link on the main page      (GET)
     """
+    debug("/translate BEGIN")
     basic_user_info = user_data_from_req(request)
     user_info = get_user(user_id=basic_user_info["user_id"])
     transaction_context = {"user_info": user_info}
@@ -709,23 +709,28 @@ def route_translate():
     target_language_code = request.form.get('target_lang')
 
     if translation_engine == "OpenAI":
-        if target_language_code is not None and len(target_language_code) > 0:
+        debug("/translate - engine is OpenAI")
+        if "use_async_results" not in request.form or request.form.get("use_async_results") != "True":
+            debug(f"Create an ASYNC request")
             # create a request for asynchronous translation - we get here based on submit of input.html
             key = datastore_client.key("async_job")
-            entity = datastore.Entity(key=key)
+            entity = datastore.Entity(key=key, exclude_from_indexes=("translation_result", "translation_custom_dirs", "heb_text"))
             entity.update({"created_at": draft_timestamp,
                            "created_by": user_info["name"],
                            "operation": "translation",
                            "translation_lang": target_language_code,
                            "heb_draft_id": request.form.get('heb_draft_id'),
                            "heb_author_id": request.form.get('heb_author_id'),
+                           "heb_text": heb_text,
                            "translation_engine": "openai/gpt-4o",
-                           "translation_custom_dirs": request.form.get("openai-custom-dirs")
+                           "translation_custom_dirs": request.form.get("openai-custom-dirs"),
+                           "translation_result": ""  # necessary to get it to save exclude from indexes
                            })
             datastore_client.put(entity)
             entity = datastore_client.get(entity.key)
 
-            # @TODO call an endpoint exposed by the async processor to let it know there's a pending request
+            # call an endpoint exposed by the async processor to let it know there's a pending request
+            requests.get(f"{os.getenv('ASYNC_PROCESSOR_URL')}{entity.key.id}")
 
             # return a *new* page - OpenAI is processing your request, this page will auto-refresh when it is ready
             return render_template("async_pending.html", async_request_id=entity.key.id,
@@ -734,14 +739,13 @@ def route_translate():
                                    orig_text=heb_text,
                                    target_lang=target_language_code)
         else:
+            debug("Using ASYNC results")
             # fetch and process the results of asynchronous translation - we get here based on call from async_pending.html
-            query = datastore_client.query(kind="async_job")
-            query.add_filter(filter=PropertyFilter("id", "=", request.form.get("tx_async_request_id")))
-            jobs = query.fetch()
-            job = jobs[0]
+            job = datastore_client.get(datastore_client.key("async_job", int(request.form.get("tx_async_request_id"))))
 
             transaction_context["heb_draft_id"] = job["heb_draft_id"]
             transaction_context["translation_result"] = job["translation_result"]
+            heb_text = job["heb_text"]
             heb_author_id = job["heb_author_id"]
             target_language_code = job["translation_lang"]
     else:
@@ -786,17 +790,13 @@ def route_translate():
 
 
 @tamtzit.route("/check_async")
-@require_login
 def route_check_async():
-    debug(f"route_check_async: async_request_id is {request.form.get('async_request_id')}")
-
-    query = datastore_client.query(kind="async_job")
-    query.add_filter(filter=PropertyFilter("id", "=", request.form.get('async_request_id')))
-    jobs = query.fetch()
-    for job in jobs:
-        debug(f"Got back {job}")
-        if "result" in job:
-            return job["result"]
+    debug(f"route_check_async: async_request_id is {request.args.get('async_request_id')}")
+    if request.args.get('async_request_id') is None or not request.args.get('async_request_id').isdigit():
+        return "Error - missing parameter"
+    my_job = datastore_client.get(datastore_client.key("async_job", int(request.args.get('async_request_id'))))
+    if my_job and "result_code" in my_job:
+        return my_job["result_code"]
     return "Pending"
 
 
@@ -1167,50 +1167,9 @@ def nightly_archive_cleanup():
 
 def process_translation_request(heb_text, target_language_code, translation_engine="Google",
                                 transaction_context: dict = {}):
-    # heb_lines = heb_text.split("\n")
 
-    debug(f"RAW HEBREW:--------\n{heb_text}")
-    debug(f"--------------------------")
-
-    debug(f"translated section names is {translated_section_names[target_language_code]}")
-
-    # strip off the header and footer, there is no point translating them and they are complicated to ignore later
-    stripped_heb_text = ""
-    found_a_pin = False
-    in_footer = False
-
-    for line in heb_text.split("\n"):
-        if not found_a_pin:
-            if "📌" in line:
-                found_a_pin = True
-            else:
-                continue   # strip this line, it's header
-        else:
-            if not in_footer and ("• • •" in line or "•   •   •" in line):
-                in_footer = True
-
-            if in_footer:
-                continue   # strip this line, it's footer
-
-        # while we're going through the text, replace Hebrew section headings with those of the target language
-        # it's too messy to translate and then try to figure it out
-        header_match = section_header_pat.match(line)
-        if header_match:
-            debug(f"replacing header\n'{line}'\ngroup1 is '{header_match.group(1)}'")
-            if header_match.group(1) not in translated_section_names[target_language_code]:
-                debug(f"We have no mapping for that, so leaving it alone.")
-            else:
-                line = line.replace(header_match.group(1), translated_section_names[target_language_code][header_match.group(1)])
-            debug(f"now it's {line}")
-
-        stripped_heb_text = stripped_heb_text + line + "\n"
-
-    heb_text = stripped_heb_text
-    debug(f"STRIPPED OF HEADER & FOOTER:--------\n{heb_text}")
-    debug(f"--------------------------")
-
-    # dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
-    # date_info = make_date_info(dt, target_language_code)
+    if heb_text is not None and len(heb_text) > 0:
+        heb_text = strip_header_and_footer(heb_text, target_language_code)
 
     if target_language_code in ["YY", "he"]:
         translated = heb_text

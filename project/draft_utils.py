@@ -3,9 +3,9 @@ from google.cloud import datastore, storage
 from google.cloud.datastore.query import PropertyFilter
 import requests
 
-from .common import ARCHIVE_BASE, compare_draft_state_lists, DateInfo, debug, DatastoreClientProxy, DraftStates
-from .common import JERUSALEM_TZ
-from .language_mappings import editions
+from common import ARCHIVE_BASE, compare_draft_state_lists, DateInfo, debug, DatastoreClientProxy, DraftStates
+from common import JERUSALEM_TZ
+from language_mappings import editions
 
 import cachetools.func
 from collections import defaultdict

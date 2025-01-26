@@ -86,23 +86,29 @@ def get_latest_day_worth_of_editions():
     start_daily_summary() which is a route method, called by the hebrew.html page on submission
     """
     latest_drafts, _ = fetch_drafts()
-    yesterdays_editions = defaultdict(dict)
+    todays_editions = defaultdict(dict)
     for draft in latest_drafts:
+
+        # if the last_edit was yesterday, break out of the loop
+        draft_last_change_ts = draft['last_edit'].astimezone(JERUSALEM_TZ)
+        if draft_last_change_ts.date() != datetime.now(tz=ZoneInfo('Asia/Jerusalem')).date():
+            break
+
         draft_lang = 'he' if draft['translation_lang'] == '--' else draft['translation_lang']
         draft_time_of_day = get_edition_name_from_text(draft)
         debug(f"GLDWOE: Checking latest {draft_lang} draft ({draft_time_of_day}) - is this most mature for this lang at this time of day? {draft['states']}")
-        if draft_time_of_day not in yesterdays_editions[draft_lang]:
-            yesterdays_editions[draft_lang][draft_time_of_day] = draft
+        if draft_time_of_day not in todays_editions[draft_lang]:
+            todays_editions[draft_lang][draft_time_of_day] = draft
             debug(f"GLDWOE: added {draft_time_of_day} to yesterdays_Editions for lang {draft_lang}")            
         else:
-            draft_maturity = compare_draft_state_lists(draft, yesterdays_editions[draft_lang][draft_time_of_day])
+            draft_maturity = compare_draft_state_lists(draft, todays_editions[draft_lang][draft_time_of_day])
             if draft_maturity == -1:
-                yesterdays_editions[draft_lang][draft_time_of_day] = draft
+                todays_editions[draft_lang][draft_time_of_day] = draft
                 debug(f"GLDWOE: Yes, this is the most mature draft found so far.")
             else:
                 debug("GLDWOE: No, this edition is not newer.")
                 
-    return yesterdays_editions
+    return todays_editions
 
 
 def get_more_mature_draft(draft1, draft2):

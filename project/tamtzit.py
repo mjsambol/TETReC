@@ -887,11 +887,11 @@ def start_daily_summary():
 
     # this is a map from edition name (morning, afternoon, eve) to a draft object
     debug(f"start_daily_summary: getting yesterday's editions...")
-    yesterdays_editions = get_latest_day_worth_of_editions()[lang]
+    todays_editions = get_latest_day_worth_of_editions()[lang]
     organized_editions = {}
-    for edition_time_of_day in yesterdays_editions:
+    for edition_time_of_day in todays_editions:
         debug(f"start_daily_summary: processing {edition_time_of_day}")
-        edition = yesterdays_editions[edition_time_of_day]
+        edition = todays_editions[edition_time_of_day]
         processed_text_info = (
             process_translation_request(edition['hebrew_text' if lang == 'he' else 'translation_text'], lang))
         # we get back:

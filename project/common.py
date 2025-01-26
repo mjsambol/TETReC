@@ -92,7 +92,7 @@ class DatastoreClientProxy:
         self.debug_mode = os.getenv("FLASK_DEBUG") == "1" and not os.getenv("FLASK_DEBUG_USE_PROD") == "1"
 
     @classmethod
-    def get_instance(cls, project):
+    def get_instance(cls, project="tamtzit-hadashot"):
         if project not in cls._proxy_instances_by_project:
             cls._proxy_instances_by_project[project] = DatastoreClientProxy(project=project)
         return cls._proxy_instances_by_project[project]

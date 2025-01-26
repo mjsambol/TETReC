@@ -288,7 +288,8 @@ openai_force_translations = {
         'מחבלים': 'terrorists',
         'מרגש': 'moving',
         'עוטף עזה': 'the Gaza envelope',
-        'שר הביטחון כ"ץ': 'Defense Minister Katz'
+        'שר הביטחון כ"ץ': 'Defense Minister Katz',
+        'ניצנים': 'Nitzanim'
     },
     "fr": {
         'אזעקות': 'sirènes'
@@ -303,6 +304,7 @@ openai_fix_translations = {
         'Samaria': 'Shomron',
         'spokesman': 'spokesperson',
         'slightly injured': 'lightly injured',
+        'militant': 'terrorist'
     }, "fr": {}
 }
 
@@ -319,28 +321,20 @@ def openai_translate(text: str, target_language_code: str, source_language: str 
             print("OpenAI init caused error")
             print(err)
 
-        messages = [
-            {"role": "system",
-             "content": f"You are translating news updates from Hebrew to {target_language_name}. " +
-                        "The translation may restructure sentences to make them more natural for readers of {target_language_name}."},
-            {"role": "system",
-             "content": "Each item begins with a hyphen or other special character at the start of the line; " +
-                        "the translation should maintain separation between items, " +
-                        "and each should begin with the same hyphen or special character with which the Hebrew began."},
-            {"role": "system",
-             "content": "The following python dictionary must be used to enforce translation of the terms which appear as its keys. " +
-                        f"For example, the Hebrew word אזעקות must always be translated as {openai_force_translations[target_language_code]['אזעקות']}."},
-            {"role": "system",
-             "content": json.dumps(openai_force_translations[target_language_code].update(title_translations[target_language_code]), ensure_ascii=False)},
-        ]
         if target_language_code == 'en':
-            messages.extend([
+            messages = [
                 {"role": "system",
-                 "content": "In addition, the following python dictionary indicates English words which " +
-                            "sometimes appear in the translation results, and alternatives which must be used instead."},
-                {"role": "system", 
-                 "content": json.dumps(openai_fix_translations["en"], ensure_ascii=False)}
-            ])
+                "content": f"You are translating news updates from Hebrew to {target_language_name}. " +
+                            "You are encouraged to restructure sentences to make them more natural for {target_language_name}." +
+                            "Each item begins with a hyphen or other special character at the start of the line; " +
+                            "the translation must maintain this separation between items." +
+                            "The following python dictionary MUST be used when translating terms which appear as its keys: " +
+                            json.dumps(openai_force_translations[target_language_code].update(title_translations[target_language_code]), ensure_ascii=False) +
+                            f" For example, the Hebrew word אזעקות must always be translated as {openai_force_translations[target_language_code]['אזעקות']}. " +
+                            "In addition, the following python dictionary indicates English words which " +
+                            "sometimes appear in the translation results, and alternatives which must be used instead. " +
+                            json.dumps(openai_fix_translations["en"], ensure_ascii=False)}
+            ]
         elif target_language_code == 'fr':
             messages = [
                 {"role": "system",

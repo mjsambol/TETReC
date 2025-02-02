@@ -39,7 +39,7 @@
             const draft_key = "{{draft_key}}";
             const continue_to_daily_summary = "{{req_rule}}".indexOf("daily_summary") == -1 &&
         ((("{{date_info.day_of_week_digit}}"=="5") && ("{{date_info.part_of_day}}" == "צוהריים"))  ||                   // Friday afternoon
-         (("{{date_info.day_of_week_digit}}"!="6" || !date_info.is_dst) && ("{{date_info.part_of_day}}" == "ערב")));  // Evening and (NOT Saturday or Not Summer)
+         (("{{date_info.day_of_week_digit}}"!="6" || "{{date_info.is_dst}}"=="False") && ("{{date_info.part_of_day}}" == "ערב")));  // Evening and (NOT Saturday or Not Summer)
         </script>
         <script src="{{url_for('static', filename='hebrew.js', version='20250107b')}}"></script>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>

@@ -345,20 +345,22 @@ def do_edits_reach_last_two_sections(draft):
         return False
     text_at_ready_to_edit = last_backup_before_editing["hebrew_text"]
 
-    orig_last_heading = text_at_ready_to_edit.rfind("📌")
-    orig_second_last_heading = text_at_ready_to_edit.rfind("📌", 0, orig_last_heading)
-    orig_footer_start_pos = text_at_ready_to_edit.find("•   •   •")
-    orig_last_chunk = text_at_ready_to_edit[orig_second_last_heading:orig_footer_start_pos]
-    curr_last_heading = current_text.rfind("📌")
-    curr_second_last_heading = current_text.rfind("📌", 0, curr_last_heading)
-    curr_footer_start_pos = text_at_ready_to_edit.find("•   •   •")
-    curr_last_chunk = current_text[curr_second_last_heading:curr_footer_start_pos]
-    # debug("Checking whether edits have reached the last section. Originally it was:")
-    # debug(orig_last_chunk)
-    # debug("Now the last section is:")
-    # debug(curr_last_chunk)
-    return curr_last_chunk != orig_last_chunk
-
+    try:
+        orig_last_heading = text_at_ready_to_edit.rfind("📌")
+        orig_second_last_heading = text_at_ready_to_edit.rfind("📌", 0, orig_last_heading)
+        orig_footer_start_pos = text_at_ready_to_edit.find("•   •   •", orig_last_heading)
+        orig_last_chunk = text_at_ready_to_edit[orig_second_last_heading:orig_footer_start_pos]
+        curr_last_heading = current_text.rfind("📌")
+        curr_second_last_heading = current_text.rfind("📌", 0, curr_last_heading)
+        curr_footer_start_pos = current_text.find("•   •   •", curr_last_heading)
+        curr_last_chunk = current_text[curr_second_last_heading:curr_footer_start_pos]
+        # debug("Checking whether edits have reached the last section. Originally it was:")
+        # debug(orig_last_chunk)
+        # debug("Now the last section is:")
+        # debug(curr_last_chunk)
+        return curr_last_chunk != orig_last_chunk
+    except:
+        return False
 
 ############################################
 # Notes on use of GCP Cloud Storage (GCS)

@@ -730,6 +730,7 @@ def route_translate():
             entity = datastore_client.get(entity.key)
 
             # call an endpoint exposed by the async processor to let it know there's a pending request
+            debug(f"route_translate: calling requests.get({os.getenv('ASYNC_PROCESSOR_URL')}{entity.key.id})")
             requests.get(f"{os.getenv('ASYNC_PROCESSOR_URL')}{entity.key.id}")
 
             # return a *new* page - OpenAI is processing your request, this page will auto-refresh when it is ready
@@ -1056,12 +1057,13 @@ def route_translation_schedule_thisweek_change():
     tx_or_rv = request.args.get("which_role")
     new_volunteer = request.args.get('new_volunteer') or "---"
 
-    print(f"fetching schedule for {sched_dates['this_week_from_str']}")
-    schedule = sched_obj.fetch_from_db(sched_dates['this_week_from_str'])   # @TODO change to support scheds beyond English
+    schedule_week = sched_dates['this_week_from_str'] if not sched_dates['read_only'] else sched_dates['next_week_from_str']
+    print(f"fetching schedule for {schedule_week}")
+    schedule = sched_obj.fetch_from_db(schedule_week)   # @TODO change to support scheds beyond English
     if not day_name or not day_name in schedule['schedule']:
         return "ERROR bad param day_name: " + day_name
     if not edition_name or not edition_name in schedule['schedule'][day_name]:
-        return "ERROR bad param edition_name: " + edition_name
+        return "ERROR bad param edition_name: " + (edition_name if edition_name else "MISSING")
     if not tx_or_rv or not tx_or_rv in ["tx", "rv"]:
         return "ERROR bad param tx_or_rv " + tx_or_rv
     schedule['schedule'][day_name][edition_name]['translator' if tx_or_rv == 'tx' else 'reviewer'] = new_volunteer 

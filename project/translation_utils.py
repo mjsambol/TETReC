@@ -61,9 +61,11 @@ def tx_heb_prefix(word, lang):
 
 
 title_translations = {"en":{
-    # This section of translations is based on an image shared by Yair, original source unknown
+    'טוראי': 'Private',
+    'רב טוראי': 'Corporal',
     'רב"ט': 'Corporal',
     'סמל': 'Sergeant',
+    'סמל ראשון': 'Staff Sergeant',
     'סמ"ר': 'Staff Sergeant',
 
     'רב סמל': 'Sergeant First Class',
@@ -71,23 +73,28 @@ title_translations = {"en":{
 
     'רב סמל ראשון': 'Master Sergeant', # < switching based on other sources and Ilana's friend. Originally had: 'Chief Sergeant First Class',
     'רס"ר': 'Master Sergeant',       # < Originally had: 'Chief Sergeant First Class',
+    'רב סמל מתקדם': 'Sergeant Major',
     'רס"מ': 'Sergeant Major',        # < Originally had: 'Master Sergeant',
     'רס"ם': 'Sergeant Major',        # < Originally had: 'Master Sergeant',
 
-    'רס"ב': 'First Sergeant',
-    'רנ"מ': 'Sergeant Major',        # "apparently doesn't exist anymore" per Ilana's friend
-    'רנ"ם': 'Sergeant Major',        # "apparently doesn't exist anymore" per Ilana's friend
-    'רנ"ג': 'Command Sergeant Major',
+    'רב סמל בכיר': 'Warrant Officer',
+    'רס"ב': 'Warrant Officer',
+    'רנ"מ': 'Sergeant Major',        # "apparently doesn't exist anymore" per Ilana's friend & Wikipedia
+    'רנ"ם': 'Sergeant Major',        # "apparently doesn't exist anymore" per Ilana's friend & Wikipedia
+    'רב נגד': 'Chief Warrant Officer',
+    'רנ"ג': 'Chief Warrant Officer',
 
+    'סגן משנה': 'Second Lieutenant',
     'סג"מ': 'Second Lieutenant',
     'סג"ם': 'Second Lieutenant',
-    'סגן': 'First Lieutenant',
+    'סגן': 'Lieutenant',
     'סרן': 'Captain',
 
     'רב סרן': 'Major',
     'רס"ן': 'Major',
     'רס"נ': 'Major',
 
+    'סגן אלוף': 'Lieutenant Colonel',
     'סא"ל': 'Lieutenant Colonel',
     'סגן אלוף': 'Lieutenant Colonel',
 
@@ -105,21 +112,17 @@ title_translations = {"en":{
     # This section of translations is based on https://www.almaany.com/en/dict/en-he/commander/
     # which is a surprising source but nothing here seems controversial
     'רמטכ"ל': 'Chief of General Staff',     # More accurate translation than this source's 'Commander in Chief',
+
+    'מ"מ': 'Platoon Commander',
     'מ"פ': 'Company Commander',
-    'מג"ד': 'Battalon Commander',
-    'סמג"ד': 'Deputy Battalon Commander',
+    'סמ"פ': 'Deputy Company Commander',
+    'מג"ד': 'Battalion Commander',
+    'סמג"ד': 'Deputy Battalion Commander',
     'מח"ט': 'Brigade Commander',
-    'סמח"ט': 'Deputy Commander of Brigade',
+    'סמח"ט': 'Deputy Brigade Commander',
     'מא"ז': 'District Commander',
     'מש"ט': 'Flight Commander',
-    'מ"מ': 'Platoon Commander',
     'מט"ק': 'Tank Commander',
-    # not 100% sure about this one... it's also an abbreviation for mefaked she'eino katzin
-    # 'מש"ק': 'Tank Company Commander',   
-    # end section
-
-    # this came up in conversation, seems straightforward though I don't have an official source
-    'סמ"פ': 'Deputy Company Commander',
 
     # from a stamp shared by Chana
     'רבשצ': 'Military Security Coordinator',
@@ -322,18 +325,41 @@ def openai_translate(text: str, target_language_code: str, source_language: str 
             print(err)
 
         if target_language_code == 'en':
+            system_prompt = f"""
+            You are a professional translator specializing in Hebrew-to-English news updates. 
+            Your translation **must strictly follow** the provided dictionaries.
+
+            ### **Rules:**
+            1. **Strictly adhere** to the provided terminology dictionary - this is MANDATORY
+            2. **Word replacements are MANDATORY** - replace all occurences of words in the second dictionary with their provided values.
+            3. **DO NOT use synonyms** for dictionary terms - use exact matches, though words should be conjugated as needed to fit the sentence.
+            4. **Maintain the itemization** (hyphens, bullet points, or other separators).
+            3. **Produce natural-sounding English** while staying accurate and respecting the provided dictionaries.
+
+            ### Terminology Dictionary:
+            {json.dumps(openai_force_translations[target_language_code].update(title_translations[target_language_code]), ensure_ascii=False, indent=2)}
+
+            You MUST also apply the supplied python dictionary's translations to alternate forms of the keys, like those with prefixes. 
+            For example, since the dictionary indicates that 'מחבל' MUST be translated as 'terrorist', translate 'המחבל' as 'the terrorist'.
+
+            ### Word Replacements:
+            {json.dumps(openai_fix_translations['en'], ensure_ascii=False, indent=2)}
+
+            The word replacement dictionary MUST be applied even to alternate forms of the keys, e.g. those which have been conjugated 
+            differently or have prefix or suffix modifiers.
+
+            ### **Incorrect Translations (Avoid These):**
+            ❌ "מחבל" → "militant" (Incorrect)  
+            ✅ "מחבל" → "terrorist" (Correct)  
+
+            ❌ "יהודה ושומרון" → "Judea and Samaria" (Incorrect)  
+            ✅ "יהודה ושומרון" → "Yehuda and Shomron" (Correct)  
+
+            Translate the following Hebrew text while strictly following all these rules.
+            """            
+
             messages = [
-                {"role": "system",
-                "content": f"You are translating news updates from Hebrew to {target_language_name}. " +
-                            "You are encouraged to restructure sentences to make them more natural for {target_language_name}." +
-                            "Each item begins with a hyphen or other special character at the start of the line; " +
-                            "the translation must maintain this separation between items." +
-                            "The following python dictionary MUST be used when translating terms which appear as its keys: " +
-                            json.dumps(openai_force_translations[target_language_code].update(title_translations[target_language_code]), ensure_ascii=False) +
-                            f" For example, the Hebrew word אזעקות must always be translated as {openai_force_translations[target_language_code]['אזעקות']}. " +
-                            "In addition, the following python dictionary indicates English words which " +
-                            "sometimes appear in the translation results, and alternatives which must be used instead. " +
-                            json.dumps(openai_fix_translations["en"], ensure_ascii=False)}
+                {"role": "system", "content": system_prompt}
             ]
         elif target_language_code == 'fr':
             messages = [
@@ -421,17 +447,20 @@ def openai_translate(text: str, target_language_code: str, source_language: str 
             messages.extend([{"role": "user", "content": custom_dirs}])
 
         if target_language_code == 'en':
-            messages.extend([{"role": "user", "content": f"Translate the following Hebrew text to {target_language_name}: \n" + text}])
+            messages.extend([{"role": "user", "content": text}])
         elif target_language_code == 'fr':
             messages.extend([{"role": "user", "content": f"Traduire en français le texte hébreu en tenant compte de toutes ces données\n" + text}])
 
         debug(f"openai_translate(): sending the following directions to openAI: {messages}")
 
-        completion = openai_client.chat.completions.create(model="gpt-4o", messages=messages)
+        # low temperature for more deterministic, rule-following results
+        completion = openai_client.chat.completions.create(model="gpt-4o", temperature=0.2, messages=messages)
             # {"role": "system", "content": "Do not abbreviate anything which is not abbreviated in the Hebrew."""},
             # {"role": "system", "content": "Text which indicates when the news item happened, such as 'last night' or 'this morning', should be minimized in the translation."},
 
-        return completion.choices[0].message.content
+        result = completion.choices[0].message.content
+        result = post_translation_swaps(result, target_language_code)
+        return result
 
 
 def google_translate(text: str, target_language_code: str, source_language: str) -> str:

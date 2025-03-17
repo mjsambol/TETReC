@@ -249,6 +249,7 @@ def post_translation_swaps(text, target_language_code):
         text = re.sub(r"red alert (siren)?", "siren", text, flags=re.IGNORECASE)
         text = re.sub(r"Ben Gabir", "Ben Gvir", text)
         text = re.sub("spokesman", "spokesperson", text, flags=re.IGNORECASE)
+        text = re.sub("militant", "terrorist", text, flags=re.IGNORECASE)
 
     elif target_language_code == 'fr':
         text = re.sub(r'\balarm(s?)\b', lambda m: "alert" + ('s' if m.group(1).startswith("s") else ''), text, flags=re.IGNORECASE)
@@ -280,7 +281,6 @@ openai_force_translations = {
         'חטופים': 'hostages',
         'חטיבת האש': 'artillery brigade',
         'חלל': 'fallen',
-        'חרדי': 'Haredi',
         'יהודה ושומרון': 'Yehuda and Shomron',
         'יישוב': 'community',
         'יישובים': 'communities',
@@ -292,7 +292,9 @@ openai_force_translations = {
         'מרגש': 'moving',
         'עוטף עזה': 'the Gaza envelope',
         'שר הביטחון כ"ץ': 'Defense Minister Katz',
-        'ניצנים': 'Nitzanim'
+        'ניצנים': 'Nitzanim',
+        'חרדי': 'Haredi',
+        'חרדים': 'Haredim'
     },
     "fr": {
         'אזעקות': 'sirènes'
@@ -307,7 +309,9 @@ openai_fix_translations = {
         'Samaria': 'Shomron',
         'spokesman': 'spokesperson',
         'slightly injured': 'lightly injured',
-        'militant': 'terrorist'
+        'militant': 'terrorist',
+        'militants': 'terrorists',
+        'ultra-orthodox': 'Haredi'
     }, "fr": {}
 }
 

@@ -87,14 +87,17 @@ class DatastoreClientProxy:
 
     _proxy_instances_by_project = {}
 
-    def __init__(self, project) -> None:
-        self.client = datastore.Client(project=project)
+    def __init__(self, project, credentials) -> None:
+        if credentials:
+            self.client = datastore.Client(project=project, credentials=credentials)
+        else:
+            self.client = datastore.Client(project=project)
         self.debug_mode = os.getenv("FLASK_DEBUG") == "1" and not os.getenv("FLASK_DEBUG_USE_PROD") == "1"
 
     @classmethod
-    def get_instance(cls, project="tamtzit-hadashot"):
+    def get_instance(cls, project="tamtzit-hadashot", credentials=None):
         if project not in cls._proxy_instances_by_project:
-            cls._proxy_instances_by_project[project] = DatastoreClientProxy(project=project)
+            cls._proxy_instances_by_project[project] = DatastoreClientProxy(project, credentials)
         return cls._proxy_instances_by_project[project]
 
     def key(self, name, value=None):

@@ -4,15 +4,23 @@ from concurrent.futures import ThreadPoolExecutor
 from translation_utils import openai_translate, strip_header_and_footer
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from google.oauth2 import service_account
+import os
 # if running on python 3.8 the above line needs to be changed to
 # from backports.zoneinfo import ZoneInfo
 
 app = FastAPI()
-# for datastore to connect, first run locally
-# gcloud auth application-default login
-# and potentially set env var
-# PROJECT_ID=tamtzit-hadashot
-datastore_client = DatastoreClientProxy.get_instance("tamtzit-hadashot")
+
+project_id = os.getenv("PROJECT_ID")
+service_account_json = os.getenv("SERVICE_ACCOUNT_JSON_LOC")
+
+if not project_id or not service_account_json or not os.path.isfile(service_account_json):
+    print("Environment variables PROJECT_ID and SERVICE_ACCOUNT_JSON_LOC must be defined.")
+    exit(1)
+
+credentials = service_account.Credentials.from_service_account_file(service_account_json)
+
+datastore_client = DatastoreClientProxy.get_instance(project=project_id, credentials=credentials)
 # more relevant reading about authentication with Service Accounts:
 # https://googleapis.dev/python/google-api-core/latest/auth.html
 # https://googleapis.dev/python/google-auth/latest/user-guide.html#service-account-private-key-files

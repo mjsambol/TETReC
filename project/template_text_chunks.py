@@ -42,6 +42,7 @@ friday_afternoon_in_dst = {  # in dst == SUMMER i.e. Pesach to Simchat Torah
         """)
 }
 friday_afternoon_in_dst["YY"] = friday_afternoon_in_dst["he"]
+friday_afternoon_in_dst["H1"] = friday_afternoon_in_dst["he"]
 friday_afternoon_in_dst["en"] = friday_afternoon_not_dst["en"]
 
 saturday_early_edition = {

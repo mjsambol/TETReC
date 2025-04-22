@@ -89,7 +89,7 @@
                 }
             }
 
-            var starting_hebrew_text = `{{heb_text}}`;
+            var starting_hebrew_text = `{{orig_heb_text}}`;
             var last_saved_translation = `{{translated}}`;
             var last_draft_save_result_good = false;
 
@@ -154,7 +154,7 @@
 
     <body>
                 <div id="orig_heb_panel" style="display: none; font-size:17px;">
-                    <textarea rows="25" id="heb_text_area" style="width:100%; font-size: inherit;" dir="rtl">{{heb_text}}</textarea>
+                    <textarea rows="25" id="heb_text_area" style="width:100%; font-size: inherit;" dir="rtl">{{orig_heb_text}}</textarea>
                     <table width="100%">
                         <tr><br><br>
                             <td align="center"><button id="swap_hebrew_view" style="font-size: 16px; padding:6px 6px" onclick="swap_hebrew_view();" disabled>Show latest</button></td>                            

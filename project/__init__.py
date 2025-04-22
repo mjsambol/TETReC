@@ -17,10 +17,10 @@ import os
 
 
 def create_app():
-    print(f"__init__.py create_app(): path is {sys.path}")
-    print(f"CWD is {os.getcwd()}")
-    print(f"this file is {os.path.realpath(__file__)}")
-    print(f"this file is in {os.path.dirname(os.path.realpath(__file__))}")
+    # print(f"__init__.py create_app(): path is {sys.path}")
+    # print(f"CWD is {os.getcwd()}")
+    # print(f"this file is {os.path.realpath(__file__)}")
+    # print(f"this file is in {os.path.dirname(os.path.realpath(__file__))}")
     sys.path.append(os.path.dirname(os.path.realpath(__file__)))
     app = Flask(__name__)
     app.wsgi_app = wrap_wsgi_app(app.wsgi_app)

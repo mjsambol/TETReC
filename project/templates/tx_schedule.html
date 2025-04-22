@@ -52,11 +52,8 @@
 
             function select_edition_to_change() {
                 if (!confirm("You are about to change the schedule. \n" +
-                "This should *only* be done after communicating the change on the Whatsapp group!\n\n" +
-                "Have you informed the group of this change?\n\n")) {
-                    return;
-                }
-                if (!confirm("After dismissing this dialog box, click on the edition which you wish to change.")) {
+                "Please make sure the team is informed (via Whatsapp) of this change.\n\n" +
+                "After dismissing this dialog box, click on the edition which you wish to change.")) {
                     return;
                 }
                 change_mode = true;

@@ -665,8 +665,6 @@ def route_continue_draft():
     for draft in drafts:
         ts = draft['timestamp']
         if ts.strftime('%Y%m%d-%H%M%S') == draft_timestamp:
-            heb_text = draft['hebrew_text']
-            translated = draft['translation_text']
             draft_creator_user_info = get_user(user_id=draft["created_by"])
             names = {
                 "heb_author_in_heb": draft_creator_user_info["name_hebrew"],
@@ -677,7 +675,16 @@ def route_continue_draft():
             font_size_prefs = get_font_sz_prefs(request)
             key = draft.key
 
-            return render_template(next_page, heb_text=Markup(heb_text), translated=Markup(translated),
+            # we want to show the *latest* Hebrew, and include both so the reviewer can compare
+            heb_drafts = [d for d in drafts if d.key.id == draft['heb_draft_id']]
+            heb_draft = heb_drafts.pop() if len(heb_drafts) > 0 else None
+            if not heb_draft:
+                debug("/draft: ERR - unable to find original Hebrew draft!")
+                heb_draft = draft
+
+            return render_template(next_page, orig_heb_text=Markup(draft['hebrew_text']),
+                                   latest_heb_text=Markup(heb_draft['hebrew_text']), 
+                                   translated=Markup(draft['translation_text']),
                                    draft_timestamp=draft_timestamp,
                                    lang=draft['translation_lang'], **names, user_info=user_info,
                                    draft_key=key.to_legacy_urlsafe().decode('utf8'), heb_draft_id=draft['heb_draft_id'],
@@ -1037,7 +1044,14 @@ def route_team_availability_next_week():
         if team not in team_availability:
             team_availability[team] = {}
 
-        team_availability[team][user['name']] = sum([sum(user_availability[key]) for key in user_availability])
+        # I'm adding 'translation' and 'review' to user availability which previously only had one kind
+        # need to be backward compatible with old DB entries
+        if 'translation' not in user_availability:
+            user_availability['translation'] = dict(user_availability)
+            user_availability['review'] = {}
+
+        team_availability[team][user['name']] = (sum([sum(user_availability['translation'][key]) for key in user_availability['translation']]) +
+                                                 sum([sum(user_availability['review'][key]) for key in user_availability['review']]))
 
     return render_template("team_avail_next_week.html", team_availability=team_availability)
         
@@ -1083,6 +1097,16 @@ def route_translation_build_next_schedule():
         return
 
     sched_dates = get_scheduling_dates()
+
+    # once a week let's clean up old entries from this table
+    query = datastore_client.query(kind="user_availability")
+    user_avail_info = query.fetch()
+    this_month = format_date(sched_dates['this_week_from'], "MMMM", locale='en')
+    for info in user_avail_info:
+        if not info["week_of"].startswith(this_month):
+            datastore_client.delete(info.key)
+    # done with cleanup
+
     for lang in ["en"]:   # @TODO support other langs
         sched = Schedule(lang) 
         sched.cache_user_info()

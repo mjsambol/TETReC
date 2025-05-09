@@ -662,6 +662,7 @@ def route_continue_draft():
     draft_timestamp = request.args.get('ts')
     edit_mode = request.args.get('edit')
     drafts, _ = fetch_drafts()
+
     for draft in drafts:
         ts = draft['timestamp']
         if ts.strftime('%Y%m%d-%H%M%S') == draft_timestamp:
@@ -676,7 +677,7 @@ def route_continue_draft():
             key = draft.key
 
             # we want to show the *latest* Hebrew, and include both so the reviewer can compare
-            heb_drafts = [d for d in drafts if d.key.id == draft['heb_draft_id']]
+            heb_drafts = [d for d in drafts if d.key.id == int(draft['heb_draft_id'])]
             heb_draft = heb_drafts.pop() if len(heb_drafts) > 0 else None
             if not heb_draft:
                 debug("/draft: ERR - unable to find original Hebrew draft!")

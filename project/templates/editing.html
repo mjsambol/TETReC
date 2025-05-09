@@ -43,8 +43,13 @@
             function swap_hebrew_view() {
                 button_text = document.getElementById("swap_hebrew_view").innerText;
                 if (button_text == "Show latest") {
-                    document.getElementById("heb_text_area").value = latest_status["by_lang"]["--"]["text"];
-                    document.getElementById("swap_hebrew_view").innerText = "Show my start";
+                    if ((latest_status != null) && ("--" in latest_status["by_lang"]) && ("text" in latest_status["by_lang"]["--"]) && 
+                        (latest_status["by_lang"]["--"]["text"] != null) && (latest_status["by_lang"]["--"]["text"].length > 0)) {
+                        document.getElementById("heb_text_area").value = latest_status["by_lang"]["--"]["text"];
+                    } else {
+                        document.getElementById("heb_text_area").value = hebrew_text_on_open;
+                    }
+                    document.getElementById("swap_hebrew_view").innerText = "Show translation start";
                     document.getElementById("pull_additions_button").style.visibility = "hidden";
                 } else {
                     document.getElementById("heb_text_area").value = starting_hebrew_text;
@@ -54,6 +59,7 @@
             }
 
             var starting_hebrew_text = `{{orig_heb_text}}`;
+            var hebrew_text_on_open = `{{latest_heb_text}}`;
             var last_saved_translation = `{{translated}}`;
             var is_finished = "True" === "{{is_finished}}";
             var in_progress = "True" === "{{in_progress}}";
@@ -371,6 +377,8 @@
 <script>
     if (is_finished || in_progress) {
         observe_only();
+        swap_hebrew_view();  // by request from the team: when entered in editing mode, show latest Hebrew, not original
+        document.getElementById("swap_hebrew_view").disabled = false;        
     }
     update_char_count();
 </script>

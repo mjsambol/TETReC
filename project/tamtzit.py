@@ -961,8 +961,12 @@ def get_next_translators():
 def route_translation_current_schedule():
     sched_dates = get_scheduling_dates()
     sched_obj = Schedule("en")
-    sched_week = sched_dates['next_week_from_str'] if sched_dates['read_only'] else sched_dates['this_week_from_str']
+    sched_week = sched_dates['next_week_from_str'] if (sched_dates['read_only'] or 'next_week' in request.args) else sched_dates['this_week_from_str']
     editions_to_skip = get_user_availability(zero_user, sched_week)
+    if 'translation' in editions_to_skip['available']:
+        editions_to_skip = editions_to_skip['available']['translation']
+    else:
+        editions_to_skip = editions_to_skip['available']
 
     query = datastore_client.query(kind="translation_schedule")
     debug(f"tx_schedule_curr: fetching schedule for week of {sched_week}")
@@ -976,7 +980,7 @@ def route_translation_current_schedule():
     debug(f"tx_schedule_curr: passing data: {schedule}")
 
     return render_template("tx_schedule.html", week=sched_obj.week,
-                           editions_to_skip=Markup(json.dumps(editions_to_skip['available'])),
+                           editions_to_skip=Markup(json.dumps(editions_to_skip)),
                            week_being_scheduled=(sched_dates['week_being_scheduled'] if sched_dates['read_only'] else sched_dates['week_already_scheduled']),
                            schedule_data=Markup(json.dumps(schedule))) 
     # make_response(redirect(
@@ -1092,9 +1096,9 @@ def route_translation_build_next_schedule():
     # as this is meant to be called only by the App Engine scheduler, we check an expected header
     # and if it's not there, reject the request
     debug("Building next week's translation schedule...")
-    if 'X-Appengine-Cron' not in request.headers or request.headers['X-Appengine-Cron'] != 'true':
-        debug("This request does not come from AppEngine, so ignoring it.")
-        return
+    # if 'X-Appengine-Cron' not in request.headers or request.headers['X-Appengine-Cron'] != 'true':
+    #     debug("This request does not come from AppEngine, so ignoring it.")
+    #     return
 
     sched_dates = get_scheduling_dates()
 
@@ -1102,18 +1106,30 @@ def route_translation_build_next_schedule():
     query = datastore_client.query(kind="user_availability")
     user_avail_info = query.fetch()
     this_month = format_date(sched_dates['this_week_from'], "MMMM", locale='en')
-    for info in user_avail_info:
-        if not info["week_of"].startswith(this_month):
-            datastore_client.delete(info.key)
+    if this_month in ["January","February","March","April","May","June","July","August","September","October","November","December"]:
+        # that check is extra protection because I can't figure out why some availability entries were deleted
+        print(f"Deleting old availability entries - anything not from {this_month}")
+        for info in user_avail_info:
+            if not info["week_of"].startswith(this_month):
+                print(f"deleting {info}")
+                print(f"Just to be clear, the availability part: {info['available']}")
+                datastore_client.delete(info.key)
     # done with cleanup
 
     for lang in ["en"]:   # @TODO support other langs
         sched = Schedule(lang) 
         sched.cache_user_info()
-        sched.get_input_from_datastore(sched_dates['next_week_from_str'])
+
+        if request.args.get('redo'):
+            sched.get_input_from_datastore(sched_dates["this_week_from_str"])
+        else:
+            sched.get_input_from_datastore(sched_dates['next_week_from_str'])
         sched.make_translation_schedule()
-        # sched.print_schedule()
-        sched.persist_schedule(sched_dates['next_week_from_str'])
+        sched.print_schedule()
+        if request.args.get('redo'):
+            sched.persist_schedule(sched_dates['this_week_from_str'])
+        else:
+            sched.persist_schedule(sched_dates['next_week_from_str'])
         the_following_week = sched_dates['next_week_from'] + timedelta(days=7)
         the_following_week_str = format_date(the_following_week, "MMMM d", locale='en')
         sched.set_up_next_week(the_following_week_str, non_interactive_mode_p=True)

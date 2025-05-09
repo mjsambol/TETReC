@@ -243,6 +243,7 @@ def post_translation_swaps(text, target_language_code):
         text = re.sub('martyrs?', 'fallen', text, flags=re.IGNORECASE)
         text = re.sub('allowed to be published', 'released for publication', text, flags=re.IGNORECASE)
         text = re.sub("Judea and Samaria", "Yehuda and Shomron", text, flags=re.IGNORECASE)
+        text = re.sub("West Bank", "Yehuda and Shomron", text, flags=re.IGNORECASE)
         text = re.sub("Beer Sheva", "Be'er Sheva", text, flags=re.IGNORECASE)
         text = re.sub("slightly injured", "lightly injured", text, flags=re.IGNORECASE)
         text = re.sub(r"ultra[ -]?orthodox", "Haredi", text, flags=re.IGNORECASE)
@@ -250,6 +251,7 @@ def post_translation_swaps(text, target_language_code):
         text = re.sub(r"Ben Gabir", "Ben Gvir", text)
         text = re.sub("spokesman", "spokesperson", text, flags=re.IGNORECASE)
         text = re.sub("militant", "terrorist", text, flags=re.IGNORECASE)
+        text = re.sub("settlement", "community", text, flags=re.IGNORECASE)
 
     elif target_language_code == 'fr':
         text = re.sub(r'\balarm(s?)\b', lambda m: "alert" + ('s' if m.group(1).startswith("s") else ''), text, flags=re.IGNORECASE)
@@ -294,7 +296,8 @@ openai_force_translations = {
         'שר הביטחון כ"ץ': 'Defense Minister Katz',
         'ניצנים': 'Nitzanim',
         'חרדי': 'Haredi',
-        'חרדים': 'Haredim'
+        'חרדים': 'Haredim',
+        'איו"ש': 'Yehuda and Shomron'
     },
     "fr": {
         'אזעקות': 'sirènes'
@@ -311,7 +314,10 @@ openai_fix_translations = {
         'slightly injured': 'lightly injured',
         'militant': 'terrorist',
         'militants': 'terrorists',
-        'ultra-orthodox': 'Haredi'
+        'ultra-orthodox': 'Haredi',
+        'West Bank': 'Yehuda and Shomron',
+        'settlement': 'community',
+        'settlements': 'communities'
     }, "fr": {}
 }
 

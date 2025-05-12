@@ -1,8 +1,30 @@
+<!--
+Team Text Editing, Translation and Review Coordination tool
+Copyright (C) 2023-2025, Moshe Sambol, https://github.com/mjsambol
+
+Originally created for the Tamtzit Hachadashot / News In Brief project
+of the Lokhim Ahrayut non-profit organization
+Published in English as "Israel News Highlights"  
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
+
 <html>
     <head>
         <title>Tamtzit - Editing {{lang}} (Mobile)</title>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
-        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240516')}}"></script>
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20250512')}}"></script>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
         <script>
             const TEXT_BEING_EDITED = "translated_text";
@@ -101,6 +123,26 @@
             var is_finished = "True" === "{{is_finished}}";
             var in_progress = "True" === "{{in_progress}}";
             var last_draft_save_result_good = false;
+
+            async function set_status_ready_for_review() {
+                await fetch("/mark_edit_ready?draft_id={{draft_key}}");
+            }
+
+            function copy_to_clipboard() {
+                copyToClipboard('translated_text');
+                if (manual_saves_only) {
+                    saveDraft(true);
+                }
+                set_status_ready_for_review();
+            }
+
+            function copy_review_link() {
+                var review_msg = "For review: " + document.location.href;
+                review_msg = review_msg.replace("&edit=true", '')
+                review_msg = review_msg.replace("edit=true", '')
+                copyToClipboardTrick(review_msg);  
+                set_status_ready_for_review();
+            }            
 
             function done() {
                 saveDraft(true);
@@ -206,6 +248,13 @@
             <td width="10%"> </td>
         <td align="center"><button id="next_button" style="font-size: 45px; padding:8px 8px" onclick="swapNext();">Preview</button></td>
     </tr>
+    <tr><td colspan="3"> </td></tr>
+    <tr>
+        <td align="center"><button id="copy_link"  style="font-size: 45px; padding:8px 8px" onclick="copy_review_link();">Copy Link</button> 
+            <td width="10%"><div style="height:200px; overflow:hidden;"> </div></td>
+        <td align="center"><button id="copy_text" style="font-size: 45px; padding:8px 8px" onclick="copy_to_clipboard();">Copy Text</button></td>
+    </td></tr>
+
     <tr><td colspan="3" align="center">
         <button id="done_button" style="font-size: 45px; padding:8px 8px" onclick="done();">DONE</button>
     </td></tr>

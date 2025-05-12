@@ -1,8 +1,8 @@
 <!--
-    Editing and Translation Coordination tool
-    Copyright (C) 2023-2024, Moshe Sambol, https://github.com/mjsambol
+    Team Text Editing, Translation and Review Coordination tool
+    Copyright (C) 2023-2025, Moshe Sambol, https://github.com/mjsambol
 
-    Originally created for the Tamtzit Hachadashot project
+    Originally created for the Tamtzit Hachadashot / News In Brief project
     of the Lokhim Ahrayut non-profit organization
     Published in English as "Israel News Highlights"
 
@@ -23,7 +23,7 @@
 <html>
     <head>
         <title>Tamtzit - Hebrew Editing (mobile)</title>
-        <script src="{{url_for('static', filename='tamtzit-common.js', version='20240808')}}"></script>
+        <script src="{{url_for('static', filename='tamtzit-common.js', version='20250512')}}"></script>
         <script>
             //
             // These variables are needed for the hebrew.js import which follows
@@ -40,7 +40,7 @@
         ((("{{date_info.day_of_week_digit}}"=="5") && ("{{date_info.part_of_day}}" == "צוהריים"))  ||                   // Friday afternoon
          (("{{date_info.day_of_week_digit}}"!="6" || "{{date_info.is_dst}}"=="False") && ("{{date_info.part_of_day}}" == "ערב")));  // Evening and (NOT Saturday or Not Summer)
         </script>
-        <script src="{{url_for('static', filename='hebrew.js', version='20250107b')}}"></script>
+        <script src="{{url_for('static', filename='hebrew.js', version='20250512')}}"></script>
         <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}">
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 

@@ -1,9 +1,9 @@
-#####################################################################################################
+##################################################################################
 #
-# Editing and Translation Coordination tool
-# Copyright (C) 2023-2024, Moshe Sambol, https://github.com/mjsambol
+# Team Text Editing, Translation and Review Coordination tool
+# Copyright (C) 2023-2025, Moshe Sambol, https://github.com/mjsambol
 #
-# Originally created for the Tamtzit Hachadashot project 
+# Originally created for the Tamtzit Hachadashot / News In Brief project
 # of the Lokhim Ahrayut non-profit organization
 # Published in English as "Israel News Highlights"
 #
@@ -14,13 +14,14 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU Affero General Public License for more details.
 #
 # You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
-######################################################################################################
+#################################################################################
+
 import os
 import cachetools.func
 from collections import defaultdict

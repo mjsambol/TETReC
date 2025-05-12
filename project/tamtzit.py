@@ -612,6 +612,41 @@ def route_mark_published():
     return "OK"
 
 
+@tamtzit.route("/mark_edit_ready")
+@require_login
+def route_mark_edit_ready():
+    draft_id_key = request.args.get('draft_id')
+    if draft_id_key is None:
+        debug("ERROR: /mark_edit_ready got no draft_id!")
+        return None
+
+    draft_id = Key.from_legacy_urlsafe(draft_id_key)
+    if draft_id is None:
+        debug("ERROR: /mark_edit_ready got invalid draft_id!")
+        return
+
+    draft = datastore_client.get(draft_id)
+    if draft is None:
+        debug("ERROR: /mark_edit_ready unable to find matching draft data!")
+        return None
+
+    prev_states = draft["states"]
+    if DraftStates.EDIT_READY.name in [st["state"] for st in prev_states]:
+        debug("/mark_edit_ready: draft has already been marked ready for editing")
+        return "OK"
+    
+    dt = datetime.now(ZoneInfo('Asia/Jerusalem'))
+    db_user_info = get_user(user_id=user_data_from_req(request)[Cookies.COOKIE_USER_ID])
+
+    prev_states.append({"state": DraftStates.EDIT_READY.name, "at": dt.strftime('%Y%m%d-%H%M%S'),
+                        "by": db_user_info["name"], "by_heb": db_user_info["name_hebrew"]})
+    draft.update({"states": prev_states})
+    datastore_client.put(draft)
+
+    return "OK"
+
+
+
 @tamtzit.route("/start_translation")
 @require_login
 @require_role("translator")

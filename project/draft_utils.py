@@ -256,8 +256,12 @@ def update_translation_draft(draft_key, translated_text, user_info, is_finished=
     edit_timestamp = datetime.now(tz=ZoneInfo('Asia/Jerusalem'))
     draft.update({"last_edit": edit_timestamp}) 
     prev_states = draft["states"]
-    # this method is specific to translation and the only states the tool supports right now for translation
-    # are writing and publish_ready. Later it will be good to add additional states, at least edit_ready and published
+
+    if "editor" in user_info["role"]:
+        if DraftStates.EDIT_ONGOING.name not in [states_entry["state"] for states_entry in prev_states]:
+            prev_states.append({"state": DraftStates.EDIT_ONGOING.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'),
+                                "by": user_info["name"], "by_heb": user_info["name_hebrew"]})
+
     if is_finished and DraftStates.PUBLISH_READY.name not in [states_entry["state"] for states_entry in prev_states]:
         prev_states.append({"state": DraftStates.PUBLISH_READY.name, "at": edit_timestamp.strftime('%Y%m%d-%H%M%S'),
                             "by": user_info["name"], "by_heb": user_info["name_hebrew"]})

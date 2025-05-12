@@ -1,8 +1,8 @@
 /*
-    Editing and Translation Coordination tool
-    Copyright (C) 2023-2024, Moshe Sambol, https://github.com/mjsambol
+    Text Editing, Translation and Review Coordination tool
+    Copyright (C) 2023-2025, Moshe Sambol, https://github.com/mjsambol
 
-    Originally created for the Tamtzit Hachadashot project
+    Originally created for the Tamtzit Hachadashot / News In Brief project
     of the Lokhim Ahrayut non-profit organization
     Published in English as "Israel News Highlights"
 
@@ -100,14 +100,12 @@ async function updateStatus() {
                             status_msg = status_msg.substring(0, status_msg.length - 4);
                             if (edition_state["state"] == "WRITING" || edition_state["state"] == "EDIT_READY") {
                                 status_msg = status_msg + " עד ל " + obj['by_lang'][lang]['last_edit'];
-                                if (lang == '--' || lang == 'H1') {
-                                    if (edition_state["state"] == "EDIT_READY") {
-                                        status_msg = status_msg + ' -- <b><font color="#1a9c3b">';
-                                    } else {
-                                        status_msg = status_msg + ' -- <b><font color="#d6153c">לא ';
-                                    }
-                                    status_msg = status_msg + "מוכן לעריכה</font></b></td>";
+                                if (edition_state["state"] == "EDIT_READY") {
+                                    status_msg = status_msg + ' -- <b><font color="#1a9c3b">';
+                                } else {
+                                    status_msg = status_msg + ' -- <b><font color="#d6153c">לא ';
                                 }
+                                status_msg = status_msg + "מוכן לעריכה</font></b></td>";
                             } else if (edition_state["state"] == "EDIT_ONGOING" || edition_state["state"] == "EDIT_NEAR_DONE") {
         
                                 status_msg = status_msg + " -- <b>" + STATE_NAMES_HEBREW[edition_state["state"]] + "</b>";

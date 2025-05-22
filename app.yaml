@@ -1,0 +1,45 @@
+##################################################################################
+#
+# Team Text Editing, Translation and Review Coordination tool
+# Copyright (C) 2023-2025, Moshe Sambol, https://github.com/mjsambol
+#
+# Originally created for the Tamtzit Hachadashot / News In Brief project
+# of the Lokhim Ahrayut non-profit organization
+# Published in English as "Israel News Highlights"
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published
+# by the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+#
+#################################################################################
+
+runtime: python39
+entrypoint: gunicorn 'project:create_app()'
+app_engine_apis: true
+
+handlers:
+- url: /.*
+  script: auto
+
+env_variables:
+  FLASK_DEBUG: '0'
+# Tamtzit's key
+  OPENAI_API_KEY: "YOUR-KEY-HERE"
+  ASYNC_PROCESSOR_URL: "http://YOUR-IP-ADDRESS:PORT/items/"
+  MAILJET_KEY: 'YOUR-KEY'
+  MAILJET_PWD: 'YOUR-PWD'
+  EMAIL_SENDER_ADDR: ''
+  EMAIL_SENDER_NAME: ''
+  USER_SCHEDULING_PREFERENCES: >
+  {
+  }  
+# This file is used by AppEngine so there is no need to set a service account here.

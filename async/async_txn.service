@@ -1,0 +1,16 @@
+[Unit]
+Description=TETReC Asynchronous translation FastAPI component
+[Service]
+# originally these were www-data but GCP access uses several files under ~/.local and access perms became a pain
+# User=www-data
+# Group=www-data
+User=TETReC
+Group=TETReC
+WorkingDirectory=/opt/translate
+Environment="PROJECT_ID=tamtzit-hadashot"
+Environment="OPENAI_API_KEY=YOUR-KEY-HERE"
+Environment="SERVICE_ACCOUNT_JSON_LOC=/path/to/tamtzit-datastore-access-service-acct-key.json"
+ExecStart=/opt/translate/venv/bin/uvicorn async_txn:app --host 0.0.0.0 --port 5081 --reload
+[Install]
+WantedBy=multi-user.target
+

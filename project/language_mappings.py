@@ -44,8 +44,8 @@ locales['H1'] = 'he_IL.UTF-8'
 sections = {} # noqa
 sections['keys_from_Hebrew'] = {
     "מלחמת חרבות ברזל": "SwordsOfIron",
-    "החזית הצפונית": "NORTH",
     "החזית הדרומית": "SOUTH",
+    "החזית הצפונית": "NORTH",
     "החזית מול תימן": "YEMEN",
     'חזית איו"ש': "YandS",
     "ביטחון": 'Security',
@@ -60,8 +60,8 @@ sections['keys_from_Hebrew'] = {
 
 sections['en'] = {
     "SwordsOfIron": "Swords of Iron",
-    "NORTH": "Northern Front",
     "SOUTH": "Southern Front",
+    "NORTH": "Northern Front",
     "YEMEN": "Yemeni Front",
     "YandS": "Yehuda and Shomron",
     "Security": "Security",
@@ -76,8 +76,8 @@ sections['en'] = {
 }
 sections['fr'] = {
     "SwordsOfIron": "Guerre des Épées de Fer",
-    "NORTH": Markup("Au nord"),
     "SOUTH": Markup("Au sud"),
+    "NORTH": Markup("Au nord"),
     "YEMEN": Markup("Le front face au Yémen"),
     "YandS": "Yehouda et Shomron",
     "Security": "Sécurité",
@@ -92,8 +92,8 @@ sections['fr'] = {
 }
 sections['he'] = {
     "SwordsOfIron": "מלחמת חרבות ברזל",
-    "NORTH": "החזית הצפונית",
     "SOUTH": "החזית הדרומית",
+    "NORTH": "החזית הצפונית",
     "YEMEN": "החזית מול תימן",
     "YandS": 'חזית איו"ש',
     "Security": "ביטחון",

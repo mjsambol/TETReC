@@ -1319,6 +1319,9 @@ def process_translation_request(heb_text, target_language_code, translation_engi
             elif (kw_match(kw["jands"], line.lower())) and 'YandS' not in organized:
                 debug("starting J&S section")
                 section = organized['YandS']
+            elif (kw_match(kw["rising-lion"], line.lower())) and 'RISING-LION' not in organized:
+                debug("starting RISING-LION section")
+                section = organized['RISING-LION']
             # elif kw["policy"] in line.lower() and "politics" in line.lower() and 'PandP' not in organized:
             #     debug("starting policy section")
             #     section = organized['PandP']

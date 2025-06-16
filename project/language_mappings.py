@@ -44,6 +44,7 @@ locales['H1'] = 'he_IL.UTF-8'
 sections = {} # noqa
 sections['keys_from_Hebrew'] = {
     "מלחמת חרבות ברזל": "SwordsOfIron",
+    'מבצע "עם כלביא"': "RISING-LION",
     "החזית הדרומית": "SOUTH",
     "החזית הצפונית": "NORTH",
     "החזית מול תימן": "YEMEN",
@@ -60,6 +61,7 @@ sections['keys_from_Hebrew'] = {
 
 sections['en'] = {
     "SwordsOfIron": "Swords of Iron",
+    "RISING-LION": "Operation Rising Lion",
     "SOUTH": "Southern Front",
     "NORTH": "Northern Front",
     "YEMEN": "Yemeni Front",
@@ -76,6 +78,7 @@ sections['en'] = {
 }
 sections['fr'] = {
     "SwordsOfIron": "Guerre des Épées de Fer",
+    "RISING-LION": Markup('Opération "Rising Lion" (Am Kélavi)'),
     "SOUTH": Markup("Au sud"),
     "NORTH": Markup("Au nord"),
     "YEMEN": Markup("Le front face au Yémen"),
@@ -92,6 +95,7 @@ sections['fr'] = {
 }
 sections['he'] = {
     "SwordsOfIron": "מלחמת חרבות ברזל",
+    "RISING-LION": 'מבצע "עם כלביא"',
     "SOUTH": "החזית הדרומית",
     "NORTH": "החזית הצפונית",
     "YEMEN": "החזית מול תימן",
@@ -122,6 +126,7 @@ keywords = {}  # noqa
 keywords['en'] = {
     "edition": "edition",
     "intro_pin": ["war of iron swords", "iron swords war", "swords of iron"],
+    "rising-lion": "lion",
     "northern": "northern ",
     "southern": "southern ",
     "yemen": ["yemen", "yemeni"],
@@ -140,6 +145,7 @@ keywords['en'] = {
 keywords['fr'] = {
     "edition": "édition",
     "intro_pin": "guerre des épées de fer",
+    "rising-lion": "lion",
     "northern": " nord",
     "southern": " sud",
     "yemen": " yémen",
@@ -158,6 +164,7 @@ keywords['fr'] = {
 keywords['he'] = {
     "edition": "מהדורת",
     "intro_pin": "מלחמת חרבות ברזל",
+    "rising-lion": "כלביא",
     "northern": "הצפונית",
     "southern": "הדרומית",
     "yemen": "תימן",

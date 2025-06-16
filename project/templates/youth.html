@@ -6,6 +6,12 @@
 {{line}}
 {% endfor %}{% endif %}
 
+{% if 'RISING-LION' in organized and organized['RISING-LION'] | length > 0 %}
+🦁 *מבצע "עם כלביא":*
+{% for line in organized['RISING-LION'] %}
+{{line}}
+{% endfor %}{% endif %}
+
 {% if 'SOUTH' in organized and organized['SOUTH'] | length > 0 %}
 ⬇️ *החזית הדרומית:*
 {% for line in organized['SOUTH'] %}

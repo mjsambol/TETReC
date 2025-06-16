@@ -207,7 +207,9 @@ class Schedule:
 
             for func in ['translation', 'review']:
                 volunteer.set_offered(info['available'][func], func)
-            print(f'{volunteer.name} offered {volunteer.total_offered} options across {volunteer.days_offered} days')
+            print(f'{volunteer.name} offered {volunteer.total_offered} options across {volunteer.days_offered} days:')
+            print(f'{info["available"]}')
+
             for day_name in self.week:
                 day = self.week[day_name]
 
@@ -218,11 +220,15 @@ class Schedule:
                     day_offer = func[0][day_name]
                     if not type(day_offer[0]) == int:
                         day_offer = [int(x) for x in day_offer]
+                    print(f"{day_name} day_offer from {volunteer.name} is {day_offer}")                        
                     if day_offer[0]:
+                        print("set morning")
                         day.morning.add_offer(volunteer, func[1])
                     if day_offer[1]:
+                        print("set afternoon")
                         day.afternoon.add_offer(volunteer, func[1])
                     if day_offer[2]:
+                        print("set evening")
                         day.evening.add_offer(volunteer, func[1])
 
     def confirm_proceed_with_available_data(self, non_interactive_mode_p):
@@ -237,9 +243,9 @@ class Schedule:
 
     def check_rule_1(self):
         # Rule 1: For a slot that has only one person available, assign them
-        # print("Checking rule 1...")
+        print("Checking rule 1...")
         for day in self.week.values():
-            # print(f"Checking {day.name}")
+            print(f"Checking {day.name}")
             day = self.week[day.name]
             all_editions = [day.morning, day.afternoon, day.evening]
             for edition in all_editions:
@@ -248,15 +254,15 @@ class Schedule:
                 if edition in self.no_edition_times:
                     continue
 
-                # print(f"checking {edition.name} - {len(edition.offered_translate)} translation  offers, ")
-                # print(f" with {len(edition.t_candidates)} curr candidates")
+                print(f"checking {edition.name} - {len(edition.offered_translate)} translation offers: {[p.name for p in edition.offered_translate]}, ")
+                print(f" with {len(edition.t_candidates)} curr candidates - {[p.name for p in edition.t_candidates]}")
                 if len(edition.t_candidates) == 1:
                     # and also tell the translator he's been assigned, so that he can keep track of how many assignments
                     edition.set_translator(edition.t_candidates[0])
                     print(f"Rule 1: {edition.translator.name} will translate on {day.name} {edition.name}")
 
     def check_rule_2(self):
-        # print("Checking rule 2...")
+        print("Checking rule 2...")
         rule_applied = False
         # Rule 2: For each day, for each person who already has an assignment that day,
         # remove them as candidates for other slots that day,
@@ -273,15 +279,16 @@ class Schedule:
                             continue
                         if edition.translator in other_edition.t_candidates and len(other_edition.t_candidates) > 1:
                             other_edition.t_candidates.remove(edition.translator)
-                            # print(f"Rule 2: removing {edition.translator.name} from {day.name} {other_edition.name}")
+                            print(f"Rule 2: removing {edition.translator.name} from {day.name} {other_edition.name}")
                             rule_applied = True
+        print("Done with rule 2")
         return rule_applied
 
     def check_rule_3(self):
         # Rule 3: Once a person has three assigned slots, remove them from other slots across the week
         # unless they are the only one left in that slot (in which case they're already assigned to there),
         # or unless all volunteers for that slot have the same number of other assignments
-        # print("Checking rule 3...")
+        print("Checking rule 3...")
         rule_applied = False
 
         for day in self.week.values():
@@ -299,27 +306,32 @@ class Schedule:
                 # remove volunteers from edition.t_candidates working through the list of to_remove
                 # until all those left have the same number of assignments as the last in the list
                 while len(to_remove) > 0 and len(to_remove[0].assigned) > len(to_remove[-1].assigned):
-                    # print(f"removing {to_remove[0].name} as candidate for {day.name} {edition.name} ")
-                    # print(f"  - already has {len(to_remove[0].assigned)} assignments")
+                    print(f"removing {to_remove[0].name} as candidate for {day.name} {edition.name} ")
+                    print(f"  - already has {len(to_remove[0].assigned)} assignments")
                     edition.t_candidates.remove(to_remove[0])
                     to_remove.remove(to_remove[0])
                     rule_applied = True
-        # print("done with rule 3")
+        print("done with rule 3")
         return rule_applied
 
     def offered_and_available(self, per: Person) -> List[Edition]:
         """Used extensively by Rule 5"""
         offered_and_available_list = []
+        print(f"oaa: {per.name}: {per.offered_translate}")
         if not per.offered_translate:
             return []
         for offer_day_name in per.offered_translate:
+            print(f"oaa: {per.name}: checking {offer_day_name}")
             day_data = self.week[offer_day_name]
-            offer_data = per.offered_translate[offer_day_name]
+            offer_data = [int(x) for x in per.offered_translate[offer_day_name]]
             if offer_data[0] == 1 and not day_data.morning.translator and per in day_data.morning.t_candidates:
+                print(f"oaa: {per.name}: adding morning")
                 offered_and_available_list.append(day_data.morning)
             if offer_data[1] == 1 and not day_data.afternoon.translator and per in day_data.afternoon.t_candidates:
+                print(f"oaa: {per.name}: adding afternoon")
                 offered_and_available_list.append(day_data.afternoon)
             if offer_data[2] == 1 and not day_data.evening.translator and per in day_data.evening.t_candidates:
+                print(f"oaa: {per.name}: adding evening")
                 offered_and_available_list.append(day_data.evening)
         return offered_and_available_list
 
@@ -333,11 +345,14 @@ class Schedule:
         # take the first person with the lowest of those two, give them an assignment,
         # recalculate their num_offered_and_available, repeat the outer loop from the top
 
+        print("Starting rule 5...")
         offered_and_available_cache = {p: len(self.offered_and_available(p)) for p in self.team.values()}
+        print(offered_and_available_cache)
 
         available_volunteers = [p for p in self.team.values()
                                 if len(p.assigned) < self.max_assignments_per_volunteer
                                 and offered_and_available_cache[p] > 0]
+        print(f"There are {len(available_volunteers)} volunteers available: {available_volunteers}")
         if len(available_volunteers) == 0:
             return False
 
@@ -466,7 +481,7 @@ class Schedule:
             if self.check_rule_5():
                 reloop = True
 
-        # print("done.\n\n\n Assigning reviewers...")
+        print("done.\n\n\n Assigning reviewers...")
         self.do_assign_reviewers()
         # print("done")
 
@@ -517,13 +532,17 @@ class Schedule:
         # finally, let's delete any schedules that aren't related to this month
         now = datetime.now(ZoneInfo('Asia/Jerusalem'))
         this_month = format_date(now, "MMMM", locale='en')
-        if this_month in ["January","February","March","April","May","June","July","August","September","October","November","December"]:
+        months = ["January","February","March","April","May","June","July","August","September","October","November","December"]
+        if this_month in months:
             # that check is extra protection because I can't figure out why some availability entries were deleted
-            print(f"Deleting old schedule entries - anything not from {this_month}")
+            month_index = months.index(this_month)
+            next_month = months[(month_index + 1) % 12]
+            last_month = months[(month_index - 1) % 12]
+            print(f"Deleting old schedule entries - anything not from {last_month}, {this_month} or {next_month}")
             query = datastore_client.query(kind="translation_schedule")
             schedules = query.fetch()
             for sched in schedules:
-                if this_month not in sched['week_from']:
+                if this_month not in sched['week_from'] and last_month not in sched['week_from'] and next_month not in sched['week_from']:
                     datastore_client.delete(sched.key)
 
 

@@ -190,6 +190,9 @@ class Schedule:
             user_details = self.cached_users[info['user_id']]
             print(f"Processing availability for {info['user_id']} = {user_details['name']}")
 
+            print(f"Availability is {info['available']}")
+            info['available'] = info['available'].replace("'", '"')
+
             user_fname = user_details['name'].split(" ")[0]
             if user_fname not in self.team:
                 # someone got added to the DB but not recognized here yet

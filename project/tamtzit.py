@@ -1143,11 +1143,15 @@ def route_translation_build_next_schedule():
     query = datastore_client.query(kind="user_availability")
     user_avail_info = query.fetch()
     this_month = format_date(sched_dates['this_week_from'], "MMMM", locale='en')
-    if this_month in ["January","February","March","April","May","June","July","August","September","October","November","December"]:
+    months = ["January","February","March","April","May","June","July","August","September","October","November","December"]
+    if this_month in months:
         # that check is extra protection because I can't figure out why some availability entries were deleted
-        print(f"Deleting old availability entries - anything not from {this_month}")
+        month_index = months.index(this_month)
+        next_month = months[(month_index + 1) % 12]
+        last_month = months[(month_index - 1) % 12]
+        print(f"Deleting old user availability - anything not from {last_month}, {this_month} or {next_month}")
         for info in user_avail_info:
-            if not info["week_of"].startswith(this_month):
+            if this_month not in info["week_of"] and last_month not in info["week_of"] and next_month not in info["week_of"]:
                 print(f"deleting {info}")
                 print(f"Just to be clear, the availability part: {info['available']}")
                 datastore_client.delete(info.key)

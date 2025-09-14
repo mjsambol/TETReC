@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Add User</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 2em;
+    }
+    form {
+      max-width: 400px;
+    }
+    label {
+      display: block;
+      margin-top: 1em;
+      font-weight: bold;
+    }
+    .rtl-label {
+    text-align: right;
+    direction: rtl;
+    display: block;
+    }    
+    input[type="text"],
+    input[type="email"] {
+      width: 100%;
+      padding: 0.5em;
+      margin-top: 0.2em;
+      box-sizing: border-box;
+    }
+    input[type="submit"]:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }    
+    input[type="submit"] {
+      margin-top: 1.5em;
+      padding: 0.6em 1.2em;
+      background-color: #4682b4;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    input[type="submit"]:hover {
+      background-color: #315f7c;
+    }
+    input[type="submit"]:hover:not(:disabled) {
+      background-color: #315f7c;
+    }    
+    select {
+    width: 100%;
+    padding: 0.5em;
+    margin-top: 0.2em;
+    box-sizing: border-box;
+    }    
+  </style>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const form = document.getElementById("addUserForm");
+      const submitBtn = document.getElementById("submitBtn");
+
+      const requiredFields = ["name", "email", "role", "name_hebrew"].map(id => document.getElementById(id));
+
+      function validateForm() {
+        const allFilled = requiredFields.every(field => field.value.trim() !== "");
+        const validRole = document.getElementById("role").value !== "";
+        submitBtn.disabled = !(allFilled && validRole);
+      }
+
+      requiredFields.forEach(field => {
+        field.addEventListener("input", validateForm);
+        field.addEventListener("change", validateForm);  // for <select>
+      });
+
+      validateForm();  // initial check
+    });
+  </script>  
+</head>
+<body>
+  <h1>Add a New User</h1>
+  <form action="{{ url_for('tamtzit.route_add_user') }}" method="post">
+    <label for="name">Name (English)</label>
+    <input type="text" id="name" name="name" required>
+
+    <label for="name_hebrew" class="rtl-label">שם בעברית</label>
+    <input type="text" id="name_hebrew" name="name_hebrew" dir="rtl" required>
+
+    <label for="email">Email</label>
+    <input type="email" id="email" name="email" required>
+
+    <label for="role">Role</label>
+    <select id="role" name="role" required>
+    <option value="">-- Select Role --</option>
+    <option value="Hebrew">Hebrew</option>
+    <option value="translator_en">Translator (English)</option>
+    <option value="translator_fr">Translator (French)</option>
+    <option value="translator_YY">Youth (Noar)</option>
+    </select>
+
+    <input type="submit" value="Add User" id="submitBtn" disabled>
+  </form>
+</body>
+</html>

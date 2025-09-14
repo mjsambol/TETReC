@@ -752,11 +752,14 @@ def route_translate():
     translation_engine = request.form.get("tx_engine")
     target_language_code = request.form.get('target_lang')
 
-    if translation_engine == "OpenAI":
-        debug("/translate - engine is OpenAI")
+    debug(f"/translate - engine is {translation_engine}")
+
+    if translation_engine.startswith("OpenAI"):
         if "use_async_results" not in request.form or request.form.get("use_async_results") != "True":
             debug(f"Create an ASYNC request")
             # create a request for asynchronous translation - we get here based on submit of input.html
+            openAI_model = translation_engine.split("-", 1)[1]
+
             key = datastore_client.key("async_job")
             entity = datastore.Entity(key=key, exclude_from_indexes=("translation_result", "translation_custom_dirs", "heb_text"))
             entity.update({"created_at": draft_timestamp,
@@ -766,7 +769,7 @@ def route_translate():
                            "heb_draft_id": request.form.get('heb_draft_id'),
                            "heb_author_id": request.form.get('heb_author_id'),
                            "heb_text": heb_text,
-                           "translation_engine": "openai/gpt-4o",
+                           "translation_engine": "openai/" + openAI_model,
                            "translation_custom_dirs": request.form.get("openai-custom-dirs"),
                            "translation_result": ""  # necessary to get it to save exclude from indexes
                            })
@@ -1000,6 +1003,8 @@ def route_translation_current_schedule():
     sched_obj = Schedule("en")
     sched_week = sched_dates['next_week_from_str'] if (sched_dates['read_only'] or 'next_week' in request.args) else sched_dates['this_week_from_str']
     editions_to_skip = get_user_availability(zero_user, sched_week)
+
+    # The zero user's availability doesn't have translation / review, so this is a safety mechanism worth keeping in place
     if 'translation' in editions_to_skip['available']:
         editions_to_skip = editions_to_skip['available']['translation']
     else:
@@ -1013,6 +1018,9 @@ def route_translation_current_schedule():
     for s in schedule_info:
         debug("got a schedule from the db...")
         schedule = s['schedule']
+
+    # we also need to pull user info and make a mapping of user fname lname-initial to color
+    # so that user schedule colors are taken from the db rather than hard-coded in tx_schedule.html
 
     debug(f"tx_schedule_curr: passing data: {schedule}")
 
@@ -1072,6 +1080,11 @@ def route_team_availability_next_week():
     query = datastore_client.query(kind="user")
     users = query.fetch()
     for user in users:
+        if "translator_en" not in user["role"] and "editor_en" not in user["role"]:
+            # for now, the scheduler is only used by the English team, no need creating DB objects for everyone else,
+            # which will happen with the call to get_user_availability.
+            continue   
+
         user_availability = get_user_availability(user, sched_dates['next_week_from_str'])["available"]
         if "translator_" in user["role"]:
             start_pos = user["role"].index("translator_") + len("translator_")
@@ -1115,6 +1128,8 @@ def route_translation_schedule_thisweek_change():
     schedule_week = sched_dates['this_week_from_str'] if not sched_dates['read_only'] else sched_dates['next_week_from_str']
     print(f"fetching schedule for {schedule_week}")
     schedule = sched_obj.fetch_from_db(schedule_week)   # @TODO change to support scheds beyond English
+    if not schedule:
+        return f"ERROR: there is no schedule for the requested date of {schedule_week}"
     if not day_name or not day_name in schedule['schedule']:
         return "ERROR bad param day_name: " + day_name
     if not edition_name or not edition_name in schedule['schedule'][day_name]:
@@ -1385,6 +1400,44 @@ def process_translation_request(heb_text, target_language_code, translation_engi
     result = {'heb_text': heb_text, 'organized': organized,  # 'date_info': date_info,
               'sections': sections[target_language_code]}
     return result
+
+
+@tamtzit.route('/users')
+@require_login
+@require_role("admin")
+def route_list_users():
+    query = datastore_client.query(kind="user")
+    query.order = ["name_hebrew"]
+    users = list(query.fetch())
+
+    # Make sure all expected fields exist
+    for user in users:
+        user.setdefault("name", "")
+        user.setdefault("name_hebrew", "")
+        user.setdefault("email", "")
+        user.setdefault("role", "")
+
+    return render_template("user_list.html", users=users)
+
+
+
+@tamtzit.route("/users/add", methods=["GET", "POST"])
+@require_login
+@require_role("admin")
+def route_add_user():
+    if request.method == "POST":
+        key = datastore_client.key("user")  # lowercase 'user' as per your structure
+        entity = datastore.Entity(key=key)
+        entity.update({
+            "name": request.form.get("name", "").strip(),
+            "name_hebrew": request.form.get("name_hebrew", "").strip(),
+            "email": request.form.get("email", "").strip(),
+            "role": request.form.get("role", "").strip(),
+        })
+        datastore_client.put(entity)
+        return redirect(url_for("tamtzit.route_list_users"))
+
+    return render_template("add_user.html")
 
 
 if __name__ == '__main__':

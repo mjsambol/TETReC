@@ -285,16 +285,24 @@ def get_user_availability(db_user_info, week_of_str):
     debug(f"Creating a new availability entry")
     key = datastore_client.key("user_availability")
     entity = datastore.Entity(key=key)
-    entity.update({"user_id": db_user_info.key.id,
-                   "week_of": week_of_str,
-                   "available": {
+    # ths was a dormant bug, just found it when testing the scheduler mid-week when the coming week's setup hadn't yet been done
+    if db_user_info == zero_user:
+        new_availability = {"Sunday": [0, 0, 0], "Monday": [0, 0, 0], "Tuesday": [0, 0, 0],
+                                 "Wednesday": [0, 0, 0], "Thursday": [0, 0, 0],
+                                 "Friday": [0, 0, 1], "Saturday": [1, 1, 0]}
+    else:
+        new_availability = {
                         "translation": {"Sunday": [0, 0, 0], "Monday": [0, 0, 0], "Tuesday": [0, 0, 0],
                                  "Wednesday": [0, 0, 0], "Thursday": [0, 0, 0],
                                  "Friday": [0, 0, 0], "Saturday": [0, 0, 0]},
                         "review": {"Sunday": [0, 0, 0], "Monday": [0, 0, 0], "Tuesday": [0, 0, 0],
                                  "Wednesday": [0, 0, 0], "Thursday": [0, 0, 0],
-                                 "Friday": [0, 0, 0], "Saturday": [0, 0, 0]},
-                   }}) 
+                                 "Friday": [0, 0, 0], "Saturday": [0, 0, 0]}
+        }
+
+    entity.update({"user_id": db_user_info.key.id,
+                   "week_of": week_of_str,
+                   "available": new_availability}) 
     datastore_client.put(entity)
     entity = datastore_client.get(entity.key)
     return entity

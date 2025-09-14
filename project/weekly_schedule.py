@@ -132,15 +132,24 @@ class Schedule:
         self.max_assignments_per_volunteer = 3  # hopefully. This may get raised as we go, if needed
         self.week: dict[str, Day] = \
             {n: Day(n) for n in ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]}
-        # There is no good reason to stay with first names only. If the team grows, this can be changed
-        # and the only other changes needed are in get_input_from_datastore where we match details by first name,
+        # This was originally first names only. In 2025-08 I changed it to include initial of last name.
+        # In the future if there is reason to change it further, look for references to the team object in this file,
         # and in tx_schedule.html where colors are assigned to each person
         self.team: dict[str, Person] = \
-            {n: Person(n) for n in ["Anne", "Ayelet", "Gabriela", "Karen", "Malke", "Moshe", "Rebecca", "Rochel"]}
+            {n: Person(n) for n in ["Moshe S"]}
 
         self.no_edition_times = \
             [self.week["Friday"].evening, self.week["Saturday"].morning, self.week["Saturday"].afternoon]
         self.datastore_client = DatastoreClientProxy.get_instance()
+
+
+    def add_to_team(self, user):
+        user_fname, user_lname = user['name'].split(" ")
+        name_to_render = user_fname + " " + user_lname[0:1]
+        if name_to_render not in self.team:
+            self.team[name_to_render] = Person(name_to_render)
+            self.team[name_to_render].db_details = user
+        return self.team[name_to_render]
 
 
     def cache_user_info(self):
@@ -151,13 +160,11 @@ class Schedule:
                 or "editor_" + self.lang in user["role"]):
                 self.cached_users[user.key.id] = user
                 self.cached_users[user["name"]] = user
-                user_fname = user['name'].split(" ")[0]
-                if user_fname not in self.team:
-                    self.team[user_fname] = Person(user_fname)
-                self.team[user_fname].db_details = user
+                self.add_to_team(user)
+
 
     def parse_file_input(self, fname):
-        # this method was only used during development.
+        # this method was only used during development and should be ignored or removed.
         with open(fname) as in_file:
             volunteer_input = json.load(in_file)
         for volunteer_entry in volunteer_input:
@@ -191,15 +198,11 @@ class Schedule:
             print(f"Processing availability for {info['user_id']} = {user_details['name']}")
 
             print(f"Availability is {info['available']}")
-            info['available'] = info['available'].replace("'", '"')
+            if type(info['available']) is str:
+                info['available'] = info['available'].replace("'", '"')
 
-            user_fname = user_details['name'].split(" ")[0]
-            if user_fname not in self.team:
-                # someone got added to the DB but not recognized here yet
-                self.team[user_fname] = Person(user_fname)
-                self.team[user_fname].db_details = user_details
+            volunteer = self.add_to_team(user_details)
 
-            volunteer = self.team[user_fname]
             # backward compatibility check
             if 'translation' not in info['available']:
                 info['available']['translation'] = dict(info['available'])
@@ -521,10 +524,10 @@ class Schedule:
         # be cleaned up later.
         query = datastore_client.query(kind="translation_schedule")
         query.add_filter(filter=PropertyFilter("week_from", "=", week_from_str_p))
-        draft_backups = query.fetch()
-        for dbkup in draft_backups:
-            dbkup.update({"week_from": "Draft - " + week_from_str_p})
-            datastore_client.put(dbkup)
+        sched_draft_backups = query.fetch()
+        for s_d_bkup in sched_draft_backups:
+            s_d_bkup.update({"week_from": "Draft - " + week_from_str_p})
+            datastore_client.put(s_d_bkup)
 
         # now store the new schedule
         key = datastore_client.key("translation_schedule")

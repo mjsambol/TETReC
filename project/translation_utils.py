@@ -23,6 +23,7 @@
 #################################################################################
 
 import json
+import os
 import re
 from textwrap import dedent
 from google.cloud import translate, datastore  # prerequisite: pip install google-cloud-translate
@@ -276,6 +277,7 @@ def post_translation_swaps(text, target_language_code):
         text = re.sub("spokesman", "spokesperson", text, flags=re.IGNORECASE)
         text = re.sub("militant", "terrorist", text, flags=re.IGNORECASE)
         text = re.sub("settlement", "community", text, flags=re.IGNORECASE)
+        text = re.sub("strip", "Strip", text)
 
     elif target_language_code == 'fr':
         text = re.sub(r'\balarm(s?)\b', lambda m: "alert" + ('s' if m.group(1).startswith("s") else ''), text, flags=re.IGNORECASE)
@@ -346,7 +348,9 @@ openai_fix_translations = {
 }
 
 def openai_translate(text: str, target_language_code: str, source_language: str = "he", custom_dirs: str = "",
-                     transaction_context: dict = {}) -> str:
+                     model: str = "gpt-4o", transaction_context: dict = {}) -> str:
+        # transaction_context param is ignored but should be kept, is used elsewhere for in-out params like edition ID. 
+
         debug(f"translate_text: using OpenAI as engine... ")  # Hebrew is ======\n{text}\n======")
         # debug("Forcing these terms: \n " +
         #       json.dumps(openai_force_translations[target_language_code] | title_translations[target_language_code],
@@ -358,6 +362,8 @@ def openai_translate(text: str, target_language_code: str, source_language: str 
             print("OpenAI init caused error")
             print(err)
 
+        print("Created OpenAI client")
+
         if target_language_code == 'en':
             system_prompt = f"""
             You are a professional translator specializing in Hebrew-to-English news updates. 
@@ -368,7 +374,7 @@ def openai_translate(text: str, target_language_code: str, source_language: str 
             2. **Word replacements are MANDATORY** - replace all occurences of words in the second dictionary with their provided values.
             3. **DO NOT use synonyms** for dictionary terms - use exact matches, though words should be conjugated as needed to fit the sentence.
             4. **Maintain the itemization** (hyphens, bullet points, or other separators).
-            3. **Produce natural-sounding English** while staying accurate and respecting the provided dictionaries.
+            5. **Produce natural-sounding English** while staying accurate and respecting the provided dictionaries.
 
             ### Terminology Dictionary:
             {json.dumps(openai_force_translations[target_language_code].update(title_translations[target_language_code]), ensure_ascii=False, indent=2)}
@@ -389,17 +395,15 @@ def openai_translate(text: str, target_language_code: str, source_language: str 
             ❌ "יהודה ושומרון" → "Judea and Samaria" (Incorrect)  
             ✅ "יהודה ושומרון" → "Yehuda and Shomron" (Correct)  
 
+            Do not abbreviate anything which is not abbreviated in the Hebrew.
+            Wording which indicates when the news item happened, such as 'last night' or 'this morning', should be minimized in the translation.            
+
             Translate the following Hebrew text while strictly following all these rules.
             """            
 
-            messages = [
-                {"role": "system", "content": system_prompt}
-            ]
         elif target_language_code == 'fr':
-            messages = [
-                {"role": "system",
-                 "content": dedent('''
-                Je suis un journaliste israélien sioniste, et de ce fait ne parle pas de "Judée et Samarie" mais de "la région de Yehouda et Shomron", pas de colonies mais de localités, pas de colons mais d'habitants. 
+            system_prompt = dedent('''
+                Nous sommes des journalistes israéliens sionistes, et de ce fait ne parlons pas de "Judée et Samarie" mais de "la région de Yehouda et Shomron", pas de colonies mais de localités, pas de colons mais d'habitants, résidents ou civils.
 
                 Grades de Tsahal:
                 אל"מ = Colonel
@@ -413,12 +417,13 @@ def openai_translate(text: str, target_language_code: str, source_language: str 
                 סגן-משנה = Sous-lieutenant
                 סמ"ר = Caporal-chef
                 סמל = Caporal
-                סמל ראשון = Caporal-chef
+                סמל ראשון / סמ״ר = Caporal-chef
                 סרן = Capitaine
                 רא"ל = Chef d'état-major
                 רב טוראי = Première classe
                 רב סרן = Commandant
                 רב-אלוף = Chef d'état-major
+                נגד = sous-officier
                 רב-נגד = Major
                 רב-סמל = Sergent
                 רב-סמל בכיר = Adjudant-chef
@@ -443,7 +448,8 @@ def openai_translate(text: str, target_language_code: str, source_language: str 
 
                 מג"ב = Magav. La première occurrence ajouter (police des frontières), par exemple “quatre combattants de Magav (police des frontières) ont été blessés.”
                 ג'יהאד אסלאמי (גא"פ) = Jihad islamique
-
+                מד"א=Mada
+                מחבלים = terroristes
                 Géographie:
                 בבנימין = dans la région de Binyamin
                 ביהודה ושומרון = dans la région de Yehouda et Shomron
@@ -460,6 +466,7 @@ def openai_translate(text: str, target_language_code: str, source_language: str 
                 קבר יוסף = tombeau de Yossef
 
                 Autres:
+                הלילה = cette nuit
                 בית משפט מחוזי = Cour d'Appel
                 הותר לפרסום = Il a été autorisé à la publication
                 יהי זכרו ברוך = Que sa mémoire soit bénie
@@ -469,31 +476,70 @@ def openai_translate(text: str, target_language_code: str, source_language: str 
                 צהריים = après-midi
                 חשוון = Heshvan
                 פיקוד העורף = Le Pikoud Haoref (Commandement du Front Intérieur)
-                Lorsqu’une personne apparaît pour la 1e fois dans le texte, la nommer par son prénom et nom. Les apparitions suivantes peuvent se suffire du nom de famille.
+                Lorsqu’une personne apparaît pour la 1e fois dans le texte, la nommer par son prénom et nom. Les apparitions suivantes peuvent se suffire du nom de famille. 
                 חסידי ברסלב = 'hassidim de Breslev (Bratslav)
                 כ-10 = une dizaine
                 כ-20 = une vingtaine
                 אוטובוס = bus
-                ''')
-            }]
+                בג"ץ = la Cour Suprême
+                בנימין נתניהו = Binyamin Netanyahou
+
+                Essaie de mettre l’indication temporelle d’un événement (cette nuit, hier soir, etc) au milieu de la phrase et non au début. Par exemple “הלילה נמשכו התקיפות ברצועה” se traduira “Les frappes se sont poursuivies cette nuit dans la bande de Gaza” (et non “Cette nuit, les frappes se sont poursuivies dans la bande de Gaza”)
+                Lorsque des noms propres sont rapportés, la première occurrence doit contenir prénom et nom de famille. Par exemple Steve Witkoff et pas juste Witkoff. Betzalel Smotrich et pas juste Smotrich.
+                Note que lorsqu'il y a des éléments à compléter, comme des prénoms, il est impératif de prendre l’actualité à jour. Par exemple, le ministre de la défense en Israël est Israël Katz (et non plus Yoav Galant). Le chef d’état major de l'armée est Eyal Zamir (et non plus Herzi Halevi). Et Donald Trump est l’actuel président américain, pas juste l'ancien. 
+
+                Mise en page: essayer au possible de conserver exactement la meme mise en page. Les - • et > en début de ligne sont importants, de même que les astérisques qui entourent parfois des noms propres, comme *Matan Abramovitch*.
+
+                Traduis le texte hébreu selon ces consignes.
+            ''')
 
         if len(custom_dirs) > 0:
-            messages.extend([{"role": "user", "content": custom_dirs}])
+            system_prompt = system_prompt + "\n" + custom_dirs
 
-        if target_language_code == 'en':
-            messages.extend([{"role": "user", "content": text}])
-        elif target_language_code == 'fr':
-            messages.extend([{"role": "user", "content": f"Traduire en français le texte hébreu en tenant compte de toutes ces données\n" + text}])
+        print(f"Calling OpenAI with model={model}")
+        
+        response = openai_client.responses.create(
+            model=model,
+            instructions=system_prompt,
+            input=text,
+        )
 
-        debug(f"openai_translate(): sending the following directions to openAI: {messages}")
-
+        # messages = [
+        #     {"role": "system", "content": system_prompt}, {"role": "user", "content": text}
+        # ]
         # low temperature for more deterministic, rule-following results
-        completion = openai_client.chat.completions.create(model="gpt-4o", temperature=0.2, messages=messages)
-            # {"role": "system", "content": "Do not abbreviate anything which is not abbreviated in the Hebrew."""},
-            # {"role": "system", "content": "Text which indicates when the news item happened, such as 'last night' or 'this morning', should be minimized in the translation."},
-
-        result = completion.choices[0].message.content
+        # completion = openai_client.chat.completions.create(model=model, messages=messages, timeout=30)    #, temperature=0.2, messages=messages)
+        print("OpenAI has returned a result")
+        # result = completion.choices[0].message.content
+        result = response.output_text
         result = post_translation_swaps(result, target_language_code)
+
+        # debug(f"openai_translate(): openAI returned, now running a second pass...")
+        # # now a second pass, to make the text more idiomatic:
+        # system_prompt = dedent(f"""
+        #     The following text is the result of an automated translation from Hebrew. 
+        #     The sentence structure reflects that of the Hebrew, which is not ideal for {target_language_name} readers. 
+        #     Please improve it so that it is more idiomatic in {target_language_name}.
+
+        #     Important constraints:
+
+        #     1. Only modify paragraphs that start with a single hyphen (`-`). Do not modify any other lines.
+        #     2. Do **not** remove or change any lines that begin with a `>` or an emoji.
+
+        #     Apply these changes and return the full text with improved {target_language_name}.
+        # """)
+        # messages = [{"role": "system", "content": system_prompt}]
+        # messages.extend([{"role": "user", "content": result}])
+
+        # debug(f"openai_translate(): sending the following directions to openAI for a second pass: {messages}")
+
+        # # low temperature for more deterministic, rule-following results
+        # completion = openai_client.chat.completions.create(model=model, temperature=0.2, messages=messages)
+        # debug(f"OpenAI returned, now returning results.")
+
+        # result = completion.choices[0].message.content
+        # result = post_translation_swaps(result, target_language_code)
+
         return result
 
 

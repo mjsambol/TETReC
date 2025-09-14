@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>User Management</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 2em;
+    }
+    .table-container {
+      padding-left: 10em;
+      padding-right: 10em;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th {
+      background-color: #4682b4; /* Steel Blue */
+      color: white;
+    }    
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5em;
+      text-align: left;
+    }
+    td.hebrew {
+      direction: rtl;
+      text-align: right;
+      font-family: 'Arial', sans-serif;
+    }
+    .hebrew-header {
+    text-align: right;
+    direction: rtl;
+    }    
+    tbody tr:nth-child(even) {
+      background-color: #f0f8ff; /* Light pale blue */
+    }
+  </style>
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const rows = document.querySelectorAll("tbody tr");
+        rows.forEach(row => {
+        const roleCell = row.children[2]; // third column: Role
+        if (!roleCell.textContent.trim()) {
+            row.style.color = "#AAA"; // light gray
+        }
+        });
+    });
+    </script>
+</head>
+<body>
+<br>
+  <div class="table-container">
+   <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th class="hebrew-header">שם בעברית</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in users %}
+      <tr>
+        <td>{{ user.name }}</td>
+        <td>{{ user.email }}</td>
+        <td>{{ user.role }}</td>
+        <td class="hebrew">{{ user.name_hebrew }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <br>
+  <center><a href="{{ url_for('tamtzit.route_add_user') }}">Add New User</a></center>
+ </div>  
+</body>
+</html>

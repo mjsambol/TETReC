@@ -4,10 +4,10 @@ from concurrent.futures import ThreadPoolExecutor
 from translation_utils import openai_translate, strip_header_and_footer
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from google.oauth2 import service_account
-import os
 # if running on python 3.8 the above line needs to be changed to
 # from backports.zoneinfo import ZoneInfo
+from google.oauth2 import service_account
+import os
 
 app = FastAPI()
 
@@ -32,9 +32,9 @@ executor = ThreadPoolExecutor(3)
 def read_root():
     return {"Hello": "World"}
 
-def call_openai(heb_text, target_lang, async_job):
+def call_openai(heb_text, target_lang, model, custom_dirs, async_job):
     print("Calling OpenAI...")
-    tx_result = openai_translate(heb_text, target_lang)
+    tx_result = openai_translate(heb_text, target_lang, model=model, custom_dirs=custom_dirs)
     print("OpenAI returned, writing to DB")
 
     async_job.update({"translation_timestamp": datetime.now(tz=ZoneInfo('Asia/Jerusalem')),
@@ -60,7 +60,13 @@ def read_item(item_id: int):
         translation_target_lang = my_job["translation_lang"]
         heb_text = my_job["heb_text"]
         heb_text = strip_header_and_footer(heb_text, translation_target_lang)
-        executor.submit(call_openai, heb_text, translation_target_lang, my_job)
+        openai_model = my_job["translation_engine"]
+        if openai_model and openai_model.startswith("openai/"):
+            openai_model = openai_model.split("/",1)[1]
+        else:
+            openai_model = "gpt-4o"
+        custom_dirs = my_job["translation_custom_dirs"] or ""
+        executor.submit(call_openai, heb_text, translation_target_lang, openai_model, custom_dirs, my_job)
 
         return {"item_id": item_id, "heb_draft_id": my_job["heb_draft_id"]}
     else:
